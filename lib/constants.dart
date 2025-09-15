@@ -9,6 +9,6 @@ const String GOOGLE_LOGIN_URL ="https://moderntrademarket.com/api/auth/google/";
 // const String AUTH_BASE_URL = "http://localhost:8000/auth/api";
 // const String GOOGLE_LOGIN_URL = "http://localhost:8000/api/auth/google/";
 
-const String CLIENT_ID ='523073964558-gledgcadbktligsepqbr8gbgkurqd1hh.apps.googleusercontent.com';
-const String SERVER_ID ='523073964558-vg7d64ca74bmpfhioiju95ifu85k30au.apps.googleusercontent.com';
-const String SERVER_SECRET ='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';
+const String CLIENT_ID ="your-client-id.apps.googleusercontent.com";
+const String SERVER_ID ="your-server-id.apps.googleusercontent.com";
+const String SERVER_SECRET ="your-secret.apps.googleusercontent.com";

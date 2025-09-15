@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 const String baseUrl = BASE_URL;
 
@@ -232,7 +233,9 @@ class _EditProductPageState extends State<EditProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/my-listings',
+      child: Scaffold(
       appBar: AppBar(
         title: const Text("Edit Product"),
         backgroundColor: maroon,
@@ -285,6 +288,7 @@ class _EditProductPageState extends State<EditProductPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

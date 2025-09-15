@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class StoreSettingsPage extends StatefulWidget {
   const StoreSettingsPage({super.key});
@@ -166,7 +167,9 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(),
@@ -219,6 +222,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                                 style: TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
                             Text("*2MB max",
+                            Text("*3MB max",
                                 style: TextStyle(color: Colors.red, fontSize: 12)),
                             const SizedBox(height: 8),
                             _logoUrl != null
@@ -246,6 +250,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 ),
               ),
             ),
+      ),
     );
   }
 

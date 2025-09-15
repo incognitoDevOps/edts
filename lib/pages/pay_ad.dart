@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class PayAd extends StatefulWidget {
   final String adId; // Receive the ad id.
@@ -137,7 +138,9 @@ class _PayAdState extends State<PayAd> {
   Widget build(BuildContext context) {
     final Color maroon = const Color(0xFF6C1910);
 
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/my-ads',
+      child: Scaffold(
       appBar: AppBar(title: const Text("Complete Payment")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -221,6 +224,7 @@ class _PayAdState extends State<PayAd> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

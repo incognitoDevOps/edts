@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moderntr/constants.dart'; // Import for formatting numbers
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 final String baseUrl = BASE_URL;
 final storage = FlutterSecureStorage();
@@ -113,41 +114,44 @@ class _MyReviewsPageState extends State<MyReviewsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Remove the AppBar by setting it to null.
-      appBar: null,
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: FutureBuilder<List<Map<String, dynamic>>>(
-          future: _reviewsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text("No reviews found."));
-            } else {
-              final reviews = snapshot.data!;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Custom header at the top.
-                  _buildCustomHeader(),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: reviews.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return _buildReviewCard(reviews[index]);
-                      },
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
+        // Remove the AppBar by setting it to null.
+        appBar: null,
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _reviewsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text("Error: ${snapshot.error}"));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text("No reviews found."));
+              } else {
+                final reviews = snapshot.data!;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Custom header at the top.
+                    _buildCustomHeader(),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: reviews.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return _buildReviewCard(reviews[index]);
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              );
-            }
-          },
+                  ],
+                );
+              }
+            },
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
 import 'package:intl/intl.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class PromoteProductWidget extends StatefulWidget {
   final String productId;
@@ -95,7 +96,9 @@ class _PromoteProductWidgetState extends State<PromoteProductWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/my-listings',
+      child: Scaffold(
       // appBar: AppBar(title: const Text("Promote Product")),
       body: SingleChildScrollView(
         child: Container(
@@ -206,6 +209,7 @@ class _PromoteProductWidgetState extends State<PromoteProductWidget> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class AdDetailsPage extends StatefulWidget {
   final String adId; // ad ID passed from the ads page
@@ -305,7 +306,9 @@ class _AdDetailsPageState extends State<AdDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/my-ads',
+      child: Scaffold(
       // Optionally add an AppBar.
       body: FutureBuilder<Map<String, dynamic>>(
         future: fetchAdDetails(),
@@ -334,6 +337,7 @@ class _AdDetailsPageState extends State<AdDetailsPage> {
             );
           }
         },
+      ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moderntr/constants.dart';
 import 'package:intl/intl.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 final String baseUrl = BASE_URL;
 final storage = FlutterSecureStorage();
@@ -100,6 +101,39 @@ class _MyAdsPageState extends State<MyAdsPage> {
     final paidStatus = ad["paid_status"]?.toString().toLowerCase() ?? "";
     final adStatus = ad["status"]?.toString().toLowerCase() ?? "";
 
+    // Add Edit and Delete buttons for all ads
+    buttons.add(
+      ElevatedButton.icon(
+        onPressed: () => _editAd(ad),
+        icon: const Icon(Icons.edit, size: 18, color: Colors.white),
+        label: const Text("Edit"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+
+    buttons.add(
+      ElevatedButton.icon(
+        onPressed: () => _deleteAd(ad),
+        icon: const Icon(Icons.delete, size: 18, color: Colors.white),
+        label: const Text("Delete"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+
     if (paidStatus == "not paid") {
       buttons.add(
         ElevatedButton.icon(
@@ -112,9 +146,9 @@ class _MyAdsPageState extends State<MyAdsPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),
@@ -145,17 +179,79 @@ class _MyAdsPageState extends State<MyAdsPage> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
-      child: Row(
-        children: buttons.map((button) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: button,
-            ),
-          );
-        }).toList(),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: buttons,
       ),
     );
+  }
+
+  void _editAd(Map<String, dynamic> ad) {
+    // Navigate to edit ad page (you'll need to create this)
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Ad"),
+        content: const Text("Edit ad functionality will be implemented here."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAd(Map<String, dynamic> ad) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Ad"),
+        content: const Text("Are you sure you want to delete this ad? This action cannot be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final token = await storage.read(key: 'token');
+        final response = await http.delete(
+          Uri.parse("$BASE_URL/ads/${ad['ad_id']}/delete/"),
+          headers: {
+            "Authorization": "Bearer $token",
+            "Content-Type": "application/json",
+          },
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Ad deleted successfully!")),
+          );
+          setState(() {}); // Refresh the ads list
+        } else {
+          final error = jsonDecode(response.body)["error"] ?? "Failed to delete ad";
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error deleting ad: $e")),
+        );
+      }
+    }
   }
 
   Widget _buildAdCard(BuildContext context, Map<String, dynamic> ad) {
@@ -238,7 +334,9 @@ class _MyAdsPageState extends State<MyAdsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: fetchAds(),
         builder: (context, snapshot) {
@@ -280,6 +378,7 @@ class _MyAdsPageState extends State<MyAdsPage> {
             );
           }
         },
+      ),
       ),
     );
   }

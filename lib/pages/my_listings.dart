@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 final String baseUrl = BASE_URL;
 final storage = FlutterSecureStorage();
@@ -249,7 +250,9 @@ class _MyListingsPageState extends State<MyListingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       appBar: AppBar(
         title: const Text("My Listings"),
         actions: [
@@ -259,6 +262,7 @@ class _MyListingsPageState extends State<MyListingsPage> {
               onPressed: _loadListings,
             ),
         ],
+      ),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),

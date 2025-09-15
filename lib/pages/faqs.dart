@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart'; // Contains base URL
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 final String baseUrl = BASE_URL;
 
@@ -89,7 +90,9 @@ class _FAQsPageState extends State<FAQsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
@@ -123,6 +126,7 @@ class _FAQsPageState extends State<FAQsPage> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

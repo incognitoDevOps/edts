@@ -405,7 +405,7 @@ class _EditProductPageState extends State<EditProductPage> {
           ),
         ),
         const SizedBox(height: 4),
-        const Text("*2MB max per image, 10 images max",
+        const Text("*3MB max per image, 10 images max",
             style: TextStyle(color: Colors.red, fontSize: 12)),
       ],
     );

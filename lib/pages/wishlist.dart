@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:moderntr/services/wishlist_service.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({super.key});
@@ -67,7 +68,9 @@ class _WishlistPageState extends State<WishlistPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/',
+      child: Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -120,6 +123,7 @@ class _WishlistPageState extends State<WishlistPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

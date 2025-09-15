@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 class BackButtonHandler extends StatelessWidget {
@@ -15,7 +16,12 @@ class BackButtonHandler extends StatelessWidget {
 
   Future<bool> _onWillPop(BuildContext context) async {
     if (showExitConfirmation) {
-      return await _showExitConfirmation(context) ?? false;
+      final shouldExit = await _showExitConfirmation(context) ?? false;
+      if (shouldExit) {
+        SystemNavigator.pop(); // Exit the app
+        return true;
+      }
+      return false;
     }
 
     if (context.canPop()) {
@@ -31,6 +37,15 @@ class BackButtonHandler extends StatelessWidget {
   }
 
   Future<bool?> _showExitConfirmation(BuildContext context) {
+    // Show toast message first
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Are you sure you want to exit?"),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

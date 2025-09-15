@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
 import 'package:intl/intl.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class CategoryListings extends StatefulWidget {
   const CategoryListings({super.key});
@@ -32,7 +33,12 @@ class _CategoryListingsState extends State<CategoryListings> {
   String? selectedSubcounty; // Stores the subcounty id
 
   bool _initialized = false;
-  bool _isLoading = false; // Spinner state
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMoreProducts = true;
+  int _currentPage = 1;
+  final int _productsPerPage = 20;
+  final ScrollController _scrollController = ScrollController();
 
   // Toggle between grid and list view.
   bool _isGridView = true;
@@ -42,7 +48,34 @@ class _CategoryListingsState extends State<CategoryListings> {
     super.initState();
     fetchCategories();
     fetchCounties();
+    _scrollController.addListener(_scrollListener);
     // fetchProducts() will be called later after processing query parameters.
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.offset >= _scrollController.position.maxScrollExtent &&
+        !_scrollController.position.outOfRange &&
+        !_isLoadingMore &&
+        _hasMoreProducts) {
+      _loadMoreProducts();
+    }
+  }
+
+  Future<void> _loadMoreProducts() async {
+    if (_isLoadingMore || !_hasMoreProducts) return;
+    
+    setState(() {
+      _isLoadingMore = true;
+      _currentPage++;
+    });
+    
+    await fetchProducts(loadMore: true);
   }
 
   @override
@@ -125,21 +158,24 @@ class _CategoryListingsState extends State<CategoryListings> {
   }
 
   /// Fetch products using the selected filters (using IDs).
-  Future<void> fetchProducts() async {
+  Future<void> fetchProducts({bool loadMore = false}) async {
+    if (!loadMore) {
+      setState(() {
+        _currentPage = 1;
+        _hasMoreProducts = true;
+        _isLoading = true;
+      });
+    }
+
     final queryParameters = {
-      'page': '1',
-      'per_page': '10',
+      'page': _currentPage.toString(),
+      'per_page': _productsPerPage.toString(),
       if (selectedCounty != null) 'county': selectedCounty!,
       if (selectedSubcounty != null) 'subcounty': selectedSubcounty!,
       if (selectedCategory != null) 'category': selectedCategory!,
       if (selectedSubcategory != null) 'subcategory': selectedSubcategory!,
       if (selectedVariant != null) 'variant': selectedVariant!,
     };
-
-    // Show spinner while loading.
-    setState(() {
-      _isLoading = true;
-    });
 
     final uri = Uri.parse("$BASE_URL/products/all/")
         .replace(queryParameters: queryParameters);
@@ -148,20 +184,30 @@ class _CategoryListingsState extends State<CategoryListings> {
       final response = await http.get(uri);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final newProducts = List<Map<String, dynamic>>.from(data['products'] ?? []);
+        
         setState(() {
-          products = data['products'];
+          if (loadMore) {
+            products.addAll(newProducts);
+          } else {
+            products = newProducts;
+          }
+          _hasMoreProducts = newProducts.length >= _productsPerPage;
           _isLoading = false;
+          _isLoadingMore = false;
         });
       } else {
         print('Error: ${response.statusCode}');
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
       print('Exception: $e');
       setState(() {
         _isLoading = false;
+        _isLoadingMore = false;
       });
     }
   }
@@ -417,23 +463,24 @@ class _CategoryListingsState extends State<CategoryListings> {
   }
 
   Widget _buildGridView() {
-    final tileWidth = (MediaQuery.of(context).size.width - 30) / 2;
-    return SingleChildScrollView(
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: products.map<Widget>((item) {
-          return SizedBox(
-            width: tileWidth,
-            child: _buildProductCard(item),
-          );
-        }).toList(),
+    return GridView.builder(
+      controller: _scrollController,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.7,
       ),
+      itemCount: products.length,
+      itemBuilder: (context, index) {
+        return _buildProductCard(products[index]);
+      },
     );
   }
 
   Widget _buildListView() {
     return ListView.builder(
+      controller: _scrollController,
       itemCount: products.length,
       itemBuilder: (context, index) {
         final item = products[index];
@@ -622,84 +669,103 @@ class _CategoryListingsState extends State<CategoryListings> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // Filters row.
-          SizedBox(
-            height: 50,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+    return BackButtonHandler(
+      parentRoute: '/',
+      child: Scaffold(
+        body: Column(
+          children: [
+            // Filters row.
+            SizedBox(
+              height: 50,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // For category filter, include an "All Category" option via buildStyledDropdown.
+                    buildStyledDropdown("Category", categories, selectedCategory,
+                        onCategorySelected),
+                    buildStyledDropdown("Sub Category", subcategories,
+                        selectedSubcategory, onSubcategorySelected),
+                    buildStyledDropdown(
+                        "Variant", variants, selectedVariant, onVariantSelected),
+                    _buildCountyDropdown(),
+                    _buildSubCountyDropdown(),
+                  ],
+                ),
+              ),
+            ),
+            // Toggle view row.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // For category filter, include an "All Category" option via buildStyledDropdown.
-                  buildStyledDropdown("Category", categories, selectedCategory,
-                      onCategorySelected),
-                  buildStyledDropdown("Sub Category", subcategories,
-                      selectedSubcategory, onSubcategorySelected),
-                  buildStyledDropdown(
-                      "Variant", variants, selectedVariant, onVariantSelected),
-                  _buildCountyDropdown(),
-                  _buildSubCountyDropdown(),
+                  IconButton(
+                    icon: Icon(Icons.grid_view,
+                        color: _isGridView ? Colors.blue : Colors.grey),
+                    onPressed: () {
+                      setState(() {
+                        _isGridView = true;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.list,
+                        color: !_isGridView ? Colors.blue : Colors.grey),
+                    onPressed: () {
+                      setState(() {
+                        _isGridView = false;
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
-          ),
-          // Toggle view row.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.grid_view,
-                      color: _isGridView ? Colors.blue : Colors.grey),
-                  onPressed: () {
-                    setState(() {
-                      _isGridView = true;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.list,
-                      color: !_isGridView ? Colors.blue : Colors.grey),
-                  onPressed: () {
-                    setState(() {
-                      _isGridView = false;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          // Product listings.
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : (products.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.search_off,
-                                  size: 64, color: Colors.grey),
-                              SizedBox(height: 16),
-                              Text(
-                                "No products available",
-                                style:
-                                    TextStyle(fontSize: 16, color: Colors.grey),
+            // Product listings.
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (products.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.search_off,
+                                    size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No products available",
+                                  style:
+                                      TextStyle(fontSize: 16, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: _isGridView
+                                    ? _buildGridView()
+                                    : _buildListView(),
                               ),
+                              if (_isLoadingMore)
+                                const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              if (!_hasMoreProducts && products.isNotEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Text("No more products available"),
+                                ),
                             ],
-                          ),
-                        )
-                      : _isGridView
-                          ? _buildGridView()
-                          : _buildListView()),
+                          )),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

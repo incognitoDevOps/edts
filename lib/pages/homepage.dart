@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:moderntr/services/wishlist_service.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 1;
   bool _hasMoreProducts = true;
   bool _isLoadingMore = false;
+  int _totalProductsLoaded = 0;
+  static const int _initialProductsToShow = 20;
 
   @override
   void initState() {
@@ -165,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
           isRefreshing = true;
           _currentPage = 1;
           _hasMoreProducts = true;
+          _totalProductsLoaded = 0;
           boostedProducts.clear();
           mostViewedProducts.clear();
           otherProducts.clear();
@@ -173,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final response = await http.get(
         Uri.parse(
-            '$BASE_URL/products/structured/?page=$_currentPage&per_page=$_productsPerPage'),
+            '$BASE_URL/products/structured/?page=$_currentPage&per_page=${refresh ? _initialProductsToShow : _productsPerPage}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -219,7 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          _hasMoreProducts = newProducts.length >= _productsPerPage;
+          _totalProductsLoaded += newProducts.length;
+          _hasMoreProducts = newProducts.length >= (refresh ? _initialProductsToShow : _productsPerPage);
           isLoadingProducts = false;
           isRefreshing = false;
           _isLoadingMore = false;
@@ -524,7 +529,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final pages = _chunkedCategories(categories, 6);
 
-    return Scaffold(
+    return BackButtonHandler(
+      showExitConfirmation: true,
+      child: Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
@@ -795,6 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class ChatDetailsPage extends StatefulWidget {
   const ChatDetailsPage({super.key});
@@ -272,7 +273,9 @@ class _ChatDetailsPageState extends State<ChatDetailsPage> {
         messages.sort((a, b) => DateTime.parse(a['timestamp'])
             .compareTo(DateTime.parse(b['timestamp'])));
 
-        return Scaffold(
+        return BackButtonHandler(
+          parentRoute: '/chats',
+          child: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading:
                 false, // 👈 disables the default back arrow
@@ -323,6 +326,7 @@ class _ChatDetailsPageState extends State<ChatDetailsPage> {
                         _buildMessageInput(),
                       ],
                     ),
+          ),
         );
       },
     );

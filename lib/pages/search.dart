@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
 import 'package:intl/intl.dart'; // For price formatting
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 const String baseUrl = BASE_URL;
 
@@ -475,7 +476,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/',
+      child: Scaffold(
       body: Column(
         children: [
           // Filters row.
@@ -581,6 +584,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

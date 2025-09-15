@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:moderntr/services/products_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class CreateStorePage extends StatefulWidget {
   const CreateStorePage({super.key});
@@ -80,7 +81,9 @@ class _CreateStorePageState extends State<CreateStorePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -171,7 +174,7 @@ class _CreateStorePageState extends State<CreateStorePage> {
                   ),
                 ),
                 SizedBox(height: 4),
-                Text("*2MB max",
+                const Text("*3MB max",
                     style: TextStyle(color: Colors.red, fontSize: 12)),
                 SizedBox(height: 24),
                 // Buttons Row with 50/50 width
@@ -200,6 +203,7 @@ class _CreateStorePageState extends State<CreateStorePage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

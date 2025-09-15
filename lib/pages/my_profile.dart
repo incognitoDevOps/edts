@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moderntr/constants.dart';
 import 'package:moderntr/services/auth_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class MyProfilePage extends StatefulWidget {
   const MyProfilePage({super.key});
@@ -135,12 +136,17 @@ class _MyProfilePageState extends State<MyProfilePage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return const BackButtonHandler(
+        parentRoute: '/account',
+        child: Scaffold(
         body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
         actions: [
@@ -280,6 +286,7 @@ class _MyProfilePageState extends State<MyProfilePage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class MyChatsPage extends StatefulWidget {
   const MyChatsPage({super.key});
@@ -222,7 +223,9 @@ class _MyChatsPageState extends State<MyChatsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/',
+      child: Scaffold(
       body: FutureBuilder<List<dynamic>>(
         future: _chatsFuture,
         builder: (context, snapshot) {
@@ -244,6 +247,7 @@ class _MyChatsPageState extends State<MyChatsPage> {
             );
           }
         },
+      ),
       ),
     );
   }

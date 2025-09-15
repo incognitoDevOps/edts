@@ -145,6 +145,7 @@ class ProductService:
                     "description": store.description,
                     "product": store.product,
                     "logo": store.logo.url if store.logo else None,
+                    "created_at": store.created_at.isoformat() if store.created_at else None,
                     "social_links": {
                         "facebook": store.facebook,
                         "twitter": store.twitter,

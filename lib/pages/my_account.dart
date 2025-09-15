@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class MyAccountPage extends StatefulWidget {
   const MyAccountPage({super.key});
@@ -87,12 +88,17 @@ class _MyAccountPageState extends State<MyAccountPage> {
   Widget build(BuildContext context) {
     // Display a loader while fetching the user details.
     if (_isLoadingUser) {
-      return const Scaffold(
+      return const BackButtonHandler(
+        parentRoute: '/',
+        child: Scaffold(
         body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/',
+      child: Scaffold(
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
         child: Column(
@@ -114,6 +120,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
             _buildAccountOption(context, "FAQs", "/faqs", Icons.question_answer),
           ],
         ),
+      ),
       ),
     );
   }

@@ -393,6 +393,26 @@ class AdDetailView(APIView):
         """Retrieves details of a specific ad along with payments."""
         response, code = AdService.get_ad_details(request,user=request.user, ad_id=ad_id)
         return Response(response, status=code)
+
+    def put(self, request, ad_id):
+        """Update an existing ad."""
+        data = request.data
+        response, code = AdService.update_ad(
+            user=request.user,
+            ad_id=ad_id,
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
+            cost_per_day=data.get("cost_per_day"),
+        )
+        return Response(response, status=code)
+
+    def delete(self, request, ad_id):
+        """Delete an ad."""
+        response, code = AdService.delete_ad(
+            user=request.user,
+            ad_id=ad_id,
+        )
+        return Response(response, status=code)
     
 class CreateReviewView(APIView):
     permission_classes = [IsAuthenticated]

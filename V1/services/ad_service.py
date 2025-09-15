@@ -139,3 +139,58 @@ class AdService:
             }, 200
         except adManager.DoesNotExist:
             return {"error": "Ad not found or not owned by you"}, 404
+
+    @staticmethod
+    def delete_ad(user, ad_id):
+        """Delete an ad if it belongs to the user."""
+        try:
+            ad = adManager.objects.get(id=ad_id, store__owner=user)
+            ad.delete()
+            return {"message": "Ad deleted successfully"}, 200
+        except adManager.DoesNotExist:
+            return {"error": "Ad not found or not owned by you"}, 404
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+    @staticmethod
+    def update_ad(user, ad_id, start_date=None, end_date=None, cost_per_day=None):
+        """Update an existing ad."""
+        try:
+            ad = adManager.objects.get(id=ad_id, store__owner=user)
+            
+            if start_date:
+                start_date_obj = datetime.combine(
+                    datetime.strptime(start_date, "%Y-%m-%d").date(), time.min
+                )
+                start_date_obj = timezone.make_aware(start_date_obj)
+                
+                # Get today's date for comparison
+                today_date = timezone.now().date()
+                start_date_date = start_date_obj.date()
+
+                if start_date_date < today_date:
+                    return {"error": "Start date cannot be in the past"}, 400
+                    
+                ad.start_date = start_date_obj
+
+            if end_date:
+                end_date_obj = datetime.combine(
+                    datetime.strptime(end_date, "%Y-%m-%d").date(), time.min
+                )
+                end_date_obj = timezone.make_aware(end_date_obj)
+                
+                if end_date_obj <= ad.start_date:
+                    return {"error": "End date must be after start date"}, 400
+                    
+                ad.end_date = end_date_obj
+
+            if cost_per_day:
+                ad.cost_per_day = cost_per_day
+
+            ad.save()
+            return {"message": "Ad updated successfully"}, 200
+            
+        except adManager.DoesNotExist:
+            return {"error": "Ad not found or not owned by you"}, 404
+        except Exception as e:
+            return {"error": str(e)}, 500

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 const String baseUrl = BASE_URL;
 
@@ -211,7 +212,9 @@ class _CreateProductPageState extends State<CreateProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BackButtonHandler(
+      parentRoute: '/account',
+      child: Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -224,7 +227,7 @@ class _CreateProductPageState extends State<CreateProductPage> {
                     style:
                         TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text("List your products and start selling.",
+                const Text("*3MB max per image, 10 images max",
                     style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 16),
                 // Product name field
@@ -271,6 +274,7 @@ class _CreateProductPageState extends State<CreateProductPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

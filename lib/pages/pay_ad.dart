@@ -83,8 +83,9 @@ class _PayAdState extends State<PayAd> {
       await Future.delayed(const Duration(seconds: interval));
       elapsed += interval;
       try {
+        // Check the ad details to see if payment status changed
         final response = await http.get(
-          Uri.parse("$BASE_URL/ads/${widget.adId}/status"),
+          Uri.parse("$BASE_URL/ads/${widget.adId}/"),
           headers: {
             "Authorization": "Bearer $token",
             "Content-Type": "application/json",
@@ -105,13 +106,18 @@ class _PayAdState extends State<PayAd> {
           final data = jsonDecode(response.body);
           if (data["paid_status"] == "paid") {
             setState(() => _isPaying = false);
-            // Redirect to the payment success page.
-            context.go('/payment-success');
+            // Redirect to ads page after successful payment
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Payment successful!")),
+            );
+            context.go('/my-ads');
             return;
           } else if (data["paid_status"] == "failed") {
             setState(() => _isPaying = false);
-            // Redirect to the payment failed page.
-            context.go('/payment-failed');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Payment failed. Please try again.")),
+            );
+            context.go('/my-ads');
             return;
           }
         }
@@ -121,7 +127,10 @@ class _PayAdState extends State<PayAd> {
     }
     // If timeout reached, assume payment failed.
     setState(() => _isPaying = false);
-    context.go('/payment-failed');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Payment timeout. Please check your ads page.")),
+    );
+    context.go('/my-ads');
   }
 
   @override
@@ -160,7 +169,8 @@ class _PayAdState extends State<PayAd> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      // Optionally handle "Pay later" logic.
+                      // Redirect to ads page instead of create ad page
+                      context.go('/my-ads');
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),

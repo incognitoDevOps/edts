@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moderntr/services/products_service.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 class MainLayout extends StatefulWidget {
   final Widget child;
@@ -74,28 +75,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        bool? exit = await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Exit App"),
-            content: const Text("Are you sure you want to exit the app?"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text("Cancel"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text("Exit"),
-              ),
-            ],
-          ),
-        );
-        return exit ?? false;
-      },
-      child: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           backgroundColor: const Color(0xFF6C1910),
           elevation: 0,
@@ -149,8 +129,7 @@ class _MainLayoutState extends State<MainLayout> {
             ],
           ),
         ),
-        body: widget.child,
-        bottomNavigationBar: BottomNavigationBar(
+      );
           type: BottomNavigationBarType.fixed,
           backgroundColor: const Color(0xFF6C1910),
           selectedItemColor: Colors.white,

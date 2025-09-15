@@ -15,11 +15,24 @@ class StoreService:
     @staticmethod
     def get_store_products(store, domain, page=1, per_page=10):
         """Fetch all products belonging to a store in a paginated manner."""
-        products = Product.objects.filter(store=store).select_related("category", "sub_category", "variant","store")
+        products = Product.objects.filter(store=store).select_related(
+            "category", "sub_category", "variant", "store", "county", "subcounty"
+        ).prefetch_related("images")
 
         paginator = Paginator(products, per_page)
         product_page = paginator.get_page(page)
 
+        # Get all images for products in this page
+        product_ids = [product.id for product in product_page]
+        images_by_product = {}
+        
+        if product_ids:
+            from inventory.models import ProductImage
+            product_images = ProductImage.objects.filter(product_id__in=product_ids)
+            for img in product_images:
+                if img.product_id not in images_by_product:
+                    images_by_product[img.product_id] = []
+                images_by_product[img.product_id].append(f"{img.image.url}")
 
 
         return {
@@ -30,11 +43,18 @@ class StoreService:
                 {
                     "id": product.id,
                     "name": product.name,
+                    "description": product.description,
                     "price": product.price,
-                    "image": f"{product.image.url}" if product.image else None,
+                    "image": images_by_product.get(product.id, [None])[0],
+                    "images": images_by_product.get(product.id, []),
                     "category": product.category.name,
                     "sub_category": product.sub_category.name if product.sub_category else None,
                     "variant": product.variant.name if product.variant else None,
+                    "county": product.county.name if product.county else None,
+                    "subcounty": product.subcounty.name if product.subcounty else None,
+                    "town": product.town,
+                    "created_at": product.created_at.isoformat() if product.created_at else None,
+                    "updated_at": product.updated_at.isoformat() if product.updated_at else None,
                 }
                 for product in product_page
             ]

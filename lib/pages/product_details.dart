@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart'; // For launching WhatsApp
 import 'package:go_router/go_router.dart'; // For navigation
 // Import flutter_html for rendering rich HTML with emojis.
 import 'package:flutter_html/flutter_html.dart';
+import 'package:moderntr/widgets/back_button_handler.dart';
 
 const String baseUrl = BASE_URL;
 
@@ -828,21 +829,26 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return const BackButtonHandler(
+        child: Scaffold(
         body: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
     if (_errorMessage != null) {
-      return Scaffold(
+      return BackButtonHandler(
+        child: Scaffold(
         body: Center(
           child: Text(
             _errorMessage!,
             style: const TextStyle(color: Colors.red),
           ),
         ),
+        ),
       );
     }
-    return Scaffold(
+    return BackButtonHandler(
+      child: Scaffold(
       backgroundColor: Colors.white,
       // appBar: AppBar(
       //   title: Text(
@@ -882,6 +888,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

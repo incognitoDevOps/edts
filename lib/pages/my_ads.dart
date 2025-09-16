@@ -188,22 +188,93 @@ class _MyAdsPageState extends State<MyAdsPage> {
   }
 
   void _editAd(Map<String, dynamic> ad) {
-    // Navigate to edit ad page (you'll need to create this)
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Edit Ad"),
-        content: const Text("Edit ad functionality will be implemented here."),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Start Date (YYYY-MM-DD)',
+                  border: OutlineInputBorder(),
+                ),
+                controller: TextEditingController(text: ad['start_date']),
+                onChanged: (value) => ad['start_date'] = value,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'End Date (YYYY-MM-DD)',
+                  border: OutlineInputBorder(),
+                ),
+                controller: TextEditingController(text: ad['end_date']),
+                onChanged: (value) => ad['end_date'] = value,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Cost Per Day',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) => ad['cost_per_day'] = value,
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Close"),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _updateAd(ad);
+            },
+            child: const Text("Update"),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _updateAd(Map<String, dynamic> ad) async {
+    try {
+      final token = await storage.read(key: 'token');
+      final response = await http.put(
+        Uri.parse("$BASE_URL/ads/${ad['ad_id']}/update/"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "start_date": ad['start_date'],
+          "end_date": ad['end_date'],
+          "cost_per_day": ad['cost_per_day'],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ad updated successfully!")),
+        );
+        setState(() {}); // Refresh the ads list
+      } else {
+        final error = jsonDecode(response.body)["error"] ?? "Failed to update ad";
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating ad: $e")),
+      );
+    }
+  }
   Future<void> _deleteAd(Map<String, dynamic> ad) async {
     final confirmed = await showDialog<bool>(
       context: context,

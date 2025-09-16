@@ -81,16 +81,6 @@ class _MainLayoutState extends State<MainLayout> {
           elevation: 0,
           title: Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/'); // Navigate home if no back stack
-                  }
-                },
-              ),
               Expanded(
                 child: Container(
                   height: 40,
@@ -129,6 +119,8 @@ class _MainLayoutState extends State<MainLayout> {
             ],
           ),
         ),
+        body: widget.child,
+        bottomNavigationBar: BottomNavigationBar(
       );
           type: BottomNavigationBarType.fixed,
           backgroundColor: const Color(0xFF6C1910),

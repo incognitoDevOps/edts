@@ -16,6 +16,16 @@ class BackButtonHandler extends StatelessWidget {
 
   Future<bool> _onWillPop(BuildContext context) async {
     if (showExitConfirmation) {
+      // Show toast first
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Are you sure you want to exit?"),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      
+      // Then show dialog
       final shouldExit = await _showExitConfirmation(context) ?? false;
       if (shouldExit) {
         SystemNavigator.pop(); // Exit the app
@@ -37,15 +47,6 @@ class BackButtonHandler extends StatelessWidget {
   }
 
   Future<bool?> _showExitConfirmation(BuildContext context) {
-    // Show toast message first
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Are you sure you want to exit?"),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

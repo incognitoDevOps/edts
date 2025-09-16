@@ -221,7 +221,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                             Text("Select your logo (optional)",
                                 style: TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
-                            Text("*2MB max",
                             Text("*3MB max",
                                 style: TextStyle(color: Colors.red, fontSize: 12)),
                             const SizedBox(height: 8),

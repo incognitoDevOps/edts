@@ -186,8 +186,13 @@ class EditProductAPIView(APIView):
         images = request.FILES.getlist('images')
 
         try:
-            # Assume that store_id comes from the authenticated user or request data.
-            store_id = data.get('store')  # Alternatively, derive from request.user if applicable.
+            # Get store_id from the authenticated user's store
+            try:
+                store = Store.objects.get(owner=request.user)
+                store_id = store.id
+            except Store.DoesNotExist:
+                return Response({"error": "You must own a store to edit products."}, status=status.HTTP_403_FORBIDDEN)
+                
             product = ProductService.edit_product(product_id, data, images, store_id)
             # Optionally, serialize the product for the response.
             return Response({"message": "Product updated successfully", "product_id": product.id}, status=status.HTTP_200_OK)
@@ -201,7 +206,13 @@ class EditProductAPIView(APIView):
         data = request.data.copy()
         images = request.FILES.getlist('images') if 'images' in request.FILES else []
         try:
-            store_id = data.get('store') or None
+            # Get store_id from the authenticated user's store
+            try:
+                store = Store.objects.get(owner=request.user)
+                store_id = store.id
+            except Store.DoesNotExist:
+                return Response({"error": "You must own a store to edit products."}, status=status.HTTP_403_FORBIDDEN)
+                
             product = ProductService.edit_product(product_id, data, images, store_id)
             return Response({"message": "Product updated successfully", "product_id": product.id}, status=status.HTTP_200_OK)
         except Exception as e:

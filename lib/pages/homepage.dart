@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ProductService _productService = ProductService();
   final PageController _pageController = PageController();
   final ScrollController _scrollController = ScrollController();
-  final int _productsPerPage = 10;
+  final int _productsPerPage = 20;
 
   List<Map<String, dynamic>> categories = [];
   List<Map<String, dynamic>> boostedProducts = [];
@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final response = await http.get(
         Uri.parse(
-            '$BASE_URL/products/structured/?page=$_currentPage&per_page=${refresh ? _initialProductsToShow : _productsPerPage}'),
+            '$BASE_URL/products/structured/?page=$_currentPage&per_page=$_productsPerPage'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -211,20 +211,24 @@ class _HomeScreenState extends State<HomeScreen> {
             mostViewedProducts = newMostViewed;
             otherProducts = newOthers;
           } else {
+            // Only add new products that aren't already in the lists
+            final existingBoostedIds = boostedProducts.map((p) => p['id']).toSet();
+            final existingMostViewedIds = mostViewedProducts.map((p) => p['id']).toSet();
+            final existingOtherIds = otherProducts.map((p) => p['id']).toSet();
+            
             boostedProducts.addAll(
-              _removeDuplicateProducts([...boostedProducts, ...newBoosted]),
+              newBoosted.where((p) => !existingBoostedIds.contains(p['id'])),
             );
             mostViewedProducts.addAll(
-              _removeDuplicateProducts(
-                  [...mostViewedProducts, ...newMostViewed]),
+              newMostViewed.where((p) => !existingMostViewedIds.contains(p['id'])),
             );
             otherProducts.addAll(
-              _removeDuplicateProducts([...otherProducts, ...newOthers]),
+              newOthers.where((p) => !existingOtherIds.contains(p['id'])),
             );
           }
 
           _totalProductsLoaded += newProducts.length;
-          _hasMoreProducts = newProducts.length >= (refresh ? _initialProductsToShow : _productsPerPage);
+          _hasMoreProducts = newProducts.length >= _productsPerPage;
           isLoadingProducts = false;
           isRefreshing = false;
           _isLoadingMore = false;

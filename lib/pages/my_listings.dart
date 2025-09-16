@@ -224,7 +224,7 @@ class _MyListingsPageState extends State<MyListingsPage> {
       } else if (response.statusCode == 401) {
         _handleUnauthorized("Token expired. Please log in.");
       } else {
-        final error = jsonDecode(response.body)["detail"] ?? "Failed to delete product";
+        final error = jsonDecode(response.body)["error"] ?? "Failed to delete product";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error)),
         );

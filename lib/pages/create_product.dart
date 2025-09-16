@@ -359,7 +359,7 @@ class _CreateProductPageState extends State<CreateProductPage> {
       value: selectedValue,
       onChanged: onChanged,
       items: items.map((item) {
-        return DropdownMenuItem<String>(
+            const Text("*3MB max per image, 10 images max",
           value: item['id'].toString(),
           child: Text(item['name']),
         );

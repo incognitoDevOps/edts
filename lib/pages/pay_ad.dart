@@ -107,18 +107,15 @@ class _PayAdState extends State<PayAd> {
           final data = jsonDecode(response.body);
           if (data["paid_status"] == "paid") {
             setState(() => _isPaying = false);
-            // Redirect to ads page after successful payment
+            // Navigate to payment success page first, then to ads
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Payment successful!")),
             );
-            context.go('/my-ads');
+            context.go('/payment-success');
             return;
           } else if (data["paid_status"] == "failed") {
             setState(() => _isPaying = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Payment failed. Please try again.")),
-            );
-            context.go('/my-ads');
+            context.go('/payment-failed');
             return;
           }
         }
@@ -128,10 +125,7 @@ class _PayAdState extends State<PayAd> {
     }
     // If timeout reached, assume payment failed.
     setState(() => _isPaying = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Payment timeout. Please check your ads page.")),
-    );
-    context.go('/my-ads');
+    context.go('/payment-failed');
   }
 
   @override
@@ -172,7 +166,7 @@ class _PayAdState extends State<PayAd> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      // Redirect to ads page instead of create ad page
+                      // Redirect to ads page after clicking "Pay later"
                       context.go('/my-ads');
                     },
                     style: OutlinedButton.styleFrom(

@@ -63,6 +63,7 @@ class StoreService:
                     "owner_email": product.store.owner.email if product.store.owner else None,
                     "owner_first_name": product.store.owner.first_name if product.store.owner else None,
                     "owner_last_name": product.store.owner.last_name if product.store.owner else None,
+                    "description": product.description,
                     "created_at": product.created_at.isoformat() if product.created_at else None,
                     "updated_at": product.updated_at.isoformat() if product.updated_at else None,
                 }

@@ -188,6 +188,10 @@ class _MyAdsPageState extends State<MyAdsPage> {
   }
 
   void _editAd(Map<String, dynamic> ad) {
+    final TextEditingController startDateController = TextEditingController(text: ad['start_date']);
+    final TextEditingController endDateController = TextEditingController(text: ad['end_date']);
+    final TextEditingController costController = TextEditingController(text: ad['cost_per_month']?.toString() ?? '');
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -197,30 +201,28 @@ class _MyAdsPageState extends State<MyAdsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                controller: startDateController,
                 decoration: const InputDecoration(
                   labelText: 'Start Date (YYYY-MM-DD)',
                   border: OutlineInputBorder(),
                 ),
-                controller: TextEditingController(text: ad['start_date']),
-                onChanged: (value) => ad['start_date'] = value,
               ),
               const SizedBox(height: 16),
               TextField(
+                controller: endDateController,
                 decoration: const InputDecoration(
                   labelText: 'End Date (YYYY-MM-DD)',
                   border: OutlineInputBorder(),
                 ),
-                controller: TextEditingController(text: ad['end_date']),
-                onChanged: (value) => ad['end_date'] = value,
               ),
               const SizedBox(height: 16),
               TextField(
+                controller: costController,
                 decoration: const InputDecoration(
-                  labelText: 'Cost Per Day',
+                  labelText: 'Cost Per Month',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-                onChanged: (value) => ad['cost_per_day'] = value,
               ),
             ],
           ),
@@ -233,7 +235,12 @@ class _MyAdsPageState extends State<MyAdsPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.of(context).pop();
-              await _updateAd(ad);
+              await _updateAd({
+                ...ad,
+                'start_date': startDateController.text,
+                'end_date': endDateController.text,
+                'cost_per_month': costController.text,
+              });
             },
             child: const Text("Update"),
           ),
@@ -254,7 +261,7 @@ class _MyAdsPageState extends State<MyAdsPage> {
         body: jsonEncode({
           "start_date": ad['start_date'],
           "end_date": ad['end_date'],
-          "cost_per_day": ad['cost_per_day'],
+          "cost_per_month": ad['cost_per_month'],
         }),
       );
 

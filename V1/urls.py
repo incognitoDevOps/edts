@@ -34,6 +34,7 @@ urlpatterns = [
 
     path("ads/create/", CreateAdView.as_view(), name="create-ad"),
     path("ads/pay/", PayForAdView.as_view(), name="pay-ad"),
+    path("ads/pricing-config/", AdPricingConfigView.as_view(), name="ad-pricing-config"),
     path("ads/", UserAdsView.as_view(), name="user-ads"),
     path("ads/<int:ad_id>/", AdDetailView.as_view(), name="ad-detail"),
     path("ads/<int:ad_id>/delete/", AdDetailView.as_view(), name="ad-delete"),

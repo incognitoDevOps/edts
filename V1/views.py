@@ -360,9 +360,26 @@ class CreateAdView(APIView):
             product_id=data.get("product_id"),
             start_date=data.get("start_date"),
             end_date=data.get("end_date"),
-            cost_per_day=data.get("cost_per_day"),
+            cost_per_month=data.get("cost_per_month"),
         )
         return Response(response, status=code)
+class AdPricingConfigView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        """Returns pricing configuration for ads."""
+        return Response({
+            "premium_price": 150.0,
+            "standard_price": 100.0,
+            "premium_categories": [
+                "vehicles",
+                "vehicle parts", 
+                "Appliances and furniture",
+                "fashion",
+                "electronics",
+                "Phones & Tablets",
+            ]
+        })
 
 class PayForAdView(APIView):
     permission_classes = [IsAuthenticated]
@@ -413,7 +430,7 @@ class AdDetailView(APIView):
             ad_id=ad_id,
             start_date=data.get("start_date"),
             end_date=data.get("end_date"),
-            cost_per_day=data.get("cost_per_day"),
+            cost_per_month=data.get("cost_per_month"),
         )
         return Response(response, status=code)
 

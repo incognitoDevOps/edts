@@ -158,7 +158,6 @@ class ProductService:
                 twitter=twitter,
                 linkedin=linkedin,
                 plus=plus,
-                created_at=timezone.now()  # Ensure proper timestamp
             )
 
             return Response({

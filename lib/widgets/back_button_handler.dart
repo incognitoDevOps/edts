@@ -34,13 +34,16 @@ class BackButtonHandler extends StatelessWidget {
       return false;
     }
 
+    // Check if we can pop (go back to previous screen)
     if (context.canPop()) {
       context.pop();
       return false;
     } else if (parentRoute != null) {
+      // Navigate to specified parent route
       context.go(parentRoute!);
       return false;
     } else {
+      // Default fallback to home
       context.go('/');
       return false;
     }

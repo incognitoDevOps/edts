@@ -8,7 +8,7 @@ from adManager.payments import Payment
 
 class AdService:
     @staticmethod
-    def create_ad(user, product_id, start_date, end_date, cost_per_day):
+    def create_ad(user, product_id, start_date, end_date, cost_per_month):
         """Create and promote a product ad."""
         try:
             product = Product.objects.get(id=product_id, store__owner=user)
@@ -38,7 +38,7 @@ class AdService:
                 product=product,
                 start_date=start_date_obj,
                 end_date=end_date_obj,
-                cost_per_day=cost_per_day,
+                cost_per_month=cost_per_month,
                 store=store,
                 status="inactive",  
                 paid_status="not paid"
@@ -153,7 +153,7 @@ class AdService:
             return {"error": str(e)}, 500
 
     @staticmethod
-    def update_ad(user, ad_id, start_date=None, end_date=None, cost_per_day=None):
+    def update_ad(user, ad_id, start_date=None, end_date=None, cost_per_month=None):
         """Update an existing ad."""
         try:
             ad = adManager.objects.get(id=ad_id, store__owner=user)
@@ -184,8 +184,8 @@ class AdService:
                     
                 ad.end_date = end_date_obj
 
-            if cost_per_day:
-                ad.cost_per_day = cost_per_day
+            if cost_per_month:
+                ad.cost_per_month = cost_per_month
 
             ad.save()
             return {"message": "Ad updated successfully"}, 200

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moderntr/constants.dart';
 import 'package:moderntr/widgets/back_button_handler.dart';
+import 'package:moderntr/widgets/country_code_picker.dart';
 
 class PayAd extends StatefulWidget {
   final String adId; // Receive the ad id.
@@ -19,14 +20,43 @@ class PayAd extends StatefulWidget {
 
 class _PayAdState extends State<PayAd> {
   final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _fullPhoneController = TextEditingController();
+  String _selectedCountryCode = '+254'; // Default to Kenya
   bool _isPaying = false;
 
+  void _onCountryCodeChanged(String countryCode) {
+    setState(() {
+      _selectedCountryCode = countryCode;
+    });
+    _updateFullPhoneNumber();
+  }
+
+  void _updateFullPhoneNumber() {
+    final phoneNumber = _mobileController.text.trim();
+    if (phoneNumber.isNotEmpty) {
+      // Remove the + from country code and combine with phone number
+      final countryCodeDigits = _selectedCountryCode.substring(1);
+      final fullPhoneNumber = countryCodeDigits + phoneNumber;
+      _fullPhoneController.text = fullPhoneNumber;
+    } else {
+      _fullPhoneController.text = '';
+    }
+  }
+
   Future<void> _submitPayment() async {
+    if (_mobileController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a phone number")),
+      );
+      return;
+    }
+
     setState(() => _isPaying = true);
 
+    // Use the full phone number (country code + phone number)
     final paymentData = {
       "ad_id": widget.adId,
-      "mobile_no": _mobileController.text,
+      "mobile_no": _fullPhoneController.text,
     };
     print(paymentData);
 
@@ -47,7 +77,7 @@ class _PayAdState extends State<PayAd> {
           const SnackBar(content: Text("Token expired, please log in")),
         );
         setState(() => _isPaying = false);
-        context.go('/'); // Redirect to login
+        context.go('/login');
         return;
       }
 
@@ -99,7 +129,7 @@ class _PayAdState extends State<PayAd> {
             const SnackBar(content: Text("Token expired, please log in")),
           );
           setState(() => _isPaying = false);
-          context.go('/'); // Redirect to login
+          context.go('/login');
           return;
         }
 
@@ -135,90 +165,132 @@ class _PayAdState extends State<PayAd> {
     return BackButtonHandler(
       parentRoute: '/my-ads',
       child: Scaffold(
-      appBar: AppBar(title: const Text("Complete Payment")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Complete Payment",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text("Pay for ad.", style: TextStyle(color: Colors.black54)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _mobileController,
-              decoration: InputDecoration(
-                hintText: "Enter Mpesa number",
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: maroon),
-                ),
+        appBar: AppBar(title: const Text("Complete Payment")),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Complete Payment",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Redirect to ads page after clicking "Pay later"
-                      context.go('/my-ads');
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: const BorderSide(color: Colors.black),
-                    ),
-                    child: Text(
-                      "Pay later",
-                      style: TextStyle(
-                          color: maroon,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold),
-                    ),
+              const SizedBox(height: 4),
+              const Text("Pay for ad.", style: TextStyle(color: Colors.black54)),
+              const SizedBox(height: 16),
+              
+              // Phone number input with country code picker
+              const Text(
+                "Mobile Number",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  CountryCodePicker(
+                    selectedCountryCode: _selectedCountryCode,
+                    onCountryCodeChanged: _onCountryCodeChanged,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isPaying ? null : _submitPayment,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: maroon,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isPaying
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            "Pay Ad",
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
+                  Expanded(
+                    child: TextField(
+                      controller: _mobileController,
+                      keyboardType: TextInputType.phone,
+                      onChanged: (value) => _updateFullPhoneNumber(),
+                      decoration: InputDecoration(
+                        hintText: "Enter phone number",
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
                           ),
+                          borderSide: BorderSide(color: maroon),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          borderSide: BorderSide(color: maroon, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              // Show full phone number
+              if (_fullPhoneController.text.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Full number: ${_fullPhoneController.text}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        // Redirect to ads page after clicking "Pay later"
+                        context.go('/my-ads');
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        side: const BorderSide(color: Colors.black),
+                      ),
+                      child: Text(
+                        "Pay later",
+                        style: TextStyle(
+                            color: maroon,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isPaying ? null : _submitPayment,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: maroon,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isPaying
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              "Pay Ad",
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

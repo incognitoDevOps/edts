@@ -27,18 +27,18 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> categories = [];
   List<Map<String, dynamic>> boostedProducts = [];
   List<Map<String, dynamic>> mostViewedProducts = [];
-  List<Map<String, dynamic>> otherProducts = [];
   Set<int> wishedIds = {};
 
   bool isLoadingCategories = true;
   bool isLoadingProducts = true;
   bool hasError = false;
   bool isRefreshing = false;
-  int _currentPage = 1;
-  bool _hasMoreProducts = true;
-  bool _isLoadingMore = false;
-  int _totalProductsLoaded = 0;
-  static const int _initialProductsToShow = 20;
+  
+  // Most viewed products pagination
+  int _mostViewedPage = 1;
+  bool _hasMoreMostViewed = true;
+  bool _isLoadingMoreMostViewed = false;
+  final int _mostViewedPerPage = 20;
 
   @override
   void initState() {
@@ -166,18 +166,16 @@ class _HomeScreenState extends State<HomeScreen> {
       if (refresh) {
         setState(() {
           isRefreshing = true;
-          _currentPage = 1;
-          _hasMoreProducts = true;
-          _totalProductsLoaded = 0;
+          _mostViewedPage = 1;
+          _hasMoreMostViewed = true;
           boostedProducts.clear();
           mostViewedProducts.clear();
-          otherProducts.clear();
         });
       }
 
       final response = await http.get(
         Uri.parse(
-            '$BASE_URL/products/structured/?page=$_currentPage&per_page=$_productsPerPage'),
+            '$BASE_URL/products/structured/?page=$_mostViewedPage&per_page=$_mostViewedPerPage'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -197,24 +195,15 @@ class _HomeScreenState extends State<HomeScreen> {
               .toList(),
         );
 
-        final newOthers = _removeDuplicateProducts(
-          newProducts
-              .where((p) =>
-                  p['is_boosted'] != true &&
-                  (p['view_count'] == 0 || p['view_count'] == null))
-              .toList(),
-        );
 
         setState(() {
           if (refresh) {
             boostedProducts = newBoosted;
             mostViewedProducts = newMostViewed;
-            otherProducts = newOthers;
           } else {
             // Only add new products that aren't already in the lists
             final existingBoostedIds = boostedProducts.map((p) => p['id']).toSet();
             final existingMostViewedIds = mostViewedProducts.map((p) => p['id']).toSet();
-            final existingOtherIds = otherProducts.map((p) => p['id']).toSet();
             
             boostedProducts.addAll(
               newBoosted.where((p) => !existingBoostedIds.contains(p['id'])),
@@ -222,16 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
             mostViewedProducts.addAll(
               newMostViewed.where((p) => !existingMostViewedIds.contains(p['id'])),
             );
-            otherProducts.addAll(
-              newOthers.where((p) => !existingOtherIds.contains(p['id'])),
-            );
           }
 
-          _totalProductsLoaded += newProducts.length;
-          _hasMoreProducts = newProducts.length >= _productsPerPage;
+          _hasMoreMostViewed = newProducts.length >= _mostViewedPerPage;
           isLoadingProducts = false;
           isRefreshing = false;
-          _isLoadingMore = false;
+          _isLoadingMoreMostViewed = false;
         });
       } else {
         throw Exception('Failed to load products');
@@ -241,24 +226,62 @@ class _HomeScreenState extends State<HomeScreen> {
         isLoadingProducts = false;
         hasError = true;
         isRefreshing = false;
-        _isLoadingMore = false;
+        _isLoadingMoreMostViewed = false;
       });
     }
   }
 
   void _scrollListener() {
-    if (_scrollController.offset >=
-            _scrollController.position.maxScrollExtent &&
+    if (_scrollController.offset >= _scrollController.position.maxScrollExtent &&
         !_scrollController.position.outOfRange &&
-        !_isLoadingMore &&
-        _hasMoreProducts) {
-      setState(() => _isLoadingMore = true);
-      _currentPage++;
-      _fetchStructuredProducts();
+        !_isLoadingMoreMostViewed &&
+        _hasMoreMostViewed) {
+      _loadMoreMostViewedProducts();
+    }
+  }
+  Future<void> _loadMoreMostViewedProducts() async {
+    if (_isLoadingMoreMostViewed || !_hasMoreMostViewed) return;
+    
+    setState(() => _isLoadingMoreMostViewed = true);
+    
+    try {
+      _mostViewedPage++;
+      final response = await http.get(
+        Uri.parse('$BASE_URL/products/all/?page=$_mostViewedPage&per_page=$_mostViewedPerPage'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final newProducts = List<Map<String, dynamic>>.from(data['products'] ?? []);
+        
+        // Filter for most viewed products (view_count > 0)
+        final newMostViewed = _removeDuplicateProducts(
+          newProducts.where((p) => (p['view_count'] ?? 0) > 0).toList(),
+        );
+        
+        setState(() {
+          // Only add products that aren't already in the list
+          final existingIds = mostViewedProducts.map((p) => p['id']).toSet();
+          final uniqueNewProducts = newMostViewed.where((p) => !existingIds.contains(p['id'])).toList();
+          
+          mostViewedProducts.addAll(uniqueNewProducts);
+          _hasMoreMostViewed = newProducts.length >= _mostViewedPerPage;
+          _isLoadingMoreMostViewed = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoadingMoreMostViewed = false);
     }
   }
 
   Future<void> _handleRefresh() async {
+    setState(() {
+      _mostViewedPage = 1;
+      _hasMoreMostViewed = true;
+      mostViewedProducts.clear();
+      boostedProducts.clear();
+    });
     await _fetchStructuredProducts(refresh: true);
   }
 
@@ -742,41 +765,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 padding: const EdgeInsets.all(8.0),
                                 child: _buildSkeletonLoader(),
                               )
-                            : GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: mostViewedProducts.length,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 8,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 0.69,
-                                ),
-                                itemBuilder: (context, index) {
-                                  return _buildProductCard(
-                                      mostViewedProducts[index]);
-                                },
-                              ),
-
-                    // OTHER PRODUCTS SECTION
-                    const SizedBox(height: 20),
-
-                    // const SizedBox(height: 8),
-                    isLoadingProducts && otherProducts.isEmpty
-                        ? _buildSkeletonLoader()
-                        : otherProducts.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text("No additional products available"),
-                              )
                             : Column(
                                 children: [
                                   GridView.builder(
                                     shrinkWrap: true,
                                     physics:
                                         const NeverScrollableScrollPhysics(),
-                                    itemCount: otherProducts.length,
+                                    itemCount: mostViewedProducts.length,
                                     gridDelegate:
                                         const SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
@@ -786,16 +781,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     itemBuilder: (context, index) {
                                       return _buildProductCard(
-                                          otherProducts[index]);
+                                          mostViewedProducts[index]);
                                     },
                                   ),
-                                  if (_isLoadingMore)
+                                  if (_isLoadingMoreMostViewed)
                                     const Padding(
                                       padding: EdgeInsets.all(16.0),
                                       child: CircularProgressIndicator(),
                                     ),
-                                  if (!_hasMoreProducts &&
-                                      otherProducts.isNotEmpty)
+                                  if (!_hasMoreMostViewed &&
+                                      mostViewedProducts.isNotEmpty)
                                     const Padding(
                                       padding: EdgeInsets.all(16.0),
                                       child: Text("No more products available"),

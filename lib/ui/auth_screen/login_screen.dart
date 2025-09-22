@@ -275,11 +275,25 @@ class LoginScreen extends StatelessWidget {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text("Phone Login", style: GoogleFonts.poppins()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.phone, color: teal),
+            const SizedBox(width: 8),
+            Text("Phone Login", style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              "Enter your phone number to receive a verification code.",
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Container(
@@ -317,16 +331,35 @@ class LoginScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: Text("Cancel", style: GoogleFonts.poppins()),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _sendOtp(controller);
-            },
-            child: Text("Send OTP"),
-            style: ElevatedButton.styleFrom(backgroundColor: teal),
-          ),
+          Obx(() => ElevatedButton(
+            onPressed: controller.isLoading.value 
+                ? null 
+                : () {
+                    Navigator.pop(context);
+                    _sendOtp(controller);
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: teal,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: controller.isLoading.value
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    "Send OTP",
+                    style: GoogleFonts.poppins(color: Colors.white),
+                  ),
+          )),
         ],
       ),
     );
@@ -337,9 +370,14 @@ class LoginScreen extends StatelessWidget {
       ShowToastDialog.showToast("Please enter phone number");
       return;
     }
-    ShowToastDialog.showLoader("Sending OTP...");
-    controller.sendCode().then((_) {
-      ShowToastDialog.closeLoader();
-    });
+    
+    // Validate phone number format
+    final phoneNumber = controller.phoneNumberController.text.trim();
+    if (phoneNumber.length < 10) {
+      ShowToastDialog.showToast("Please enter a valid phone number");
+      return;
+    }
+    
+    controller.sendCode();
   }
 }

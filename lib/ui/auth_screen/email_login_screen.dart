@@ -43,19 +43,43 @@ class EmailLoginScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () => _loginWithEmail(),
+            Obx(() => ElevatedButton(
+              onPressed: controller.isLoading.value ? null : () => _loginWithEmail(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: teal,
                 minimumSize: Size(double.infinity, 50),
               ),
-              child: Text("Login", style: TextStyle(fontSize: 18)),
-            ),
+              child: controller.isLoading.value
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text("Login", style: TextStyle(fontSize: 18)),
+            )),
             const SizedBox(height: 20),
-            TextButton(
-              onPressed: () => _showForgotPasswordDialog(context),
-              child: const Text("Forgot Password?"),
-            ),
+            Obx(() => TextButton(
+              onPressed: controller.isResettingPassword.value 
+                  ? null 
+                  : () => _showForgotPasswordDialog(context),
+              child: controller.isResettingPassword.value
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text("Sending..."),
+                      ],
+                    )
+                  : const Text("Forgot Password?"),
+            )),
           ],
         ),
       ),
@@ -64,68 +88,107 @@ class EmailLoginScreen extends StatelessWidget {
 
   void _showForgotPasswordDialog(BuildContext context) {
     final TextEditingController emailController = TextEditingController();
+    final RxBool isProcessing = false.obs;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Forgot Password"),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            hintText: "Enter your email",
-            prefixIcon: Icon(Icons.email),
-          ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_reset, color: teal),
+            const SizedBox(width: 8),
+            const Text("Reset Password"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Enter your email address and we'll send you a link to reset your password.",
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: "Enter your email",
+                prefixIcon: const Icon(Icons.email),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text("Cancel", style: GoogleFonts.poppins()),
           ),
-          TextButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isEmpty) {
-                ShowToastDialog.showToast("Please enter your email");
-                return;
-              }
-              Navigator.pop(context);
-              await _sendPasswordResetEmail(email);
-            },
-            child: const Text("Send Reset Link"),
-          ),
+          Obx(() => ElevatedButton(
+            onPressed: isProcessing.value 
+                ? null 
+                : () async {
+                    final email = emailController.text.trim();
+                    if (email.isEmpty) {
+                      Get.snackbar(
+                        "Error", 
+                        "Please enter your email",
+                        backgroundColor: Colors.red.withOpacity(0.1),
+                        colorText: Colors.red,
+                      );
+                      return;
+                    }
+                    
+                    isProcessing.value = true;
+                    Navigator.pop(context);
+                    await controller.sendPasswordResetEmail(email);
+                    isProcessing.value = false;
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: teal,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: isProcessing.value
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    "Send Reset Link",
+                    style: GoogleFonts.poppins(color: Colors.white),
+                  ),
+          )),
         ],
       ),
     );
   }
 
-  Future<void> _sendPasswordResetEmail(String email) async {
-    ShowToastDialog.showLoader("Sending reset email...");
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      ShowToastDialog.showToast("Reset email sent. Check your inbox.");
-    } on FirebaseAuthException catch (e) {
-      String message = "Something went wrong";
-      if (e.code == 'user-not-found') {
-        message = "No user found with this email";
-      } else if (e.code == 'invalid-email') {
-        message = "Invalid email address";
-      }
-      ShowToastDialog.showToast(message);
-    } catch (e) {
-      ShowToastDialog.showToast("Failed to send reset email");
-    } finally {
-      ShowToastDialog.closeLoader();
-    }
-  }
 
   Future<void> _loginWithEmail() async {
+    if (controller.isLoading.value) return;
+    
     if (controller.emailController.value.text.isEmpty ||
         controller.passwordController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please fill all fields");
       return;
     }
 
+    controller.isLoading.value = true;
     ShowToastDialog.showLoader("Logging in...");
+    
     try {
       UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -138,6 +201,8 @@ class EmailLoginScreen extends StatelessWidget {
           await FireStoreUtils.userExitOrNot(userCredential.user!.uid);
       if (!userExists) {
         await FirebaseAuth.instance.signOut();
+        ShowToastDialog.closeLoader();
+        controller.isLoading.value = false;
         ShowToastDialog.showToast("User not registered. Please sign up first.");
         return;
       }
@@ -145,23 +210,36 @@ class EmailLoginScreen extends StatelessWidget {
       UserModel? userModel =
           await FireStoreUtils.getUserProfile(userCredential.user!.uid);
       if (userModel != null && userModel.isActive == true) {
+        ShowToastDialog.closeLoader();
+        controller.isLoading.value = false;
         Get.offAll(() => const DashBoardScreen());
       } else {
         await FirebaseAuth.instance.signOut();
+        ShowToastDialog.closeLoader();
+        controller.isLoading.value = false;
         ShowToastDialog.showToast("Account disabled. Contact support.");
       }
     } on FirebaseAuthException catch (e) {
+      ShowToastDialog.closeLoader();
+      controller.isLoading.value = false;
       String message = "Login failed";
       if (e.code == 'user-not-found') {
         message = "No user found with this email";
       } else if (e.code == 'wrong-password') {
         message = "Incorrect password";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email format";
+      } else if (e.code == 'user-disabled') {
+        message = "This account has been disabled";
+      } else if (e.code == 'too-many-requests') {
+        message = "Too many failed attempts. Please try again later";
       }
       ShowToastDialog.showToast(message);
     } catch (e) {
-      ShowToastDialog.showToast("Login failed. Please try again.");
-    } finally {
       ShowToastDialog.closeLoader();
+      controller.isLoading.value = false;
+      print("Login error: $e");
+      ShowToastDialog.showToast("Login failed. Please try again.");
     }
   }
 }

@@ -1348,6 +1348,7 @@ getSettings() async {
         }
       }
     } catch (e) {
+<<<<<<< HEAD
       print("❌ Error debugging driver status: $e");
     }
   }
@@ -1363,3 +1364,185 @@ getSettings() async {
         driver.approvalStatus == "approved";
   }
 }
+=======
+      print("❌ Error verifying order commission: $e");
+    try {
+      final querySnapshot = await fireStore
+          .collection(CollectionName.users)
+          .where('phoneNumber', isEqualTo: fullPhoneNumber)
+          .limit(1)
+          .get();
+      
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print("Error checking phone number existence: $e");
+      return false;
+    }
+  }
+
+  /// Enhanced method to get driver with retry mechanism
+  static Future<DriverUserModel?> getDriverWithRetry(String driverId, {int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("🔄 Attempt $attempt to load driver: $driverId");
+        
+        final doc = await fireStore
+            .collection(CollectionName.driverUsers)
+            .doc(driverId)
+            .get()
+            .timeout(const Duration(seconds: 10));
+        
+        if (doc.exists && doc.data() != null) {
+          final driver = DriverUserModel.fromJson(doc.data()!);
+          print("✅ Driver loaded successfully on attempt $attempt");
+          return driver;
+        } else {
+          print("❌ Driver document not found on attempt $attempt");
+          if (attempt == maxRetries) return null;
+        }
+      } catch (e) {
+        print("❌ Error loading driver on attempt $attempt: $e");
+        if (attempt == maxRetries) return null;
+        
+        // Wait before retrying
+        await Future.delayed(Duration(seconds: attempt));
+      }
+    }
+    return null;
+  }
+
+  /// Validate order completion requirements
+  static Future<bool> validateOrderCompletion(String orderId) async {
+    try {
+      final orderDoc = await fireStore
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .get();
+      
+      if (!orderDoc.exists) {
+        print("❌ Order not found: $orderId");
+        return false;
+      }
+      
+      final orderData = orderDoc.data();
+      if (orderData == null) {
+        print("❌ Order data is null: $orderId");
+        return false;
+      }
+      
+      // Check if driver is assigned
+      if (orderData['driverId'] == null || orderData['driverId'].toString().isEmpty) {
+        print("❌ No driver assigned to order: $orderId");
+        
+        // Try to recover driver assignment
+        return await recoverDriverAssignment(orderId);
+      }
+      
+      return true;
+    } catch (e) {
+      print("❌ Error validating order completion: $e");
+      return false;
+    }
+  }
+
+  /// Recover driver assignment for orders
+  static Future<bool> recoverDriverAssignment(String orderId) async {
+    try {
+      print("🔧 Attempting to recover driver assignment for order: $orderId");
+      
+      // Check if there are accepted drivers
+      final acceptedDrivers = await fireStore
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .collection("acceptedDriver")
+          .limit(1)
+          .get();
+      
+      if (acceptedDrivers.docs.isNotEmpty) {
+        final driverId = acceptedDrivers.docs.first.id;
+        print("🔧 Found accepted driver: $driverId");
+        
+        // Update the main order document
+        await fireStore
+            .collection(CollectionName.orders)
+            .doc(orderId)
+            .update({
+          'driverId': driverId,
+          'updateDate': FieldValue.serverTimestamp(),
+        });
+        
+        print("✅ Driver assignment recovered successfully");
+        return true;
+      } else {
+        print("❌ No accepted drivers found for order: $orderId");
+        return false;
+      }
+    } catch (e) {
+      print("❌ Error recovering driver assignment: $e");
+      return false;
+    }
+  }
+
+  /// Debug driver assignment issues
+  Future<void> debugDriverAssignmentIssue(String orderId) async {
+    try {
+      print("🔍 DEBUG: Analyzing driver assignment for order: $orderId");
+      
+      // Check main order document
+      final orderDoc = await fireStore
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .get();
+      
+      if (orderDoc.exists) {
+        final data = orderDoc.data();
+        print("📋 Order data:");
+        print("   driverId: ${data?['driverId']}");
+        print("   status: ${data?['status']}");
+        print("   acceptedDriverId: ${data?['acceptedDriverId']}");
+        
+        // Check accepted drivers subcollection
+        final acceptedDrivers = await fireStore
+            .collection(CollectionName.orders)
+            .doc(orderId)
+            .collection("acceptedDriver")
+            .get();
+        
+        print("📋 Accepted drivers count: ${acceptedDrivers.size}");
+        for (var doc in acceptedDrivers.docs) {
+          print("   Driver: ${doc.id} - ${doc.data()}");
+        }
+      } else {
+        print("❌ Order document not found: $orderId");
+      }
+    } catch (e) {
+      print("❌ Error in debug analysis: $e");
+    }
+  }
+
+  /// Verify commission data was saved correctly
+  static Future<void> verifyOrderCommission(String orderId) async {
+    try {
+      final orderDoc = await fireStore
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .get();
+      
+      if (orderDoc.exists) {
+        final data = orderDoc.data();
+        final commission = data?['adminCommission'];
+        
+        if (commission != null) {
+          print("✅ Commission data verified in Firestore:");
+          print("   isEnabled: ${commission['isEnabled']}");
+          print("   type: ${commission['type']}");
+          print("   amount: ${commission['amount']}");
+        } else {
+          print("❌ No commission data found in order");
+        }
+      }
+    } catch (e) {
+      print("❌ Error verifying commission: $e");
+    }
+  }
+>>>>>>> b445605aeef0e60456b1c8e12db63c1b9b5583a5

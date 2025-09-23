@@ -7,10 +7,17 @@ class LanguageModel {
   String? id;
   bool? isRtl;
 
-  LanguageModel({this.image, this.code, this.isDeleted, this.enable, this.name, this.id, this.isRtl});
+  LanguageModel(
+      {this.image,
+        this.code,
+        this.isDeleted,
+        this.enable,
+        this.name,
+        this.id,
+        this.isRtl});
 
   LanguageModel.fromJson(Map<String, dynamic> json) {
-    image = json['image'] ?? '';
+    image = json['image']??'';
     code = json['code'];
     isDeleted = json['isDeleted'];
     enable = json['enable'];

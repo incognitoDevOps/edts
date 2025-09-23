@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:customer/model/driver_rules_model.dart';
-import 'package:customer/model/order/location_lat_lng.dart';
-import 'package:customer/model/order/positions.dart';
+import 'package:driver/model/driver_rules_model.dart';
+import 'package:driver/model/order/location_lat_lng.dart';
+import 'package:driver/model/order/positions.dart';
 
 class DriverUserModel {
   String? phoneNumber;

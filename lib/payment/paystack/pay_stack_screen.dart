@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:customer/payment/paystack/paystack_url_genrater.dart';
-import 'package:customer/themes/app_colors.dart';
+import 'package:driver/payment/paystack/paystack_url_genrater.dart';
+import 'package:driver/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -13,7 +13,7 @@ class PayStackScreen extends StatefulWidget {
   final String secretKey;
   final String callBackUrl;
 
-  const PayStackScreen({Key? key, required this.initialURl, required this.reference, required this.amount, required this.secretKey, required this.callBackUrl}) : super(key: key);
+  const PayStackScreen({super.key, required this.initialURl, required this.reference, required this.amount, required this.secretKey, required this.callBackUrl});
 
   @override
   State<PayStackScreen> createState() => _PayStackScreenState();
@@ -24,6 +24,8 @@ class _PayStackScreenState extends State<PayStackScreen> {
 
   @override
   void initState() {
+
+
     initController();
     super.initState();
   }
@@ -50,7 +52,7 @@ class _PayStackScreenState extends State<PayStackScreen> {
             }
             if ((navigation.url == '${widget.callBackUrl}?trxref=${widget.reference}&reference=${widget.reference}') ||
                 (navigation.url == "https://hello.pstk.xyz/callback") ||
-                (navigation.url == 'https://standard.paystack.co/close') ||
+                (navigation.url == 'https://standard.paystack.co/close')||
                 (navigation.url == 'https://talazo.app/login')) {
               final isDone = await PayStackURLGen.verifyTransaction(secretKey: widget.secretKey, reference: widget.reference, amount: widget.amount);
               Get.back(result: isDone);

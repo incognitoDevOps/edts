@@ -1,13 +1,19 @@
-import 'package:customer/constant/constant.dart';
-import 'package:customer/controller/wallet_controller.dart';
-import 'package:customer/model/wallet_transaction_model.dart';
-import 'package:customer/themes/app_colors.dart';
-import 'package:customer/themes/responsive.dart';
-import 'package:customer/themes/text_field_them.dart';
-import 'package:customer/utils/DarkThemeProvider.dart';
+import 'package:driver/constant/constant.dart';
+import 'package:driver/constant/show_toast_dialog.dart';
+import 'package:driver/controller/wallet_controller.dart';
+import 'package:driver/model/wallet_transaction_model.dart';
+import 'package:driver/themes/app_colors.dart';
+import 'package:driver/themes/button_them.dart';
+import 'package:driver/themes/responsive.dart';
+import 'package:driver/themes/text_field_them.dart';
+import 'package:driver/ui/withdraw_history/withdraw_history_screen.dart';
+import 'package:driver/utils/DarkThemeProvider.dart';
+import 'package:driver/utils/fire_store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class WalletScreen extends StatelessWidget {
@@ -18,401 +24,571 @@ class WalletScreen extends StatelessWidget {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
     return GetX<WalletController>(
-      init: WalletController(),
-      builder: (controller) {
-        return Scaffold(
-          backgroundColor: AppColors.primary,
-          body: Column(
-            children: [
-              Container(
-                height: Responsive.width(8, context),
-                width: Responsive.width(100, context),
-                color: AppColors.primary,
-              ),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.background,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(25),
-                      topRight: Radius.circular(25),
-                    ),
-                  ),
-                  child: controller.isLoading.value
-                      ? Constant.loader()
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 20),
-                              
-                              // Wallet Balance Card
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF00C6A0), Color(0xFF007C91)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.primary.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
+        init: WalletController(),
+        builder: (controller) {
+          return Scaffold(
+            backgroundColor: AppColors.primary,
+            body: controller.isLoading.value
+                ? Constant.loader(context)
+                : Column(
+                    children: [
+                      SizedBox(
+                        height: Responsive.width(10, context),
+                        width: Responsive.width(100, context),
+                      ),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Column(
+                              children: [
+                                const SizedBox(
+                                  height: 20,
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Total Balance".tr,
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Obx(() => Text(
-                                      Constant.amountShow(
-                                        amount: controller.userModel.value.walletAmount ?? "0.0"
-                                      ),
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => _showTopUpDialog(context, controller),
-                                        icon: const Icon(Icons.add, color: Colors.white),
-                                        label: Text(
-                                          "Topup Wallet".tr,
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white.withOpacity(0.2),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Transaction History
-                              Text(
-                                "Transaction History",
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              
-                              Expanded(
-                                child: Obx(() {
-                                  if (controller.transactionList.isEmpty) {
-                                    return Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.receipt_long_outlined,
-                                            size: 64,
-                                            color: Colors.grey[400],
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            "No transaction found".tr,
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 18,
-                                              color: Colors.grey[600],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            "Your transactions will appear here",
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-                                  
-                                  return ListView.builder(
-                                    physics: const BouncingScrollPhysics(),
-                                    itemCount: controller.transactionList.length,
-                                    itemBuilder: (context, index) {
-                                      WalletTransactionModel transaction = controller.transactionList[index];
-                                      final isCredit = !transaction.amount!.startsWith('-');
-                                      
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 12),
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: themeChange.getThem() 
-                                              ? AppColors.darkContainerBackground 
-                                              : AppColors.containerBackground,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: themeChange.getThem() 
-                                                ? AppColors.darkContainerBorder 
-                                                : AppColors.containerBorder,
-                                            width: 0.5,
-                                          ),
-                                          boxShadow: themeChange.getThem()
-                                              ? null
-                                              : [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(0.05),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: (isCredit ? Colors.green : Colors.red).withOpacity(0.1),
-                                                borderRadius: BorderRadius.circular(10),
-                                              ),
-                                              child: Icon(
-                                                isCredit ? Icons.add : Icons.remove,
-                                                color: isCredit ? Colors.green : Colors.red,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    transaction.note ?? "Transaction",
-                                                    style: GoogleFonts.poppins(
-                                                      fontWeight: FontWeight.w600,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    Constant.dateAndTimeFormatTimestamp(transaction.createdDate),
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    "Via ${transaction.paymentType ?? 'Unknown'}",
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Text(
-                                              Constant.amountShow(amount: transaction.amount ?? "0"),
-                                              style: GoogleFonts.poppins(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                                color: isCredit ? Colors.green : Colors.red,
-                                              ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                                    border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
+                                    boxShadow: themeChange.getThem()
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.grey.withOpacity(0.5),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2), // changes position of shadow
                                             ),
                                           ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                            decoration: BoxDecoration(color: AppColors.lightGray, borderRadius: BorderRadius.circular(50)),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(12.0),
+                                              child: SvgPicture.asset(
+                                                'assets/icons/ic_wallet.svg',
+                                                width: 24,
+                                                color: Colors.black,
+                                              ),
+                                            )),
+                                        const SizedBox(
+                                          width: 10,
                                         ),
-                                      );
-                                    },
-                                  );
-                                }),
-                              ),
-                            ],
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text("Total Balance".tr, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                                              Text(
+                                                Constant.amountShow(amount: controller.driverUserModel.value.walletAmount.toString()),
+                                                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: 20,
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ButtonThem.buildButton(
+                                        context,
+                                        title: "Topup Wallet".tr,
+                                        onPress: () {
+                                          topUpWalletDialog(context, controller);
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: 10,
+                                    ),
+                                    Expanded(
+                                      child: ButtonThem.buildBorderButton(
+                                        context,
+                                        title: "withdraw".tr,
+                                        onPress: () {
+                                          withdrawDialog(context, controller);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(
+                                  height: 10,
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ButtonThem.buildBorderButton(
+                                        context,
+                                        title: "Withdrawal history".tr,
+                                        onPress: () {
+                                          Get.to(const WithDrawHistoryScreen());
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(
+                                  height: 20,
+                                ),
+                                Expanded(
+                                  child: controller.transactionList.isEmpty
+                                      ? Center(
+                                          child: Text("No transaction found".tr),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: controller.transactionList.length,
+                                          itemBuilder: (context, index) {
+                                            WalletTransactionModel walletTransactionModel = controller.transactionList[index];
+                                            return Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                                                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                                                    border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
+                                                    boxShadow: themeChange.getThem()
+                                                        ? null
+                                                        : [
+                                                            BoxShadow(
+                                                              color: Colors.grey.withOpacity(0.5),
+                                                              blurRadius: 8,
+                                                              offset: const Offset(0, 2), // changes position of shadow
+                                                            ),
+                                                          ],
+                                                  ),
+                                                  child: InkWell(
+                                                    onTap: () {
+                                                      transactionDialog(context, controller, walletTransactionModel);
+                                                    },
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                                        children: [
+                                                          Container(
+                                                              decoration: BoxDecoration(color: AppColors.lightGray, borderRadius: BorderRadius.circular(50)),
+                                                              child: Padding(
+                                                                padding: const EdgeInsets.all(12.0),
+                                                                child: SvgPicture.asset(
+                                                                  'assets/icons/ic_wallet.svg',
+                                                                  width: 24,
+                                                                  color: Colors.black,
+                                                                ),
+                                                              )),
+                                                          const SizedBox(
+                                                            width: 10,
+                                                          ),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Row(
+                                                                  children: [
+                                                                    Expanded(
+                                                                      child: Text(
+                                                                        DateFormat('KK:mm:ss a, dd MMM yyyy').format(walletTransactionModel.createdDate!.toDate()).toUpperCase(),
+                                                                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                                                                      ),
+                                                                    ),
+                                                                    Text(
+                                                                      Constant.IsNegative(double.parse(walletTransactionModel.amount.toString()))
+                                                                          ? "- ${Constant.amountShow(amount: walletTransactionModel.amount.toString().replaceAll("-", ""))}"
+                                                                          : "+ ${Constant.amountShow(amount: walletTransactionModel.amount.toString())}",
+                                                                      style: GoogleFonts.poppins(
+                                                                          fontWeight: FontWeight.w600,
+                                                                          color: Constant.IsNegative(double.parse(walletTransactionModel.amount.toString())) ? Colors.red : Colors.green),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                Text(
+                                                                  walletTransactionModel.note.toString(),
+                                                                  style: GoogleFonts.poppins(fontWeight: FontWeight.w400),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  )),
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+                      ),
+                    ],
+                  ),
+          );
+        });
   }
 
-  void _showTopUpDialog(BuildContext context, WalletController controller) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Add Topup Amount".tr,
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
+  topUpWalletDialog(BuildContext context, WalletController controller) {
+    return showModalBottomSheet(
+        context: context,
+        isDismissible: false,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return Container(
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.only(topRight: Radius.circular(15), topLeft: Radius.circular(15))),
+            child: StatefulBuilder(builder: (context, setState) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20),
+                child: Padding(
+                  padding: MediaQuery.of(context).viewInsets,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Add Topup Amount".tr, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      TextFieldThem.buildTextFiledWithPrefixIcon(
+                        context,
+                        hintText: 'Enter Amount'.tr,
+                        controller: controller.amountController.value,
+                        keyBoardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+                        prefix: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Text(Constant.currencyModel!.symbol.toString()),
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Text("Select Payment Option".tr, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Obx(
+                        () => Column(
+                          children: [
+                            controller.paymentModel.value.strip!.enable == true
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                    child: InkWell(
+                                      onTap: () {
+                                        controller.selectedPaymentMethod.value = controller.paymentModel.value.strip!.name.toString();
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                            color: controller.selectedPaymentMethod.value == controller.paymentModel.value.strip!.name.toString()
+                                                ? AppColors.lightGray
+                                                : Colors.transparent,
+                                            borderRadius: const BorderRadius.all(Radius.circular(5)),
+                                            border: Border.all(color: AppColors.textFieldBorder, width: 0.5)),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                  decoration: const BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.all(Radius.circular(5))),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    child: SvgPicture.asset(
+                                                      'assets/icons/ic_stripe.svg',
+                                                      width: 30,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )),
+                                              const SizedBox(
+                                                width: 10,
+                                              ),
+                                              Expanded(child: Text(controller.paymentModel.value.strip!.name.toString(), style: GoogleFonts.poppins())),
+                                              Radio(
+                                                value: controller.paymentModel.value.strip!.name.toString(),
+                                                groupValue: controller.selectedPaymentMethod.value,
+                                                onChanged: (value) {
+                                                  controller.selectedPaymentMethod.value = value.toString();
+                                                },
+                                                activeColor: AppColors.primary,
+                                              )
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox(),
+                            controller.paymentModel.value.razorpay!.enable == true
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                    child: InkWell(
+                                      onTap: () {
+                                        controller.selectedPaymentMethod.value = controller.paymentModel.value.razorpay!.name.toString();
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                            color: controller.selectedPaymentMethod.value == controller.paymentModel.value.razorpay!.name.toString()
+                                                ? AppColors.lightGray
+                                                : Colors.transparent,
+                                            borderRadius: const BorderRadius.all(Radius.circular(5)),
+                                            border: Border.all(color: AppColors.textFieldBorder, width: 0.5)),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                  decoration: const BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.all(Radius.circular(5))),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(8.0),
+                                                    child: SvgPicture.asset(
+                                                      'assets/icons/ic_razorpay.svg',
+                                                      width: 30,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )),
+                                              const SizedBox(
+                                                width: 10,
+                                              ),
+                                              Expanded(child: Text(controller.paymentModel.value.razorpay!.name.toString(), style: GoogleFonts.poppins())),
+                                              Radio(
+                                                value: controller.paymentModel.value.razorpay!.name.toString(),
+                                                groupValue: controller.selectedPaymentMethod.value,
+                                                onChanged: (value) {
+                                                  controller.selectedPaymentMethod.value = value.toString();
+                                                },
+                                                activeColor: AppColors.primary,
+                                              )
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 20,
+                      ),
+                      ButtonThem.buildButton(
+                        context,
+                        title: "Topup".tr,
+                        onPress: () {
+                          if (controller.selectedPaymentMethod.value.isEmpty) {
+                            ShowToastDialog.showToast("Please select payment method".tr);
+                          } else if (controller.amountController.value.text.isEmpty) {
+                            ShowToastDialog.showToast("Please enter amount".tr);
+                          } else {
+                            if (controller.selectedPaymentMethod.value == controller.paymentModel.value.strip!.name.toString()) {
+                              controller.stripeMakePayment(amount: controller.amountController.value.text);
+                            } else if (controller.selectedPaymentMethod.value == controller.paymentModel.value.razorpay!.name.toString()) {
+                              controller.openCheckout(amount: double.parse(controller.amountController.value.text), orderId: "");
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextFieldThem.buildTextFiled(
-                  context,
-                  hintText: 'Enter Amount'.tr,
-                  controller: controller.amountController.value,
-                  keyBoardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Select Payment Option".tr,
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 12),
-                
-                // Payment method selection
-                Obx(() => Column(
-                  children: _buildPaymentOptions(controller),
-                )),
-                
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Get.back(),
-                        child: Text("Cancel".tr),
+              );
+            }),
+          );
+        });
+  }
+
+  transactionDialog(BuildContext context, WalletController controller, WalletTransactionModel walletTransactionModel) {
+    return showModalBottomSheet(
+        context: context,
+        isDismissible: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return Container(
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.only(topRight: Radius.circular(15), topLeft: Radius.circular(15))),
+            child: StatefulBuilder(builder: (context, setState) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20),
+                child: Padding(
+                  padding: MediaQuery.of(context).viewInsets,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Transaction Details".tr, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      const SizedBox(
+                        height: 10,
                       ),
-                    ),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _handleTopUp(context, controller),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Transaction ID".tr,
+                              style: GoogleFonts.poppins(),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          "Topup".tr,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            walletTransactionModel.transactionId.toString(),
+                            style: GoogleFonts.poppins(),
                           ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Payment Details".tr,
+                              style: GoogleFonts.poppins(),
+                            ),
+                          ),
+                          Text(
+                            Constant.amountShow(amount: walletTransactionModel.amount.toString().replaceAll("-", "")),
+                            style: GoogleFonts.poppins(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Pay Via".tr,
+                              style: GoogleFonts.poppins(),
+                            ),
+                          ),
+                          Text(
+                            walletTransactionModel.paymentType.toString(),
+                            style: GoogleFonts.poppins(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Date in UTC Format".tr,
+                              style: GoogleFonts.poppins(),
+                            ),
+                          ),
+                          Text(
+                            DateFormat('KK:mm:ss a, dd MMM yyyy').format(walletTransactionModel.createdDate!.toDate()).toUpperCase(),
+                            style: GoogleFonts.poppins(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          );
+        });
+  }
+
+  withdrawDialog(BuildContext context, WalletController controller) {
+    return showModalBottomSheet(
+        context: context,
+        isDismissible: false,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return Container(
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.only(topRight: Radius.circular(15), topLeft: Radius.circular(15))),
+            child: StatefulBuilder(builder: (context, setState) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20),
+                child: Padding(
+                  padding: MediaQuery.of(context).viewInsets,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Withdraw".tr, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Text("Amount to Withdraw".tr, style: GoogleFonts.poppins()),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                      TextFieldThem.buildTextFiledWithPrefixIcon(
+                        context,
+                        hintText: 'Enter Amount'.tr,
+                        controller: controller.withdrawalAmountController.value,
+                        keyBoardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+                        prefix: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Text(Constant.currencyModel!.symbol.toString()),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      Text('Notes'.tr, style: GoogleFonts.poppins()),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                      TextFieldThem.buildTextFiled(context, hintText: 'Notes'.tr, controller: controller.noteController.value, maxLine: 5),
+                      const SizedBox(
+                        height: 20,
+                      ),
+                      ButtonThem.buildButton(
+                        context,
+                        title: "Withdrawal".tr,
+                        onPress: () async {
+                          if (double.parse(controller.withdrawalAmountController.value.text) < double.parse(Constant.minimumAmountToWithdrawal)) {
+                            ShowToastDialog.showToast("Withdraw amount must be greater or equal to ${Constant.amountShow(amount: Constant.minimumAmountToWithdrawal)}".tr);
+                          } else if (double.parse(controller.withdrawalAmountController.value.text) > double.parse(controller.driverUserModel.value.walletAmount.toString())) {
+                            ShowToastDialog.showToast("Insufficient balance".tr);
+                          } else {
+                            bool? isAvailable = await FireStoreUtils.bankDetailsIsAvailable();
+                            if (isAvailable == true) {
+                              ShowToastDialog.showLoader("Please wait".tr);
+                              await FireStoreUtils.setWithdrawRequest(controller.withdrawModel.value!).then((value) {
+                                if (value == true) {
+                                  ShowToastDialog.closeLoader();
+                                  ShowToastDialog.showToast("Request sent to admin".tr);
+                                  Get.back();
+                                }
+                              });
+                            } else {
+                              ShowToastDialog.showToast("Your bank details is not available.Please add bank details".tr);
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  List<Widget> _buildPaymentOptions(WalletController controller) {
-    final pm = controller.paymentModel.value;
-    final List<Widget> options = [];
-    
-    if (pm.strip != null && pm.strip!.enable == true) {
-      options.add(_buildPaymentOption(
-        controller, 
-        pm.strip!.name ?? "Stripe", 
-        Icons.credit_card,
-        "Stripe"
-      ));
-    }
-    
-    if (pm.razorpay != null && pm.razorpay!.enable == true) {
-      options.add(_buildPaymentOption(
-        controller, 
-        pm.razorpay!.name ?? "RazorPay", 
-        Icons.payment,
-        "RazorPay"
-      ));
-    }
-    
-    return options;
-  }
-
-  Widget _buildPaymentOption(WalletController controller, String name, IconData icon, String value) {
-    return RadioListTile<String>(
-      value: value,
-      groupValue: controller.selectedPaymentMethod.value,
-      onChanged: (String? newValue) {
-        controller.selectedPaymentMethod.value = newValue ?? "";
-      },
-      title: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            name,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-      activeColor: AppColors.primary,
-    );
-  }
-
-  void _handleTopUp(BuildContext context, WalletController controller) {
-    if (controller.amountController.value.text.isEmpty) {
-      Get.back();
-      controller.selectedPaymentMethod.value = "";
-      return;
-    }
-    
-    if (controller.selectedPaymentMethod.value.isEmpty) {
-      return;
-    }
-    
-    final amount = controller.amountController.value.text;
-    final paymentMethod = controller.selectedPaymentMethod.value;
-    
-    Get.back();
-    
-    switch (paymentMethod.toLowerCase()) {
-      case 'stripe':
-        controller.stripeMakePayment(amount: amount);
-        break;
-      case 'razorpay':
-        // Implement RazorPay if needed
-        break;
-      default:
-        break;
-    }
-    
-    // Clear form
-    controller.amountController.value.clear();
-    controller.selectedPaymentMethod.value = "";
+              );
+            }),
+          );
+        });
   }
 }

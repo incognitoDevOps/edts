@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBp2pslYOStEzx5jc7R01ykl_A7CBkmEQI',
-    appId: '1:116120217389:android:9b67675553da1991d515a4',
+    appId: '1:116120217389:android:6c6b11d7604f545dd515a4',
     messagingSenderId: '116120217389',
     projectId: 'buzrydecloud',
     databaseURL: 'https://buzrydecloud-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -60,12 +60,15 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAqiDYdGmmem7kNeLTw-odK6LTgye_k-9Q',
-    appId: '1:116120217389:ios:d7145b38335d9dd5d515a4',
+    appId: '1:116120217389:ios:756de3b37d960e88d515a4',
     messagingSenderId: '116120217389',
     projectId: 'buzrydecloud',
     databaseURL: 'https://buzrydecloud-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'buzrydecloud.appspot.com',
-    iosBundleId: 'ca.buzryde.ca',
+    androidClientId: '116120217389-89megjc697sk662v0gufanfsaaep624v.apps.googleusercontent.com',
+    iosClientId: '116120217389-69m7sbkg6h2muv9un1vge3krftmpcd06.apps.googleusercontent.com',
+    iosBundleId: 'ca.buzryde.driver',
+    // iosBundleId: 'driver.buzryde.com',
   );
 
 }

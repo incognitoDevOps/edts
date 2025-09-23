@@ -2,7 +2,7 @@
 
 import 'dart:developer';
 
-import 'package:customer/model/payment_model.dart';
+import 'package:driver/model/payment_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -12,7 +12,7 @@ class PayFastScreen extends StatefulWidget {
   final String htmlData;
   final Payfast payFastSettingData;
 
-  const PayFastScreen({Key? key, required this.htmlData, required this.payFastSettingData}) : super(key: key);
+  const PayFastScreen({super.key, required this.htmlData, required this.payFastSettingData});
 
   @override
   State<PayFastScreen> createState() => _PayFastScreenState();
@@ -84,14 +84,14 @@ class _PayFastScreenState extends State<PayFastScreen> {
       barrierDismissible: true, // user must tap button!
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Cancel Payment'),
-          content: const SingleChildScrollView(
-            child: Text("cancelPayment?"),
+          title:  Text('Cancel Payment'.tr),
+          content:  SingleChildScrollView(
+            child: Text("cancelPayment?".tr),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text(
-                'Exit',
+              child:  Text(
+                'Exit'.tr,
                 style: TextStyle(color: Colors.red),
               ),
               onPressed: () {
@@ -100,8 +100,8 @@ class _PayFastScreenState extends State<PayFastScreen> {
               },
             ),
             TextButton(
-              child: const Text(
-                'Continue Payment',
+              child:  Text(
+                'Continue Payment'.tr,
                 style: TextStyle(color: Colors.green),
               ),
               onPressed: () {

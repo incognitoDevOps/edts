@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:driver/themes/app_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:video_player/video_player.dart';
 
 class FullScreenVideoViewer extends StatefulWidget {
@@ -9,7 +11,7 @@ class FullScreenVideoViewer extends StatefulWidget {
   final String heroTag;
   final File? videoFile;
 
-  const FullScreenVideoViewer({Key? key, required this.videoUrl, required this.heroTag, this.videoFile}) : super(key: key);
+  const FullScreenVideoViewer({super.key, required this.videoUrl, required this.heroTag, this.videoFile});
 
   @override
   _FullScreenVideoViewerState createState() => _FullScreenVideoViewerState();
@@ -33,9 +35,15 @@ class _FullScreenVideoViewerState extends State<FullScreenVideoViewer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        elevation: 0.0,
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 2,
+        backgroundColor: AppColors.primary,
+        leading: InkWell(
+            onTap: () {
+              Get.back();
+            },
+            child: const Icon(
+              Icons.arrow_back,
+            )),
       ),
       body: Container(
           color: Colors.black,

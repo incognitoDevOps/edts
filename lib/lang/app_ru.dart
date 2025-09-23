@@ -1,1 +1,3 @@
-const Map<String, String> ruRU = {'privacy_policy': "Политика конфиденциальности"};
+const Map<String, String> ruRU = {
+  'privacy_policy': "Политика конфиденциальности"
+};

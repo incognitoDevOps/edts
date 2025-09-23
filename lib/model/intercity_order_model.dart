@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:customer/model/admin_commission.dart';
-import 'package:customer/model/coupon_model.dart';
-import 'package:customer/model/freight_vehicle.dart';
-import 'package:customer/model/intercity_service_model.dart';
-import 'package:customer/model/order/location_lat_lng.dart';
-import 'package:customer/model/order/positions.dart';
-import 'package:customer/model/tax_model.dart';
-import 'package:customer/model/zone_model.dart';
+import 'package:driver/model/admin_commission.dart';
+import 'package:driver/model/coupon_model.dart';
+import 'package:driver/model/freight_vehicle.dart';
+import 'package:driver/model/intercity_service_model.dart';
+import 'package:driver/model/order/location_lat_lng.dart';
+import 'package:driver/model/order/positions.dart';
+import 'package:driver/model/tax_model.dart';
+import 'package:driver/model/zone_model.dart';
 
 import 'contact_model.dart';
 

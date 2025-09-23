@@ -5,6 +5,7 @@ import 'package:driver/themes/app_colors.dart';
 import 'package:driver/themes/button_them.dart';
 import 'package:driver/themes/responsive.dart';
 import 'package:driver/ui/auth_screen/register_screen.dart';
+import 'package:driver/ui/auth_screen/reset_password_success_screen.dart';
 import 'package:driver/ui/terms_and_condition/terms_and_condition_screen.dart';
 import 'package:driver/utils/DarkThemeProvider.dart';
 import 'package:flutter/gestures.dart';

@@ -100,8 +100,10 @@ class AuthController extends GetxController {
       );
 
       ShowToastDialog.closeLoader();
-      ShowToastDialog.showToast("Password reset email sent! Check your inbox.");
-      Get.back(); // Close the reset password dialog
+      Get.back(); // Close the reset password dialog first
+      
+      // Show success screen
+      Get.to(() => const ResetPasswordSuccessScreen());
     } on FirebaseAuthException catch (e) {
       ShowToastDialog.closeLoader();
       String message = "Failed to send reset email";

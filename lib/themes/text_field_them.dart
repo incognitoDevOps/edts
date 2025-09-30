@@ -1,6 +1,7 @@
-import 'package:driver/themes/app_colors.dart';
-import 'package:driver/utils/DarkThemeProvider.dart';
+import 'package:customer/themes/app_colors.dart';
+import 'package:customer/utils/DarkThemeProvider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -14,6 +15,7 @@ class TextFieldThem {
     TextInputType keyBoardType = TextInputType.text,
     bool enable = true,
     int maxLine = 1,
+        List<TextInputFormatter>? inputFormatters,
   }) {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
@@ -23,6 +25,7 @@ class TextFieldThem {
         enabled: enable,
         keyboardType: keyBoardType,
         maxLines: maxLine,
+        inputFormatters: inputFormatters,
         style: GoogleFonts.poppins(color: themeChange.getThem() ? Colors.white : Colors.black),
         decoration: InputDecoration(
             filled: true,
@@ -34,7 +37,7 @@ class TextFieldThem {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),
-              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkTextFieldBorder : AppColors.textFieldBorder, width: 1),
+              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),
@@ -51,13 +54,14 @@ class TextFieldThem {
             hintText: hintText));
   }
 
-  static buildTextFiledWithPrefixIcon(BuildContext context,
-      {required String hintText,
-      required TextEditingController controller,
-      required Widget prefix,
-      TextInputType keyBoardType = TextInputType.text,
-      bool enable = true,
-      ValueChanged<String>? onChanged}) {
+  static buildTextFiledWithPrefixIcon(
+    BuildContext context, {
+    required String hintText,
+    required TextEditingController controller,
+    required Widget prefix,
+    TextInputType keyBoardType = TextInputType.text,
+    bool enable = true,
+  }) {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
     return TextFormField(
@@ -66,7 +70,6 @@ class TextFieldThem {
         enabled: enable,
         keyboardType: keyBoardType,
         style: GoogleFonts.poppins(color: themeChange.getThem() ? Colors.white : Colors.black),
-        onChanged: onChanged,
         decoration: InputDecoration(
             prefix: prefix,
             filled: true,
@@ -78,7 +81,7 @@ class TextFieldThem {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),
-              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkTextFieldBorder : AppColors.textFieldBorder, width: 1),
+              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),
@@ -122,7 +125,7 @@ class TextFieldThem {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),
-              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkTextFieldBorder : AppColors.textFieldBorder, width: 1),
+              borderSide: BorderSide(color: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: const BorderRadius.all(Radius.circular(4)),

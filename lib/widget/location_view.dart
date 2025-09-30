@@ -1,6 +1,6 @@
-import 'package:driver/themes/app_colors.dart';
-import 'package:driver/themes/responsive.dart';
-import 'package:driver/utils/DarkThemeProvider.dart';
+import 'package:customer/themes/app_colors.dart';
+import 'package:customer/themes/responsive.dart';
+import 'package:customer/utils/DarkThemeProvider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dash/flutter_dash.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,7 +11,7 @@ class LocationView extends StatelessWidget {
   final String? sourceLocation;
   final String? destinationLocation;
 
-  const LocationView({super.key, this.sourceLocation, this.destinationLocation});
+  const LocationView({Key? key, this.sourceLocation, this.destinationLocation}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -23,8 +23,8 @@ class LocationView extends StatelessWidget {
         Column(
           children: [
             SvgPicture.asset(themeChange.getThem() ? 'assets/icons/ic_source_dark.svg' : 'assets/icons/ic_source.svg', width: 18),
-            Dash(direction: Axis.vertical, length: Responsive.height(6, context), dashLength: 12, dashColor: AppColors.dottedDivider),
-            SvgPicture.asset(themeChange.getThem() ? 'assets/icons/ic_destination_dark.svg' : 'assets/icons/ic_destination.svg', width: 20),
+            Dash(direction: Axis.vertical, length: Responsive.height(4, context), dashLength: 6, dashColor: AppColors.dottedDivider),
+            SvgPicture.asset(themeChange.getThem() ? 'assets/icons/ic_destination_dark.svg' : 'assets/icons/ic_destination.svg', width: 18),
           ],
         ),
         const SizedBox(
@@ -36,11 +36,7 @@ class LocationView extends StatelessWidget {
             children: [
               Text(sourceLocation.toString(), maxLines: 2, style: GoogleFonts.poppins()),
               SizedBox(height: sourceLocation!.length > 35 ? Responsive.height(1, context) : Responsive.height(3, context)),
-              Text(
-                destinationLocation.toString(),
-                maxLines: 2,
-                style: GoogleFonts.poppins(),
-              )
+              Text(destinationLocation.toString(), maxLines: 2, style: GoogleFonts.poppins())
             ],
           ),
         ),

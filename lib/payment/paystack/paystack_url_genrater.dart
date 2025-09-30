@@ -1,13 +1,13 @@
 import 'dart:convert';
 
-import 'package:driver/model/driver_user_model.dart';
-import 'package:driver/model/payment_model.dart';
-import 'package:driver/payment/paystack/pay_stack_url_model.dart';
+import 'package:customer/model/payment_model.dart';
+import 'package:customer/model/user_model.dart';
+import 'package:customer/payment/paystack/pay_stack_url_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class PayStackURLGen {
-  static Future payStackURLGen({required String amount, required String secretKey, required String currency, required DriverUserModel userModel}) async {
+  static Future payStackURLGen({required String amount, required String secretKey, required String currency, required UserModel userModel}) async {
     const url = "https://api.paystack.co/transaction/initialize";
     final response = await http.post(Uri.parse(url), body: {
       "email": userModel.email,
@@ -45,10 +45,9 @@ class PayStackURLGen {
     }
 
     return data["status"];
-
   }
 
-  static Future<String> getPayHTML({required String amount, required Payfast payFastSettingData, required DriverUserModel userModel}) async {
+  static Future<String> getPayHTML({required String amount, required Payfast payFastSettingData, required UserModel userModel}) async {
     String newUrl = 'https://${payFastSettingData.isSandbox == false ? "www" : "sandbox"}.payfast.co.za/eng/process';
     Map body = {
       'merchant_id': payFastSettingData.merchantId,
@@ -59,8 +58,8 @@ class PayStackURLGen {
       'cancel_url': payFastSettingData.cancelUrl,
       'notify_url': payFastSettingData.notifyUrl,
       'name_first': userModel.fullName,
-      'name_last':  userModel.fullName,
-      'email_address':  userModel.email,
+      'name_last': userModel.fullName,
+      'email_address': userModel.email,
     };
 
     final response = await http.post(

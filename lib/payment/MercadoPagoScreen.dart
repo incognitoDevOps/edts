@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:driver/constant/constant.dart';
+import 'package:customer/constant/constant.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -9,9 +9,9 @@ class MercadoPagoScreen extends StatefulWidget {
   final String initialURl;
 
   const MercadoPagoScreen({
-    super.key,
+    Key? key,
     required this.initialURl,
-  });
+  }) : super(key: key);
 
   @override
   State<MercadoPagoScreen> createState() => _MercadoPagoScreenState();
@@ -59,7 +59,7 @@ class _MercadoPagoScreenState extends State<MercadoPagoScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-            title:  Text("Payment".tr),
+            title: const Text("Payment"),
             centerTitle: false,
             leading: GestureDetector(
               onTap: () {
@@ -81,14 +81,14 @@ class _MercadoPagoScreenState extends State<MercadoPagoScreen> {
       barrierDismissible: true, // user must tap button!
       builder: (BuildContext context) {
         return AlertDialog(
-          title:  Text('Cancel Payment'.tr),
-          content:  SingleChildScrollView(
-            child: Text("cancelPayment?".tr),
+          title: const Text('Cancel Payment'),
+          content: const SingleChildScrollView(
+            child: Text("cancelPayment?"),
           ),
           actions: <Widget>[
             TextButton(
-              child:  Text(
-                'Cancel'.tr,
+              child: const Text(
+                'Cancel',
                 style: TextStyle(color: Colors.red),
               ),
               onPressed: () {
@@ -97,8 +97,8 @@ class _MercadoPagoScreenState extends State<MercadoPagoScreen> {
               },
             ),
             TextButton(
-              child:  Text(
-                'Continue'.tr,
+              child: const Text(
+                'Continue',
                 style: TextStyle(color: Colors.green),
               ),
               onPressed: () {

@@ -1,11 +1,9 @@
 import 'dart:convert';
 
-
-import 'package:driver/constant/constant.dart';
-import 'package:driver/model/payment_model.dart';
-import 'package:driver/payment/createRazorPayOrderModel.dart';
+import 'package:customer/constant/constant.dart';
+import 'package:customer/model/payment_model.dart';
+import 'package:customer/payment/createRazorPayOrderModel.dart';
 import 'package:http/http.dart' as http;
-
 
 class RazorPayController {
   Future<CreateRazorPayOrderModel?> createOrderRazorPay({required int amount, required RazorpayModel? razorpayModel}) async {

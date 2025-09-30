@@ -1,68 +1,65 @@
-import 'package:driver/constant/show_toast_dialog.dart';
-import 'package:driver/ui/auth_screen/login_screen.dart';
-import 'package:driver/ui/auth_screen/pending_approval_screen.dart';
-import 'package:driver/ui/bank_details/bank_details_screen.dart';
-import 'package:driver/ui/chat_screen/inbox_screen.dart';
-import 'package:driver/ui/freight/freight_screen.dart';
-import 'package:driver/ui/home_screens/home_screen.dart';
-import 'package:driver/ui/intercity_screen/home_intercity_screen.dart';
-import 'package:driver/ui/online_registration/online_registartion_screen.dart';
-import 'package:driver/ui/profile_screen/profile_screen.dart';
-import 'package:driver/ui/settings_screen/setting_screen.dart';
-import 'package:driver/ui/vehicle_information/vehicle_information_screen.dart';
-import 'package:driver/ui/wallet/wallet_screen.dart';
-import 'package:driver/utils/location_service.dart';
-import 'package:driver/model/driver_user_model.dart';
-import 'package:driver/utils/fire_store_utils.dart';
+import 'package:customer/constant/show_toast_dialog.dart';
+import 'package:customer/ui/auth_screen/login_screen.dart';
+import 'package:customer/ui/chat_screen/inbox_screen.dart';
+import 'package:customer/ui/chat_bot/chatbot.dart';
+import 'package:customer/ui/contact_us/contact_us_screen.dart';
+import 'package:customer/ui/faq/faq_screen.dart';
+import 'package:customer/ui/home_screens/home_screen_improved.dart';
+import 'package:customer/ui/interCity/interCity_screen.dart';
+import 'package:customer/ui/intercityOrders/intercity_order_screen.dart';
+import 'package:customer/ui/orders/order_screen.dart';
+import 'package:customer/ui/profile_screen/profile_screen.dart';
+import 'package:customer/ui/referral_screen/referral_screen.dart';
+import 'package:customer/ui/settings_screen/setting_screen.dart';
+import 'package:customer/ui/wallet/wallet_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 
 class DashBoardController extends GetxController {
   final drawerItems = [
-    DrawerItem('City'.tr, "assets/icons/ic_city.svg"),
-    // DrawerItem('Rides'.tr, "assets/icons/ic_order.svg"),
-    DrawerItem('OutStation'.tr, "assets/icons/ic_intercity.svg"),
-    // DrawerItem('OutStation Rides'.tr, "assets/icons/ic_order.svg"),
-    DrawerItem('Freight'.tr, "assets/icons/ic_freight.svg"),
-    DrawerItem('My Wallet'.tr, "assets/icons/ic_wallet.svg"),
-    DrawerItem('Bank Details'.tr, "assets/icons/ic_profile.svg"),
-    DrawerItem('Inbox'.tr, "assets/icons/ic_inbox.svg"),
-    DrawerItem('Profile'.tr, "assets/icons/ic_profile.svg"),
-    DrawerItem('Online Registration'.tr, "assets/icons/ic_document.svg"),
-    DrawerItem('Vehicle Information'.tr, "assets/icons/ic_city.svg"),
-    DrawerItem('Settings'.tr, "assets/icons/ic_settings.svg"),
-    DrawerItem('Log out'.tr, "assets/icons/ic_logout.svg"),
+    DrawerItem('Ride Now'.tr, "assets/icons/ic_city.svg", ""),
+    DrawerItem('City to city'.tr, "assets/icons/ic_intercity.svg", "Coming soon"),
+    DrawerItem('Rides History'.tr, "assets/icons/ic_order.svg", ""),
+    DrawerItem('OutStation History'.tr, "assets/icons/ic_order.svg", ""),
+    DrawerItem('My Wallet'.tr, "assets/icons/ic_wallet.svg", ""),
+    DrawerItem('Settings'.tr, "assets/icons/ic_settings.svg", ""),
+    DrawerItem('Refer a friends'.tr, "assets/icons/ic_referral.svg", "Coming soon"),
+    DrawerItem('Inbox'.tr, "assets/icons/ic_inbox.svg", ""),
+    DrawerItem('My Profile'.tr, "assets/icons/ic_profile.svg", ""),
+    DrawerItem('Support'.tr, "assets/icons/ic_support.svg", ""),
+    DrawerItem('Contact us'.tr, "assets/icons/ic_contact_us.svg", ""),
+    DrawerItem('FAQs'.tr, "assets/icons/ic_faq.svg", ""),
+    DrawerItem('Log out'.tr, "assets/icons/ic_logout.svg", ""),
   ];
 
   getDrawerItemWidget(int pos) {
     switch (pos) {
       case 0:
-        return const HomeScreen();
-      // case 1:
-      //   return const OrderScreen();
+        return const HomeScreenImproved();
       case 1:
-        return const HomeIntercityScreen();
-      // case 2:
-      //   return const OrderIntercityScreen();
+        return const Center(child: Text("Coming Soon"));
       case 2:
-        return const FreightScreen();
+        return const OrderScreen();
       case 3:
-        return const WalletScreen();
+        return const InterCityOrderScreen();
       case 4:
-        return const BankDetailsScreen();
+        return const WalletScreen();
       case 5:
-        return const InboxScreen();
-      case 6:
-        return const ProfileScreen();
-      case 7:
-        return const OnlineRegistrationScreen();
-      case 8:
-        return const VehicleInformationScreen();
-      case 9:
         return const SettingScreen();
+      case 6:
+        return const ReferralScreen();
+      case 7:
+        return const InboxScreen();
+      case 8:
+        return const ProfileScreen();
+      case 9:
+        return const ChatBotApp();
+      case 10:
+      return const ContactUsScreen();
+      case 11:
+        return const FaqScreen();
       default:
         return const Text("Error");
     }
@@ -71,38 +68,13 @@ class DashBoardController extends GetxController {
   RxInt selectedDrawerIndex = 0.obs;
 
   onSelectItem(int index) async {
-    if (index == 10) {
+    if (index == 12) {
       await FirebaseAuth.instance.signOut();
       Get.offAll(const LoginScreen());
     } else {
       selectedDrawerIndex.value = index;
+      Get.back();
     }
-    Get.back();
-  }
-
-  @override
-  void onInit() {
-    // TODO: implement onInit
-    checkUserApprovalStatus();
-    initializeLocation();
-    super.onInit();
-  }
-
-  /// Check if user is still approved and redirect if not
-  checkUserApprovalStatus() async {
-    try {
-      DriverUserModel? user = await FireStoreUtils.getDriverProfile(FireStoreUtils.getCurrentUid());
-      if (user != null && user.approvalStatus != 'approved') {
-        Get.offAll(() => const PendingApprovalScreen());
-      }
-    } catch (e) {
-      print("Error checking user status: $e");
-    }
-  }
-
-  /// Initialize location services
-  initializeLocation() async {
-    await LocationService.instance.getCurrentLocation(showLoader: false);
   }
 
   Rx<DateTime> currentBackPressTime = DateTime.now().obs;
@@ -121,6 +93,7 @@ class DashBoardController extends GetxController {
 class DrawerItem {
   String title;
   String icon;
+  String status; // e.g. "Coming soon"
 
-  DrawerItem(this.title, this.icon);
+  DrawerItem(this.title, this.icon, this.status);
 }

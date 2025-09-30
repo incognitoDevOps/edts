@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primary = Color(0xff000000);
-  static const Color darkModePrimary = Color(0xff86E837);
+  static const Color primary = Color(0xFF00C6A0); // changed from black to teal for light mode
+  static const Color darkModePrimary = Colors.teal; // unchanged
 
   static const Color background = Color(0xffFFFFFF);
   static const Color darkBackground = Color(0xff191B1A);
@@ -28,6 +28,7 @@ class AppColors {
   static const Color darkTextField = Color(0xFF202020);
   static const Color darkTextFieldBorder = Color(0xFF6C6C6C);
 
+  static const Color darkInvite = Color(0xff3D3D3D);
   static const Color darkService = Color(0xff282828);
   static const Color onBoarding = Color(0xffE7E8EE);
 

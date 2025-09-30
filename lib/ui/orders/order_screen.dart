@@ -4,6 +4,7 @@ import 'package:customer/constant/constant.dart';
 import 'package:customer/model/order_model.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/themes/responsive.dart';
+import 'package:customer/ui/home_screens/last_active_ride_screen.dart';
 import 'package:customer/ui/orders/complete_order_screen.dart';
 import 'package:customer/ui/orders/live_tracking_screen.dart';
 import 'package:customer/ui/orders/order_details_screen.dart';
@@ -106,71 +107,81 @@ class OrderScreen extends StatelessWidget {
   }
 
   Widget _buildOrderCard(BuildContext context, DarkThemeProvider themeChange, OrderModel orderModel) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder,
-          width: 0.5,
+    return InkWell(
+      onTap: () {
+        // Make active rides clickable to navigate to last active ride screen
+        if (orderModel.status == Constant.ridePlaced ||
+            orderModel.status == Constant.rideActive ||
+            orderModel.status == Constant.rideInProgress) {
+          Get.to(() => const LastActiveRideScreen());
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder,
+            width: 0.5,
+          ),
+          boxShadow: themeChange.getThem()
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
-        boxShadow: themeChange.getThem()
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Order header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    "#${orderModel.id?.substring(0, 8).toUpperCase() ?? 'Unknown'}",
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Order header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      "#${orderModel.id?.substring(0, 8).toUpperCase() ?? 'Unknown'}",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                ),
-                _buildStatusChip(orderModel.status ?? "Unknown"),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  _buildStatusChip(orderModel.status ?? "Unknown"),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-            // Location information
-            LocationView(
-              sourceLocation: orderModel.sourceLocationName ?? "Unknown pickup",
-              destinationLocation: orderModel.destinationLocationName ?? "Unknown destination",
-            ),
-            const SizedBox(height: 12),
+              // Location information
+              LocationView(
+                sourceLocation: orderModel.sourceLocationName ?? "Unknown pickup",
+                destinationLocation: orderModel.destinationLocationName ?? "Unknown destination",
+              ),
+              const SizedBox(height: 12),
 
-            // Driver information with enhanced error handling
-            if (orderModel.driverId != null && orderModel.driverId!.isNotEmpty)
-              DriverView(
-                driverId: orderModel.driverId!,
-                amount: orderModel.finalRate ?? orderModel.offerRate ?? "0",
-                showCallButton: orderModel.status == Constant.rideActive || orderModel.status == Constant.rideInProgress,
-                showMessageButton: orderModel.status == Constant.rideActive || orderModel.status == Constant.rideInProgress,
-              )
-            else
-              _buildLookingForDriverState(orderModel),
+              // Driver information with enhanced error handling - render in ALL tabs
+              if (orderModel.driverId != null && orderModel.driverId!.isNotEmpty)
+                DriverView(
+                  driverId: orderModel.driverId!,
+                  amount: orderModel.finalRate ?? orderModel.offerRate ?? "0",
+                  showCallButton: orderModel.status == Constant.rideActive || orderModel.status == Constant.rideInProgress,
+                  showMessageButton: orderModel.status == Constant.rideActive || orderModel.status == Constant.rideInProgress,
+                )
+              else
+                _buildLookingForDriverState(orderModel),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Action buttons
-            _buildActionButtons(context, orderModel),
-          ],
+              // Action buttons
+              _buildActionButtons(context, orderModel),
+            ],
+          ),
         ),
       ),
     );

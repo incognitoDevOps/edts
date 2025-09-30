@@ -547,36 +547,79 @@ class BookingDetailsScreen extends StatelessWidget {
   void _handleInstantBooking(BuildContext context, HomeController controller) async {
     if (controller.selectedPaymentMethod.value.isEmpty) {
       ShowToastDialog.showToast("Please select Payment Method".tr);
-    } else if (controller.sourceLocationController.value.text.isEmpty) {
-      ShowToastDialog.showToast("Please select source location".tr);
-    } else if (controller.destinationLocationController.value.text.isEmpty) {
-      ShowToastDialog.showToast("Please select destination location".tr);
-    } else if (double.parse(controller.distance.value) <= 2) {
-      ShowToastDialog.showToast("Please select more than two ${Constant.distanceType} location".tr);
-    } else if (controller.selectedType.value.offerRate == true && controller.offerYourRateController.value.text.isEmpty) {
-      ShowToastDialog.showToast("Please Enter offer rate".tr);
-    } else {
-      final qrData = QrRouteModel(
-        userId: FireStoreUtils.getCurrentUid(),
-        sourceLocationName: controller.sourceLocationController.value.text,
-        destinationLocationName: controller.destinationLocationController.value.text,
-        sourceLatitude: controller.sourceLocationLAtLng.value.latitude!,
-        sourceLongitude: controller.sourceLocationLAtLng.value.longitude!,
-        destLatitude: controller.destinationLocationLAtLng.value.latitude!,
-        destLongitude: controller.destinationLocationLAtLng.value.longitude!,
-        distance: controller.distance.value,
-        distanceType: Constant.distanceType,
-        offerRate: controller.selectedType.value.offerRate == true 
-            ? controller.offerYourRateController.value.text 
-            : controller.amount.value,
-        finalRate: controller.selectedType.value.offerRate == true 
-            ? controller.offerYourRateController.value.text 
-            : controller.amount.value,
-        paymentType: controller.selectedPaymentMethod.value,
-      );
-      
-      Get.to(() => QrCodeScreen(routeData: qrData));
+      return;
     }
+
+    if (controller.sourceLocationController.value.text.isEmpty) {
+      ShowToastDialog.showToast("Please select source location".tr);
+      return;
+    }
+
+    if (controller.destinationLocationController.value.text.isEmpty) {
+      ShowToastDialog.showToast("Please select destination location".tr);
+      return;
+    }
+
+    if (double.parse(controller.distance.value) <= 2) {
+      ShowToastDialog.showToast("Please select more than two ${Constant.distanceType} location".tr);
+      return;
+    }
+
+    if (controller.selectedType.value.offerRate == true && controller.offerYourRateController.value.text.isEmpty) {
+      ShowToastDialog.showToast("Please Enter offer rate".tr);
+      return;
+    }
+
+    // Check wallet balance if wallet payment is selected
+    if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
+      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+      if (user != null) {
+        double walletBalance = double.parse(user.walletAmount ?? "0.0");
+        double payableAmount = double.parse(
+          controller.selectedType.value.offerRate == true
+              ? controller.offerYourRateController.value.text
+              : controller.amount.value
+        );
+
+        // Add tax calculation to payable amount
+        if (Constant.taxList != null) {
+          for (var tax in Constant.taxList!) {
+            payableAmount += Constant().calculateTax(
+              amount: controller.selectedType.value.offerRate == true
+                  ? controller.offerYourRateController.value.text
+                  : controller.amount.value,
+              taxModel: tax
+            );
+          }
+        }
+
+        if (walletBalance < payableAmount) {
+          ShowToastDialog.showToast("Insufficient balance. Please top up your wallet or choose another payment method.");
+          return;
+        }
+      }
+    }
+
+    final qrData = QrRouteModel(
+      userId: FireStoreUtils.getCurrentUid(),
+      sourceLocationName: controller.sourceLocationController.value.text,
+      destinationLocationName: controller.destinationLocationController.value.text,
+      sourceLatitude: controller.sourceLocationLAtLng.value.latitude!,
+      sourceLongitude: controller.sourceLocationLAtLng.value.longitude!,
+      destLatitude: controller.destinationLocationLAtLng.value.latitude!,
+      destLongitude: controller.destinationLocationLAtLng.value.longitude!,
+      distance: controller.distance.value,
+      distanceType: Constant.distanceType,
+      offerRate: controller.selectedType.value.offerRate == true
+          ? controller.offerYourRateController.value.text
+          : controller.amount.value,
+      finalRate: controller.selectedType.value.offerRate == true
+          ? controller.offerYourRateController.value.text
+          : controller.amount.value,
+      paymentType: controller.selectedPaymentMethod.value,
+    );
+
+    Get.to(() => QrCodeScreen(routeData: qrData));
   }
 
   // Book ride handler
@@ -586,37 +629,51 @@ class BookingDetailsScreen extends StatelessWidget {
       ShowToastDialog.showToast("Please select Payment Method".tr);
       return;
     }
-    
+
     // Check wallet balance if wallet payment is selected
     if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
       final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
       if (user != null) {
         double walletBalance = double.parse(user.walletAmount ?? "0.0");
         double payableAmount = double.parse(controller.amount.value);
-        
+
         // Add tax calculation to payable amount
         if (Constant.taxList != null) {
           for (var tax in Constant.taxList!) {
             payableAmount += Constant().calculateTax(
-              amount: controller.amount.value, 
+              amount: controller.amount.value,
               taxModel: tax
             );
           }
         }
-        
+
         if (walletBalance < payableAmount) {
           ShowToastDialog.showToast("Insufficient balance. Please top up your wallet or choose another payment method.");
           return;
         }
       }
     }
-    
-    // Use the enhanced booking method from controller
-    bool success = await controller.bookRide();
-    
-    if (success) {
-      // Navigate to active ride screen
-      Get.offAll(() => const LastActiveRideScreen());
+
+    // Show loading indicator while booking
+    ShowToastDialog.showLoader("Booking your ride...");
+
+    try {
+      // Use the enhanced booking method from controller
+      bool success = await controller.bookRide();
+
+      // Close the loader
+      ShowToastDialog.closeLoader();
+
+      if (success) {
+        ShowToastDialog.showToast("Ride booked successfully! Finding drivers...");
+        // Navigate to active ride screen
+        Get.offAll(() => const LastActiveRideScreen());
+      } else {
+        ShowToastDialog.showToast("Failed to book ride. Please try again.");
+      }
+    } catch (e) {
+      ShowToastDialog.closeLoader();
+      ShowToastDialog.showToast("Error booking ride: ${e.toString()}");
     }
   }
 

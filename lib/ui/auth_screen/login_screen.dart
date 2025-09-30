@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_code_picker/country_code_picker.dart';
+<<<<<<< HEAD
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/login_controller.dart';
@@ -12,6 +13,17 @@ import 'package:customer/ui/dashboard_screen.dart';
 import 'package:customer/utils/DarkThemeProvider.dart';
 import 'package:customer/utils/fire_store_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+=======
+import 'package:driver/controller/auth_controller.dart';
+import 'package:driver/themes/app_colors.dart';
+import 'package:driver/themes/button_them.dart';
+import 'package:driver/themes/responsive.dart';
+import 'package:driver/ui/auth_screen/register_screen.dart';
+import 'package:driver/ui/auth_screen/reset_password_success_screen.dart';
+import 'package:driver/ui/terms_and_condition/terms_and_condition_screen.dart';
+import 'package:driver/utils/DarkThemeProvider.dart';
+import 'package:flutter/gestures.dart';
+>>>>>>> 7d7664a3f4dcb31b4429b902b784e67e905b9fc0
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';

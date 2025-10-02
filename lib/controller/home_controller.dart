@@ -62,6 +62,9 @@ class HomeController extends GetxController {
     AppColors.serviceColor3,
   ];
 
+  var isBooking = false.obs;
+var isInstantBooking = false.obs;
+
   @override
   void onInit() {
     // TODO: implement onInit

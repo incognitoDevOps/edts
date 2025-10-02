@@ -747,7 +747,7 @@ class _DriverInfoCard extends StatelessWidget {
                   children: [
                     Text(
                       driver.fullName ?? 'Driver',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 16),
                     ),
                     if (driver.vehicleInformation != null)
                       Text(
@@ -757,7 +757,7 @@ class _DriverInfoCard extends StatelessWidget {
                     if (driver.vehicleInformation?.vehicleNumber != null)
                       Text(
                         driver.vehicleInformation!.vehicleNumber!,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.grey[600]),
                       ),
                   ],
                 ),
@@ -773,7 +773,7 @@ class _DriverInfoCard extends StatelessWidget {
                           reviewCount: driver.reviewsCount ?? "0",
                           reviewSum: driver.reviewsSum ?? "0",
                         ),
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.grey[600]),
                       ),
                     ],
                   ),

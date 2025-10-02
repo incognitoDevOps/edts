@@ -19,14 +19,16 @@ import 'package:permission_handler/permission_handler.dart';
 class BookingDetailsScreen extends StatelessWidget {
   final HomeController homeController;
 
-  const BookingDetailsScreen({Key? key, required this.homeController}) : super(key: key);
+  const BookingDetailsScreen({Key? key, required this.homeController})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
     return Scaffold(
-      backgroundColor: themeChange.getThem() ? AppColors.darkBackground : Colors.grey[50],
+      backgroundColor:
+          themeChange.getThem() ? AppColors.darkBackground : Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -51,9 +53,11 @@ class BookingDetailsScreen extends StatelessWidget {
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.only(bottom: 0), // remove extra space for floating card
+              padding: const EdgeInsets.only(
+                  bottom: 0), // remove extra space for floating card
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -82,8 +86,10 @@ class BookingDetailsScreen extends StatelessWidget {
                 top: false,
                 child: Container(
                   width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
@@ -99,13 +105,71 @@ class BookingDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
+            // Global loading overlay
+            Obx(() => _buildLoadingOverlay(homeController.isBooking.value)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTripSummaryHeader(BuildContext context, DarkThemeProvider themeChange) {
+  Widget _buildLoadingOverlay(bool isLoading) {
+    return isLoading
+        ? Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        strokeWidth: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Booking Ride...',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Please wait',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+  }
+
+  Widget _buildTripSummaryHeader(
+      BuildContext context, DarkThemeProvider themeChange) {
     return Obx(() {
       if (homeController.sourceLocationLAtLng.value.latitude == null ||
           homeController.destinationLocationLAtLng.value.latitude == null ||
@@ -159,7 +223,8 @@ class BookingDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        homeController.selectedType.value.title ?? 'Selected Vehicle',
+                        homeController.selectedType.value.title ??
+                            'Selected Vehicle',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -186,15 +251,15 @@ class BookingDetailsScreen extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Trip details
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildTripDetailItem('Distance', 
-                  '${double.parse(homeController.distance.value).toStringAsFixed(1)} ${Constant.distanceType}'),
+                _buildTripDetailItem('Distance',
+                    '${double.parse(homeController.distance.value).toStringAsFixed(1)} ${Constant.distanceType}'),
                 Container(
                   width: 1,
                   height: 30,
@@ -206,7 +271,8 @@ class BookingDetailsScreen extends StatelessWidget {
                   height: 30,
                   color: Colors.grey[300],
                 ),
-                _buildTripDetailItem('Price', Constant.amountShow(amount: homeController.amount.value)),
+                _buildTripDetailItem('Price',
+                    Constant.amountShow(amount: homeController.amount.value)),
               ],
             ),
           ],
@@ -237,12 +303,13 @@ class BookingDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOfferRateSection(BuildContext context, DarkThemeProvider themeChange) {
+  Widget _buildOfferRateSection(
+      BuildContext context, DarkThemeProvider themeChange) {
     return Obx(() {
       if (homeController.selectedType.value.offerRate != true) {
         return const SizedBox.shrink();
       }
-      
+
       return Container(
         margin: const EdgeInsets.only(bottom: 20),
         padding: const EdgeInsets.all(16),
@@ -298,7 +365,8 @@ class BookingDetailsScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildPassengerSection(BuildContext context, DarkThemeProvider themeChange) {
+  Widget _buildPassengerSection(
+      BuildContext context, DarkThemeProvider themeChange) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -323,7 +391,8 @@ class BookingDetailsScreen extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.person_outline, color: AppColors.primary, size: 20),
+                child: Icon(Icons.person_outline,
+                    color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Text(
@@ -349,48 +418,55 @@ class BookingDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Obx(() => Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: themeChange.getThem() ? Colors.grey[800] : Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: themeChange.getThem() ? Colors.grey[700]! : Colors.grey[300]!,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  child: Icon(
-                    Icons.person,
-                    color: AppColors.primary,
-                    size: 16,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: themeChange.getThem()
+                      ? Colors.grey[800]
+                      : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: themeChange.getThem()
+                        ? Colors.grey[700]!
+                        : Colors.grey[300]!,
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    homeController.selectedTakingRide.value.fullName == "Myself"
-                        ? "Myself".tr
-                        : homeController.selectedTakingRide.value.fullName.toString(),
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                      child: Icon(
+                        Icons.person,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        homeController.selectedTakingRide.value.fullName ==
+                                "Myself"
+                            ? "Myself".tr
+                            : homeController.selectedTakingRide.value.fullName
+                                .toString(),
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentSection(BuildContext context, DarkThemeProvider themeChange) {
+  Widget _buildPaymentSection(
+      BuildContext context, DarkThemeProvider themeChange) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -430,152 +506,251 @@ class BookingDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Obx(() => InkWell(
-            onTap: () => paymentMethodDialog(context, homeController),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: themeChange.getThem() ? Colors.grey[800] : Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: themeChange.getThem() ? Colors.grey[700]! : Colors.grey[300]!,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.credit_card,
-                      color: Colors.green,
-                      size: 16,
+                onTap: () => paymentMethodDialog(context, homeController),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: themeChange.getThem()
+                        ? Colors.grey[800]
+                        : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: themeChange.getThem()
+                          ? Colors.grey[700]!
+                          : Colors.grey[300]!,
+                      width: 1,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      homeController.selectedPaymentMethod.value.isNotEmpty 
-                        ? homeController.selectedPaymentMethod.value 
-                        : "Select Payment type".tr,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: homeController.selectedPaymentMethod.value.isNotEmpty
-                          ? Theme.of(context).textTheme.bodyLarge?.color
-                          : Colors.grey[600],
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.credit_card,
+                          color: Colors.green,
+                          size: 16,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          homeController.selectedPaymentMethod.value.isNotEmpty
+                              ? homeController.selectedPaymentMethod.value
+                              : "Select Payment type".tr,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: homeController
+                                    .selectedPaymentMethod.value.isNotEmpty
+                                ? Theme.of(context).textTheme.bodyLarge?.color
+                                : Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.grey[400],
+                        size: 20,
+                      ),
+                    ],
                   ),
-                  Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.grey[400],
-                    size: 20,
-                  ),
-                ],
-              ),
-            ),
-          )),
+                ),
+              )),
         ],
       ),
     );
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => _handleInstantBooking(context, homeController),
-              icon: Icon(Icons.qr_code, color: Colors.white),
-              label: Text(
-                "Instant Booking".tr,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+    return Obx(() {
+      final isBooking = homeController.isBooking.value;
+      final isInstantBooking = homeController.isInstantBooking.value;
+      
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: isBooking ? null : () => _handleInstantBooking(context, homeController),
+                icon: isInstantBooking 
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(Icons.qr_code, color: Colors.white),
+                label: isInstantBooking 
+                    ? Text(
+                        "Processing...".tr,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        "Instant Booking".tr,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isBooking 
+                      ? AppColors.primary.withOpacity(0.5)
+                      : AppColors.primary.withOpacity(0.8),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 0),
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary.withOpacity(0.8),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 0),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => _handleBookRide(context, homeController),
-              icon: Icon(Icons.directions_car, color: Colors.white),
-              label: Text(
-                "Book Ride".tr,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: isBooking ? null : () => _handleBookRide(context, homeController),
+                icon: isBooking && !isInstantBooking
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(Icons.directions_car, color: Colors.white),
+                label: isBooking && !isInstantBooking
+                    ? Text(
+                        "Booking...".tr,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        "Book Ride".tr,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isBooking 
+                      ? Colors.grey[400]!
+                      : AppColors.primary,
+                  elevation: isBooking ? 0 : 2,
+                  shadowColor: isBooking ? Colors.transparent : AppColors.primary.withOpacity(0.3),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 0),
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                elevation: 2,
-                shadowColor: AppColors.primary.withOpacity(0.3),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 0),
               ),
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 
   // Instant booking handler
-  void _handleInstantBooking(BuildContext context, HomeController controller) async {
+  void _handleInstantBooking(
+      BuildContext context, HomeController controller) async {
     if (controller.selectedPaymentMethod.value.isEmpty) {
       ShowToastDialog.showToast("Please select Payment Method".tr);
     } else if (controller.sourceLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select source location".tr);
     } else if (controller.destinationLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select destination location".tr);
-    } else if (double.parse(controller.distance.value) <= 2) {
-      ShowToastDialog.showToast("Please select more than two ${Constant.distanceType} location".tr);
-    } else if (controller.selectedType.value.offerRate == true && controller.offerYourRateController.value.text.isEmpty) {
+    } else if (double.parse(controller.distance.value) <= 1) {
+      ShowToastDialog.showToast(
+          "Please select more than one ${Constant.distanceType} location".tr);
+    } else if (controller.selectedType.value.offerRate == true &&
+        controller.offerYourRateController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please Enter offer rate".tr);
     } else {
-      final qrData = QrRouteModel(
-        userId: FireStoreUtils.getCurrentUid(),
-        sourceLocationName: controller.sourceLocationController.value.text,
-        destinationLocationName: controller.destinationLocationController.value.text,
-        sourceLatitude: controller.sourceLocationLAtLng.value.latitude!,
-        sourceLongitude: controller.sourceLocationLAtLng.value.longitude!,
-        destLatitude: controller.destinationLocationLAtLng.value.latitude!,
-        destLongitude: controller.destinationLocationLAtLng.value.longitude!,
-        distance: controller.distance.value,
-        distanceType: Constant.distanceType,
-        offerRate: controller.selectedType.value.offerRate == true 
-            ? controller.offerYourRateController.value.text 
-            : controller.amount.value,
-        finalRate: controller.selectedType.value.offerRate == true 
-            ? controller.offerYourRateController.value.text 
-            : controller.amount.value,
-        paymentType: controller.selectedPaymentMethod.value,
-      );
-      
-      Get.to(() => QrCodeScreen(routeData: qrData));
+      try {
+        // Show loading state
+        controller.isBooking.value = true;
+        controller.isInstantBooking.value = true;
+
+        // Step 1: Determine base amount (offer or regular)
+        double baseAmount = double.parse(
+          controller.selectedType.value.offerRate == true
+              ? controller.offerYourRateController.value.text
+              : controller.amount.value,
+        );
+
+        // Step 2: Calculate total payable amount including tax
+        double payableAmount = baseAmount;
+        if (Constant.taxList != null) {
+          for (var tax in Constant.taxList!) {
+            payableAmount += Constant().calculateTax(
+              amount: baseAmount.toString(),
+              taxModel: tax,
+            );
+          }
+        }
+
+        // Step 3: Wallet balance check
+        if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
+          final user =
+              await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+          if (user != null) {
+            double walletBalance = double.parse(user.walletAmount ?? "0.0");
+
+            if (walletBalance < payableAmount) {
+              ShowToastDialog.showToast(
+                  "Insufficient balance. Please top up your wallet or choose another payment method.");
+              return; // Don't proceed if balance is not enough
+            }
+          }
+        }
+
+        // Add a small delay to show the loading state (optional)
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Step 4: Proceed to QR code screen
+        final qrData = QrRouteModel(
+          userId: FireStoreUtils.getCurrentUid(),
+          sourceLocationName: controller.sourceLocationController.value.text,
+          destinationLocationName:
+              controller.destinationLocationController.value.text,
+          sourceLatitude: controller.sourceLocationLAtLng.value.latitude!,
+          sourceLongitude: controller.sourceLocationLAtLng.value.longitude!,
+          destLatitude: controller.destinationLocationLAtLng.value.latitude!,
+          destLongitude: controller.destinationLocationLAtLng.value.longitude!,
+          distance: controller.distance.value,
+          distanceType: Constant.distanceType,
+          offerRate: baseAmount.toString(),
+          finalRate: payableAmount.toString(),
+          paymentType: controller.selectedPaymentMethod.value,
+        );
+
+        Get.to(() => QrCodeScreen(routeData: qrData));
+      } catch (e) {
+        ShowToastDialog.showToast("Error processing instant booking: $e");
+      } finally {
+        // Reset loading state
+        controller.isBooking.value = false;
+        controller.isInstantBooking.value = false;
+      }
     }
   }
 
@@ -586,37 +761,52 @@ class BookingDetailsScreen extends StatelessWidget {
       ShowToastDialog.showToast("Please select Payment Method".tr);
       return;
     }
-    
-    // Check wallet balance if wallet payment is selected
-    if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
-      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-      if (user != null) {
-        double walletBalance = double.parse(user.walletAmount ?? "0.0");
-        double payableAmount = double.parse(controller.amount.value);
-        
-        // Add tax calculation to payable amount
-        if (Constant.taxList != null) {
-          for (var tax in Constant.taxList!) {
-            payableAmount += Constant().calculateTax(
-              amount: controller.amount.value, 
-              taxModel: tax
-            );
+
+    try {
+      // Show loading state
+      controller.isBooking.value = true;
+      controller.isInstantBooking.value = false;
+
+      // Check wallet balance if wallet payment is selected
+      if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
+        final user =
+            await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+        if (user != null) {
+          double walletBalance = double.parse(user.walletAmount ?? "0.0");
+          double payableAmount = double.parse(controller.amount.value);
+
+          // Add tax calculation to payable amount
+          if (Constant.taxList != null) {
+            for (var tax in Constant.taxList!) {
+              payableAmount += Constant()
+                  .calculateTax(amount: controller.amount.value, taxModel: tax);
+            }
+          }
+
+          if (walletBalance < payableAmount) {
+            ShowToastDialog.showToast(
+                "Insufficient balance. Please top up your wallet or choose another payment method.");
+            return;
           }
         }
-        
-        if (walletBalance < payableAmount) {
-          ShowToastDialog.showToast("Insufficient balance. Please top up your wallet or choose another payment method.");
-          return;
-        }
       }
-    }
-    
-    // Use the enhanced booking method from controller
-    bool success = await controller.bookRide();
-    
-    if (success) {
-      // Navigate to active ride screen
-      Get.offAll(() => const LastActiveRideScreen());
+
+      // Add a small delay to show the loading state (optional)
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Use the enhanced booking method from controller
+      bool success = await controller.bookRide();
+
+      if (success) {
+        // Navigate to active ride screen
+        Get.offAll(() => const LastActiveRideScreen());
+      }
+    } catch (e) {
+      ShowToastDialog.showToast("Error booking ride: $e");
+    } finally {
+      // Reset loading state
+      controller.isBooking.value = false;
+      controller.isInstantBooking.value = false;
     }
   }
 
@@ -654,7 +844,8 @@ class BookingDetailsScreen extends StatelessWidget {
       builder: (BuildContext context) {
         final themeChange = Provider.of<DarkThemeProvider>(context);
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
           child: Container(
             constraints: BoxConstraints(maxHeight: Get.height * 0.8),
             child: Column(
@@ -664,7 +855,8 @@ class BookingDetailsScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
                   ),
                   child: Row(
                     children: [
@@ -688,7 +880,8 @@ class BookingDetailsScreen extends StatelessWidget {
                   child: Obx(() {
                     final contacts = controller.contactList;
                     final selected = controller.selectedTakingRide.value;
-                    final myself = ContactModel(fullName: "Myself", contactNumber: "");
+                    final myself =
+                        ContactModel(fullName: "Myself", contactNumber: "");
                     final items = <ContactModel>[myself, ...contacts];
                     return ListView.builder(
                       shrinkWrap: true,
@@ -708,7 +901,8 @@ class BookingDetailsScreen extends StatelessWidget {
                           ),
                           subtitle: contact.fullName == "Myself"
                               ? null
-                              : Text(contact.contactNumber.toString(), style: GoogleFonts.poppins()),
+                              : Text(contact.contactNumber.toString(),
+                                  style: GoogleFonts.poppins()),
                           activeColor: AppColors.primary,
                         );
                       },
@@ -722,7 +916,8 @@ class BookingDetailsScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            "No contacts found. You can add a contact to book for someone else.".tr,
+                            "No contacts found. You can add a contact to book for someone else."
+                                .tr,
                             style: GoogleFonts.poppins(fontSize: 14),
                             textAlign: TextAlign.center,
                           ),
@@ -733,33 +928,40 @@ class BookingDetailsScreen extends StatelessWidget {
                               final status = await Permission.contacts.status;
                               if (status.isGranted) {
                                 // Permission granted, open native contact picker
-                                final contact = await FlutterContacts.openExternalPick();
+                                final contact =
+                                    await FlutterContacts.openExternalPick();
                                 if (contact != null) {
                                   final name = contact.displayName;
                                   String phone = '';
                                   if (contact.phones.isNotEmpty) {
                                     phone = contact.phones.first.number;
                                   }
-                                  final newContact = ContactModel(fullName: name, contactNumber: phone);
+                                  final newContact = ContactModel(
+                                      fullName: name, contactNumber: phone);
                                   controller.contactList.add(newContact);
-                                  controller.selectedTakingRide.value = newContact;
+                                  controller.selectedTakingRide.value =
+                                      newContact;
                                   Get.back();
                                 }
                                 return;
                               }
                               // If not granted, request permission
-                              final granted = await FlutterContacts.requestPermission();
+                              final granted =
+                                  await FlutterContacts.requestPermission();
                               if (granted) {
-                                final contact = await FlutterContacts.openExternalPick();
+                                final contact =
+                                    await FlutterContacts.openExternalPick();
                                 if (contact != null) {
                                   final name = contact.displayName;
                                   String phone = '';
                                   if (contact.phones.isNotEmpty) {
                                     phone = contact.phones.first.number;
                                   }
-                                  final newContact = ContactModel(fullName: name, contactNumber: phone);
+                                  final newContact = ContactModel(
+                                      fullName: name, contactNumber: phone);
                                   controller.contactList.add(newContact);
-                                  controller.selectedTakingRide.value = newContact;
+                                  controller.selectedTakingRide.value =
+                                      newContact;
                                   Get.back();
                                 }
                                 return;
@@ -769,22 +971,28 @@ class BookingDetailsScreen extends StatelessWidget {
                                 showDialog(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
-                                    title: Text('Permission Required', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                                    title: Text('Permission Required',
+                                        style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600)),
                                     content: Text(
                                       'BuzRyde needs access to your contacts to add a rider. Please grant permission in settings.',
                                       style: GoogleFonts.poppins(),
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(),
-                                        child: Text('Cancel', style: GoogleFonts.poppins()),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(),
+                                        child: Text('Cancel',
+                                            style: GoogleFonts.poppins()),
                                       ),
                                       TextButton(
                                         onPressed: () async {
                                           await openAppSettings();
                                           Navigator.of(ctx).pop();
                                         },
-                                        child: Text('Open Settings', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                                        child: Text('Open Settings',
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.w600)),
                                       ),
                                     ],
                                   ),
@@ -821,7 +1029,8 @@ class BookingDetailsScreen extends StatelessWidget {
       builder: (BuildContext context) {
         final themeChange = Provider.of<DarkThemeProvider>(context);
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -829,7 +1038,8 @@ class BookingDetailsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                 ),
                 child: Row(
                   children: [
@@ -858,31 +1068,45 @@ class BookingDetailsScreen extends StatelessWidget {
                   final pm = controller.paymentModel.value;
                   final List<Widget> options = [];
                   if (pm.cash != null && pm.cash!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.cash!.name ?? "Cash", Icons.money));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.cash!.name ?? "Cash", Icons.money));
                   }
                   if (pm.wallet != null && pm.wallet!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.wallet!.name ?? "Wallet", Icons.account_balance_wallet));
+                    options.add(_buildPaymentOption(
+                        context,
+                        controller,
+                        pm.wallet!.name ?? "Wallet",
+                        Icons.account_balance_wallet));
                   }
                   if (pm.strip != null && pm.strip!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.strip!.name ?? "Stripe", Icons.credit_card));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.strip!.name ?? "Stripe", Icons.credit_card));
                   }
                   if (pm.razorpay != null && pm.razorpay!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.razorpay!.name ?? "RazorPay", Icons.payment));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.razorpay!.name ?? "RazorPay", Icons.payment));
                   }
                   if (pm.payStack != null && pm.payStack!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.payStack!.name ?? "PayStack", Icons.payment));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.payStack!.name ?? "PayStack", Icons.payment));
                   }
-                  if (pm.flutterWave != null && pm.flutterWave!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.flutterWave!.name ?? "FlutterWave", Icons.payment));
+                  if (pm.flutterWave != null &&
+                      pm.flutterWave!.enable == true) {
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.flutterWave!.name ?? "FlutterWave", Icons.payment));
                   }
                   if (pm.paytm != null && pm.paytm!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.paytm!.name ?? "PayTM", Icons.payment));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.paytm!.name ?? "PayTM", Icons.payment));
                   }
                   if (pm.payfast != null && pm.payfast!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.payfast!.name ?? "PayFast", Icons.payment));
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.payfast!.name ?? "PayFast", Icons.payment));
                   }
-                  if (pm.mercadoPago != null && pm.mercadoPago!.enable == true) {
-                    options.add(_buildPaymentOption(context, controller, pm.mercadoPago!.name ?? "MercadoPago", Icons.payment));
+                  if (pm.mercadoPago != null &&
+                      pm.mercadoPago!.enable == true) {
+                    options.add(_buildPaymentOption(context, controller,
+                        pm.mercadoPago!.name ?? "MercadoPago", Icons.payment));
                   }
                   if (options.isEmpty) {
                     return Text(
@@ -901,7 +1125,8 @@ class BookingDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentOption(BuildContext context, HomeController controller, String method, IconData icon) {
+  Widget _buildPaymentOption(BuildContext context, HomeController controller,
+      String method, IconData icon) {
     return ListTile(
       leading: Icon(icon, color: AppColors.primary),
       title: Text(
@@ -927,7 +1152,8 @@ class BookingDetailsScreen extends StatelessWidget {
     // set up the AlertDialog
     AlertDialog alert = AlertDialog(
       title: const Text("Warning"),
-      content: const Text("You are not able book new ride please complete previous ride payment"),
+      content: const Text(
+          "You are not able book new ride please complete previous ride payment"),
       actions: [
         okButton,
       ],
@@ -941,6 +1167,3 @@ class BookingDetailsScreen extends StatelessWidget {
     );
   }
 }
-
-
-

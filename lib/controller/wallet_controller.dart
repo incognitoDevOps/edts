@@ -82,10 +82,11 @@ class WalletController extends GetxController {
     });
   }
 
-  walletTopUp() async {
+  walletTopUp({required String amount}) async {
+    print("💰 Wallet Top-up - Amount: $amount");
     WalletTransactionModel transactionModel = WalletTransactionModel(
         id: Constant.getUuid(),
-        amount: amountController.value.text,
+        amount: amount,
         createdDate: Timestamp.now(),
         paymentType: selectedPaymentMethod.value,
         transactionId: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -95,7 +96,7 @@ class WalletController extends GetxController {
 
     await FireStoreUtils.setWalletTransaction(transactionModel).then((value) async {
       if (value == true) {
-        await FireStoreUtils.updateUserWallet(amount: amountController.value.text).then((value) {
+        await FireStoreUtils.updateUserWallet(amount: amount).then((value) {
           getUser();
           getTraction();
         });
@@ -143,7 +144,7 @@ class WalletController extends GetxController {
       await Stripe.instance.presentPaymentSheet().then((value) {
         Get.back();
         ShowToastDialog.showToast("Payment successfully");
-        walletTopUp();
+        walletTopUp(amount: amount);
       });
     } on StripeException catch (e) {
       var lo1 = jsonEncode(e);
@@ -217,7 +218,7 @@ class WalletController extends GetxController {
       Get.to(MercadoPagoScreen(initialURl: data['init_point']))!.then((value) {
         if (value) {
           ShowToastDialog.showToast("Payment Successful!!");
-          walletTopUp();
+          walletTopUp(amount: amount);
         } else {
           ShowToastDialog.showToast("Payment UnSuccessful!!");
         }
@@ -246,7 +247,7 @@ class WalletController extends GetxController {
             .then((value) {
           if (value) {
             ShowToastDialog.showToast("Payment Successful!!");
-            walletTopUp();
+            walletTopUp(amount: totalAmount);
           } else {
             ShowToastDialog.showToast("Payment UnSuccessful!!");
           }
@@ -289,7 +290,7 @@ class WalletController extends GetxController {
       Get.to(MercadoPagoScreen(initialURl: data['data']['link']))!.then((value) {
         if (value) {
           ShowToastDialog.showToast("Payment Successful!!");
-          walletTopUp();
+          walletTopUp(amount: amount);
         } else {
           ShowToastDialog.showToast("Payment UnSuccessful!!");
         }
@@ -320,7 +321,7 @@ class WalletController extends GetxController {
       if (isDone) {
         Get.back();
         ShowToastDialog.showToast("Payment successfully");
-        walletTopUp();
+        walletTopUp(amount: amount);
       } else {
         Get.back();
         ShowToastDialog.showToast("Payment Failed");
@@ -360,7 +361,9 @@ class WalletController extends GetxController {
   void handlePaymentSuccess(PaymentSuccessResponse response) {
     Get.back();
     ShowToastDialog.showToast("Payment Successful!!");
-    walletTopUp();
+    if (amountController.value.text.isNotEmpty) {
+      walletTopUp(amount: amountController.value.text);
+    }
   }
 
   void handleExternalWaller(ExternalWalletResponse response) {

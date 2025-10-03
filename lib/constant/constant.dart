@@ -6,7 +6,6 @@ import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/model/ChatVideoContainer.dart';

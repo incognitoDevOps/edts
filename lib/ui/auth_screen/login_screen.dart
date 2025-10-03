@@ -7,7 +7,6 @@ import 'package:customer/model/user_model.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/ui/auth_screen/email_login_screen.dart';
 import 'package:customer/ui/auth_screen/information_screen.dart';
-import 'package:customer/ui/auth_screen/otp_screen.dart';
 import 'package:customer/ui/dashboard_screen.dart';
 import 'package:customer/utils/DarkThemeProvider.dart';
 import 'package:customer/utils/fire_store_utils.dart';
@@ -87,33 +86,7 @@ class LoginScreen extends StatelessWidget {
                                     Get.to(() => EmailLoginScreen()),
                               ),
                               const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey[300],
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8),
-                                    child: Text(
-                                      'OR',
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey[300],
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              _buildDivider(),
                               const SizedBox(height: 16),
                               _buildAuthButton(
                                 icon: Icons.g_mobiledata,
@@ -123,33 +96,31 @@ class LoginScreen extends StatelessWidget {
                                     _handleGoogleSignIn(controller),
                               ),
                               const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey[300],
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8),
-                                    child: Text(
-                                      'OR',
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey[300],
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
+
+                              // Apple login (iOS only)
+                              if (Theme.of(context).platform ==
+                                  TargetPlatform.iOS) ...[
+                                _buildDivider(),
+                                const SizedBox(height: 16),
+                                _buildAuthButton(
+                                  icon: Icons.apple,
+                                  text: 'Continue with Apple',
+                                  color: Colors.black,
+                                  onPressed: () async {
+                                    ShowToastDialog.showLoader(
+                                        "Signing in with Apple...");
+                                    final userCredential =
+                                        await controller.signInWithApple();
+                                    ShowToastDialog.closeLoader();
+                                    if (userCredential != null) {
+                                      _handleAuthResult(userCredential);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              _buildDivider(),
                               const SizedBox(height: 16),
                               _buildAuthButton(
                                 icon: Icons.phone,
@@ -217,6 +188,25 @@ class LoginScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'OR',
+            style: GoogleFonts.poppins(
+              color: Colors.grey[600],
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+      ],
     );
   }
 
@@ -320,13 +310,10 @@ class LoginScreen extends StatelessWidget {
                   ),
                   child: CountryCodePicker(
                     onChanged: (value) {
-                      controller.countryCode.value =
-                          value.dialCode ?? '+1'; // Default to Canada
-                      print(
-                          "Selected country code: ${controller.countryCode.value}");
+                      controller.countryCode.value = value.dialCode ?? '+1';
                     },
-                    initialSelection: 'CA', // Default to Canada
-                    favorite: ['+1', 'CA', 'US'], // Canada and US as favorites
+                    initialSelection: 'CA',
+                    favorite: ['+1', 'CA', 'US'],
                     showCountryOnly: false,
                     showOnlyCountryWhenClosed: false,
                     alignLeft: false,
@@ -337,9 +324,7 @@ class LoginScreen extends StatelessWidget {
                         TextStyle(color: isDark ? Colors.white : Colors.black),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 Text(
                   "Phone Number (without leading zero)",
                   style: GoogleFonts.poppins(
@@ -362,14 +347,8 @@ class LoginScreen extends StatelessWidget {
                     ),
                   ),
                   style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                  onChanged: (value) {
-                    // Real-time validation feedback could be added here
-                  },
                 ),
-
                 const SizedBox(height: 8),
-
-                // Helper text
                 Text(
                   "Enter your number without the leading zero. Example: 111524408 instead of 0111524408",
                   style: GoogleFonts.poppins(
@@ -426,11 +405,7 @@ class LoginScreen extends StatelessWidget {
       return;
     }
 
-    // Use the public method getFullPhoneNumber() which internally handles cleaning
     final fullPhoneNumber = controller.getFullPhoneNumber();
-    print("Final phone number being sent: $fullPhoneNumber");
-
-    // Simple validation - check if the number looks reasonable
     final phoneDigits =
         controller.phoneNumberController.text.replaceAll(RegExp(r'[^\d]'), '');
     if (phoneDigits.length < 7 || phoneDigits.length > 15) {
@@ -439,10 +414,8 @@ class LoginScreen extends StatelessWidget {
       return;
     }
 
-    // Close the dialog first
     Navigator.pop(context);
-
-    // Then send the code
     controller.sendCode();
   }
 }
+

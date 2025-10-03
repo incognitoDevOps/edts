@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/information_controller.dart';
+import 'package:customer/controller/login_controller.dart';
 import 'package:customer/model/referral_model.dart';
 import 'package:customer/model/user_model.dart';
 import 'package:customer/themes/app_colors.dart';
@@ -182,6 +185,22 @@ class InformationScreen extends StatelessWidget {
                                 )),
                             const SizedBox(height: 16),
 
+                            // Apple Sign In (iOS only)
+                            if (Platform.isIOS) ...[
+                              ButtonThem.buildBorderButton(
+                                context,
+                                title: "Continue with Apple".tr,
+                                iconVisibility: true,
+                                iconAssetImage: 'assets/icons/ic_apple_gray.png',
+                                onPress: () async {
+                                  final loginController =
+                                      Get.put(LoginController());
+                                  await loginController.signInWithApple();
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
                             // Login link
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16),
@@ -220,7 +239,7 @@ class InformationScreen extends StatelessWidget {
                 ),
               ),
 
-// Terms and privacy links at bottom
+              // Terms and privacy links at bottom
               Positioned(
                 left: 0,
                 right: 0,
@@ -234,7 +253,6 @@ class InformationScreen extends StatelessWidget {
                         GestureDetector(
                           onTap: () {
                             // TODO: Open Terms of Service URL or screen
-                            // e.g. Get.to(() => const TermsScreen());
                           },
                           child: Text(
                             'Terms of Service',
@@ -250,7 +268,6 @@ class InformationScreen extends StatelessWidget {
                         GestureDetector(
                           onTap: () {
                             // TODO: Open Privacy Policy URL or screen
-                            // e.g. Get.to(() => const PrivacyPolicyScreen());
                           },
                           child: Text(
                             'Privacy Policy',
@@ -352,3 +369,4 @@ class InformationScreen extends StatelessWidget {
     }
   }
 }
+

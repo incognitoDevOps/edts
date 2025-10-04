@@ -14,10 +14,6 @@ class UserModel {
   String? walletAmount;
   bool? isActive;
   Timestamp? createdAt;
-  String? stripeCustomerId;
-  String? stripePaymentMethodId;
-  bool? stripePaymentVerified;
-  Timestamp? stripeLastVerified;
 
   UserModel({
     this.id,
@@ -33,10 +29,6 @@ class UserModel {
     this.walletAmount = "0",
     this.isActive = true,
     this.createdAt,
-    this.stripeCustomerId,
-    this.stripePaymentMethodId,
-    this.stripePaymentVerified = false,
-    this.stripeLastVerified,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -54,10 +46,6 @@ class UserModel {
       walletAmount: json['walletAmount'] ?? "0",
       isActive: json['isActive'] ?? true,
       createdAt: json['createdAt'],
-      stripeCustomerId: json['stripeCustomerId'],
-      stripePaymentMethodId: json['stripePaymentMethodId'],
-      stripePaymentVerified: json['stripePaymentVerified'] ?? false,
-      stripeLastVerified: json['stripeLastVerified'],
     );
   }
 
@@ -76,10 +64,6 @@ class UserModel {
       'walletAmount': walletAmount,
       'isActive': isActive,
       'createdAt': createdAt,
-      'stripeCustomerId': stripeCustomerId,
-      'stripePaymentMethodId': stripePaymentMethodId,
-      'stripePaymentVerified': stripePaymentVerified,
-      'stripeLastVerified': stripeLastVerified,
     };
   }
 
@@ -98,10 +82,6 @@ class UserModel {
     String? walletAmount,
     bool? isActive,
     Timestamp? createdAt,
-    String? stripeCustomerId,
-    String? stripePaymentMethodId,
-    bool? stripePaymentVerified,
-    Timestamp? stripeLastVerified,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -117,10 +97,6 @@ class UserModel {
       walletAmount: walletAmount ?? this.walletAmount,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
-      stripeCustomerId: stripeCustomerId ?? this.stripeCustomerId,
-      stripePaymentMethodId: stripePaymentMethodId ?? this.stripePaymentMethodId,
-      stripePaymentVerified: stripePaymentVerified ?? this.stripePaymentVerified,
-      stripeLastVerified: stripeLastVerified ?? this.stripeLastVerified,
     );
   }
 }

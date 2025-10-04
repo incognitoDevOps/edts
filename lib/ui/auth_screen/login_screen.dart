@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:customer/constant/constant.dart';
@@ -5,6 +7,7 @@ import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/login_controller.dart';
 import 'package:customer/model/user_model.dart';
 import 'package:customer/themes/app_colors.dart';
+import 'package:customer/themes/button_them.dart';
 import 'package:customer/ui/auth_screen/email_login_screen.dart';
 import 'package:customer/ui/auth_screen/information_screen.dart';
 import 'package:customer/ui/dashboard_screen.dart';
@@ -98,26 +101,20 @@ class LoginScreen extends StatelessWidget {
                               const SizedBox(height: 16),
 
                               // Apple login (iOS only)
-                              if (Theme.of(context).platform ==
-                                  TargetPlatform.iOS) ...[
-                                _buildDivider(),
+                              if (Platform.isIOS) ...[
                                 const SizedBox(height: 16),
-                                _buildAuthButton(
-                                  icon: Icons.apple,
-                                  text: 'Continue with Apple',
-                                  color: Colors.black,
-                                  onPressed: () async {
-                                    ShowToastDialog.showLoader(
-                                        "Signing in with Apple...");
-                                    final userCredential =
-                                        await controller.signInWithApple();
-                                    ShowToastDialog.closeLoader();
-                                    if (userCredential != null) {
-                                      _handleAuthResult(userCredential);
-                                    }
-                                  },
+                                ButtonThem.buildBorderButton(
+                                  context,
+                                  title: "Continue with Apple".tr,
+                                  iconVisibility: true,
+                                  iconAssetImage:
+                                      'assets/icons/ic_apple_gray.png',
+                                  onPress: controller.isLoading.value
+                                      ? () {}
+                                      : () {
+                                          controller.signInWithApple();
+                                        },
                                 ),
-                                const SizedBox(height: 16),
                               ],
 
                               _buildDivider(),
@@ -418,4 +415,3 @@ class LoginScreen extends StatelessWidget {
     controller.sendCode();
   }
 }
-

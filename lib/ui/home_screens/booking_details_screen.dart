@@ -3,7 +3,6 @@ import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/home_controller.dart';
 import 'package:customer/model/contact_model.dart';
 import 'package:customer/model/qr_route_model.dart';
-import 'package:customer/services/stripe_validation_service.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/themes/text_field_them.dart';
 import 'package:customer/ui/qr_code_screen.dart';
@@ -709,39 +708,25 @@ class BookingDetailsScreen extends StatelessWidget {
           }
         }
 
-        // Step 3: Get user data for payment validation
-        final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-        if (user == null) {
-          ShowToastDialog.showToast("Unable to retrieve user information");
-          return;
-        }
-
-        // Step 4: Stripe payment method validation
-        if (controller.selectedPaymentMethod.value.toLowerCase() == "stripe" ||
-            controller.selectedPaymentMethod.value.toLowerCase().contains("strip")) {
-          final validationResult = await StripeValidationService.validatePaymentMethod(user);
-
-          if (!validationResult.isValid) {
-            ShowToastDialog.showToast(validationResult.errorMessage ?? "Invalid payment method");
-            return;
-          }
-        }
-
-        // Step 5: Wallet balance check
+        // Step 3: Wallet balance check
         if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
-          double walletBalance = double.parse(user.walletAmount ?? "0.0");
+          final user =
+              await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+          if (user != null) {
+            double walletBalance = double.parse(user.walletAmount ?? "0.0");
 
-          if (walletBalance < payableAmount) {
-            ShowToastDialog.showToast(
-                "Insufficient balance. Please top up your wallet or choose another payment method.");
-            return;
+            if (walletBalance < payableAmount) {
+              ShowToastDialog.showToast(
+                  "Insufficient balance. Please top up your wallet or choose another payment method.");
+              return; // Don't proceed if balance is not enough
+            }
           }
         }
 
         // Add a small delay to show the loading state (optional)
         await Future.delayed(const Duration(milliseconds: 500));
 
-        // Step 6: Proceed to QR code screen
+        // Step 4: Proceed to QR code screen
         final qrData = QrRouteModel(
           userId: FireStoreUtils.getCurrentUid(),
           sourceLocationName: controller.sourceLocationController.value.text,
@@ -782,41 +767,27 @@ class BookingDetailsScreen extends StatelessWidget {
       controller.isBooking.value = true;
       controller.isInstantBooking.value = false;
 
-      // Get user data for payment validation
-      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-      if (user == null) {
-        ShowToastDialog.showToast("Unable to retrieve user information");
-        return;
-      }
-
-      // Stripe payment method validation
-      if (controller.selectedPaymentMethod.value.toLowerCase() == "stripe" ||
-          controller.selectedPaymentMethod.value.toLowerCase().contains("strip")) {
-        final validationResult = await StripeValidationService.validatePaymentMethod(user);
-
-        if (!validationResult.isValid) {
-          ShowToastDialog.showToast(validationResult.errorMessage ?? "Invalid payment method");
-          return;
-        }
-      }
-
       // Check wallet balance if wallet payment is selected
       if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
-        double walletBalance = double.parse(user.walletAmount ?? "0.0");
-        double payableAmount = double.parse(controller.amount.value);
+        final user =
+            await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+        if (user != null) {
+          double walletBalance = double.parse(user.walletAmount ?? "0.0");
+          double payableAmount = double.parse(controller.amount.value);
 
-        // Add tax calculation to payable amount
-        if (Constant.taxList != null) {
-          for (var tax in Constant.taxList!) {
-            payableAmount += Constant()
-                .calculateTax(amount: controller.amount.value, taxModel: tax);
+          // Add tax calculation to payable amount
+          if (Constant.taxList != null) {
+            for (var tax in Constant.taxList!) {
+              payableAmount += Constant()
+                  .calculateTax(amount: controller.amount.value, taxModel: tax);
+            }
           }
-        }
 
-        if (walletBalance < payableAmount) {
-          ShowToastDialog.showToast(
-              "Insufficient balance. Please top up your wallet or choose another payment method.");
-          return;
+          if (walletBalance < payableAmount) {
+            ShowToastDialog.showToast(
+                "Insufficient balance. Please top up your wallet or choose another payment method.");
+            return;
+          }
         }
       }
 
@@ -1156,155 +1127,15 @@ class BookingDetailsScreen extends StatelessWidget {
 
   Widget _buildPaymentOption(BuildContext context, HomeController controller,
       String method, IconData icon) {
-    return FutureBuilder<bool>(
-      future: _isPaymentMethodValid(method, controller),
-      builder: (context, snapshot) {
-        final isValid = snapshot.data ?? true;
-        final isStripe = method.toLowerCase().contains('strip');
-
-        return ListTile(
-          leading: Icon(icon, color: isValid ? AppColors.primary : Colors.grey),
-          title: Row(
-            children: [
-              Text(
-                method,
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w500,
-                  color: isValid ? null : Colors.grey,
-                ),
-              ),
-              if (isStripe && !isValid) ...[
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.orange,
-                  size: 18,
-                ),
-              ],
-            ],
-          ),
-          subtitle: isStripe && !isValid
-              ? Text(
-                  'Setup required',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.orange,
-                  ),
-                )
-              : null,
-          onTap: () async {
-            if (isStripe && !isValid) {
-              Get.back();
-              _showStripeSetupDialog(context);
-            } else {
-              controller.selectedPaymentMethod.value = method;
-              Get.back();
-            }
-          },
-        );
-      },
-    );
-  }
-
-  Future<bool> _isPaymentMethodValid(String method, HomeController controller) async {
-    if (!method.toLowerCase().contains('strip')) {
-      return true;
-    }
-
-    try {
-      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-      if (user == null) return false;
-
-      return await StripeValidationService.checkIfPaymentMethodExists(user);
-    } catch (e) {
-      return false;
-    }
-  }
-
-  void _showStripeSetupDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.credit_card, color: AppColors.primary),
-              const SizedBox(width: 12),
-              Text(
-                'Setup Required',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'You need to add a valid payment method before using Stripe payments.',
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This protects drivers and BuzRyde from unpaid trips.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.blue[800],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Get.back();
-                ShowToastDialog.showToast(
-                  'Please contact support or use the app settings to add a payment method',
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Setup Payment',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        );
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(
+        method,
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+      ),
+      onTap: () {
+        controller.selectedPaymentMethod.value = method;
+        Get.back();
       },
     );
   }

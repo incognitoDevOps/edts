@@ -65,6 +65,8 @@ class DefaultFirebaseOptions {
     projectId: 'buzrydecloud',
     databaseURL: 'https://buzrydecloud-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'buzrydecloud.appspot.com',
+    androidClientId: '116120217389-57gk77m1i043ad1s22botbitgjn7et0i.apps.googleusercontent.com',
+    iosClientId: '116120217389-if4l7olpbr631fqogkc7c628t0u0mdf5.apps.googleusercontent.com',
     iosBundleId: 'ca.buzryde.ca',
   );
 

@@ -22,6 +22,8 @@ import 'package:customer/utils/notification_service.dart';
 import 'package:customer/utils/utils.dart';
 import 'package:customer/widget/geoflutterfire/src/geoflutterfire.dart';
 import 'package:customer/widget/geoflutterfire/src/models/point.dart';
+import 'package:customer/services/stripe_service.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:geocoding/geocoding.dart';
@@ -507,7 +509,8 @@ var isInstantBooking = false.obs;
       orderModel.taxList = Constant.taxList;
 
       // Handle Stripe pre-authorization for ride booking
-      if (selectedPaymentMethod.value.toLowerCase() == "stripe") {
+      if (selectedPaymentMethod.value.toLowerCase() == "stripe" ||
+          selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
         try {
           ShowToastDialog.showLoader("Authorizing payment...");
 
@@ -520,23 +523,80 @@ var isInstantBooking = false.obs;
             }
           }
 
-          // Create Stripe payment intent with manual capture
-          Map<String, dynamic>? paymentIntentData =
-              await _createStripePreAuth(totalAmount.toString());
-
-          if (paymentIntentData != null &&
-              !paymentIntentData.containsKey("error")) {
-            orderModel.paymentIntentId = paymentIntentData['id'];
+          // Initialize Stripe service
+          final stripeConfig = paymentModel.value.strip;
+          if (stripeConfig == null ||
+              stripeConfig.stripeSecret == null ||
+              stripeConfig.clientpublishableKey == null) {
             ShowToastDialog.closeLoader();
+            ShowToastDialog.showToast("Stripe is not configured properly");
+            return false;
+          }
+
+          final stripeService = StripeService(
+            stripeSecret: stripeConfig.stripeSecret!,
+            publishableKey: stripeConfig.clientpublishableKey!,
+          );
+
+          // Create pre-authorization
+          final preAuthResult = await stripeService.createPreAuthorization(
+            amount: totalAmount.toStringAsFixed(2),
+            currency: Constant.currencyModel?.code?.toLowerCase() ?? 'usd',
+          );
+
+          if (preAuthResult['success'] == true) {
+            // Initialize payment sheet
+            await stripeService.initPaymentSheet(
+              paymentIntentClientSecret: preAuthResult['clientSecret'],
+              merchantDisplayName: 'BuzRyde',
+            );
+
+            // Present payment sheet
+            final paymentResult = await stripeService.presentPaymentSheet();
+
+            if (paymentResult != null) {
+              // Store payment intent details
+              orderModel.paymentIntentId = preAuthResult['paymentIntentId'];
+              orderModel.preAuthAmount = totalAmount.toStringAsFixed(2);
+              orderModel.paymentIntentStatus = 'requires_capture';
+              orderModel.preAuthCreatedAt = Timestamp.now();
+
+              ShowToastDialog.closeLoader();
+              ShowToastDialog.showToast(
+                  "Payment authorized successfully",
+                  position: EasyLoadingToastPosition.top);
+            } else {
+              ShowToastDialog.closeLoader();
+              ShowToastDialog.showToast("Payment authorization cancelled");
+              return false;
+            }
           } else {
             ShowToastDialog.closeLoader();
-            ShowToastDialog.showToast(
-                "Failed to authorize payment. Please try again.");
+
+            final errorMsg = preAuthResult['error'].toString();
+            if (errorMsg.toLowerCase().contains('insufficient') ||
+                errorMsg.toLowerCase().contains('balance') ||
+                errorMsg.toLowerCase().contains('declined')) {
+              ShowToastDialog.showToast("Insufficient balance");
+            } else {
+              ShowToastDialog.showToast(
+                  "Failed to authorize payment. Please try again.");
+            }
             return false;
           }
         } catch (e) {
           ShowToastDialog.closeLoader();
-          ShowToastDialog.showToast("Payment authorization failed: $e");
+
+          // Check if error is related to insufficient funds
+          final errorMsg = e.toString().toLowerCase();
+          if (errorMsg.contains('insufficient') ||
+              errorMsg.contains('balance') ||
+              errorMsg.contains('declined') ||
+              errorMsg.contains('card_declined')) {
+            ShowToastDialog.showToast("Insufficient balance");
+          } else {
+            ShowToastDialog.showToast("Payment authorization failed: $e");
+          }
           return false;
         }
       }

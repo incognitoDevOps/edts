@@ -37,7 +37,10 @@ class OrderModel {
   AdminCommission? adminCommission;
   ZoneModel? zone;
   String? zoneId;
-  String? paymentIntentId; // For Stripe pre-authorization
+  String? paymentIntentId;
+  String? preAuthAmount;
+  String? paymentIntentStatus;
+  Timestamp? preAuthCreatedAt;
 
   OrderModel(
       {this.position,
@@ -66,7 +69,10 @@ class OrderModel {
       this.adminCommission,
       this.zone,
       this.zoneId,
-      this.paymentIntentId});
+      this.paymentIntentId,
+      this.preAuthAmount,
+      this.paymentIntentStatus,
+      this.preAuthCreatedAt});
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     serviceId = json['serviceId'];
@@ -97,6 +103,9 @@ class OrderModel {
     zone = json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null;
     zoneId = json['zoneId'];
     paymentIntentId = json['paymentIntentId'];
+    preAuthAmount = json['preAuthAmount'];
+    paymentIntentStatus = json['paymentIntentStatus'];
+    preAuthCreatedAt = json['preAuthCreatedAt'];
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
       json['taxList'].forEach((v) {
@@ -133,6 +142,9 @@ class OrderModel {
     }
     data['zoneId'] = zoneId;
     data['paymentIntentId'] = paymentIntentId;
+    data['preAuthAmount'] = preAuthAmount;
+    data['paymentIntentStatus'] = paymentIntentStatus;
+    data['preAuthCreatedAt'] = preAuthCreatedAt;
     data['id'] = id;
     data['userId'] = userId;
     data['paymentType'] = paymentType;

@@ -275,6 +275,8 @@ var isInstantBooking = false.obs;
   Rx<PaymentModel> paymentModel = PaymentModel().obs;
 
   RxString selectedPaymentMethod = "".obs;
+  RxString stripePaymentIntentId = "".obs;
+  RxString stripePreAuthAmount = "".obs;
   RxList airPortList = <AriPortModel>[].obs;
 
   getPaymentData() async {
@@ -511,94 +513,20 @@ var isInstantBooking = false.obs;
       // Handle Stripe pre-authorization for ride booking
       if (selectedPaymentMethod.value.toLowerCase() == "stripe" ||
           selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
-        try {
-          ShowToastDialog.showLoader("Authorizing payment...");
-
-          // Calculate total amount including taxes
-          double totalAmount = double.parse(orderModel.offerRate!);
-          if (Constant.taxList != null) {
-            for (var tax in Constant.taxList!) {
-              totalAmount += Constant()
-                  .calculateTax(amount: orderModel.offerRate!, taxModel: tax);
-            }
-          }
-
-          // Initialize Stripe service
-          final stripeConfig = paymentModel.value.strip;
-          if (stripeConfig == null ||
-              stripeConfig.stripeSecret == null ||
-              stripeConfig.clientpublishableKey == null) {
-            ShowToastDialog.closeLoader();
-            ShowToastDialog.showToast("Stripe is not configured properly");
-            return false;
-          }
-
-          final stripeService = StripeService(
-            stripeSecret: stripeConfig.stripeSecret!,
-            publishableKey: stripeConfig.clientpublishableKey!,
-          );
-
-          // Create pre-authorization
-          final preAuthResult = await stripeService.createPreAuthorization(
-            amount: totalAmount.toStringAsFixed(2),
-            currency: Constant.currencyModel?.code?.toLowerCase() ?? 'usd',
-          );
-
-          if (preAuthResult['success'] == true) {
-            // Initialize payment sheet
-            await stripeService.initPaymentSheet(
-              paymentIntentClientSecret: preAuthResult['clientSecret'],
-              merchantDisplayName: 'BuzRyde',
-            );
-
-            // Present payment sheet
-            final paymentResult = await stripeService.presentPaymentSheet();
-
-            if (paymentResult != null) {
-              // Store payment intent details
-              orderModel.paymentIntentId = preAuthResult['paymentIntentId'];
-              orderModel.preAuthAmount = totalAmount.toStringAsFixed(2);
-              orderModel.paymentIntentStatus = 'requires_capture';
-              orderModel.preAuthCreatedAt = Timestamp.now();
-
-              ShowToastDialog.closeLoader();
-              ShowToastDialog.showToast(
-                  "Payment authorized successfully",
-                  position: EasyLoadingToastPosition.top);
-            } else {
-              ShowToastDialog.closeLoader();
-              ShowToastDialog.showToast("Payment authorization cancelled");
-              return false;
-            }
-          } else {
-            ShowToastDialog.closeLoader();
-
-            final errorMsg = preAuthResult['error'].toString();
-            if (errorMsg.toLowerCase().contains('insufficient') ||
-                errorMsg.toLowerCase().contains('balance') ||
-                errorMsg.toLowerCase().contains('declined')) {
-              ShowToastDialog.showToast("Insufficient balance");
-            } else {
-              ShowToastDialog.showToast(
-                  "Failed to authorize payment. Please try again.");
-            }
-            return false;
-          }
-        } catch (e) {
-          ShowToastDialog.closeLoader();
-
-          // Check if error is related to insufficient funds
-          final errorMsg = e.toString().toLowerCase();
-          if (errorMsg.contains('insufficient') ||
-              errorMsg.contains('balance') ||
-              errorMsg.contains('declined') ||
-              errorMsg.contains('card_declined')) {
-            ShowToastDialog.showToast("Insufficient balance");
-          } else {
-            ShowToastDialog.showToast("Payment authorization failed: $e");
-          }
+        // Check if we already have a payment intent ID from the payment selection
+        if (stripePaymentIntentId.value.isEmpty) {
+          ShowToastDialog.showToast(
+              "Please select Stripe payment method again to authorize payment");
           return false;
         }
+
+        // Use the stored payment intent details
+        orderModel.paymentIntentId = stripePaymentIntentId.value;
+        orderModel.preAuthAmount = stripePreAuthAmount.value;
+        orderModel.paymentIntentStatus = 'requires_capture';
+        orderModel.preAuthCreatedAt = Timestamp.now();
+
+        print("✅ Using pre-authorized payment: ${stripePaymentIntentId.value}");
       }
 
       if (selectedTakingRide.value.fullName != "Myself") {
@@ -652,6 +580,8 @@ var isInstantBooking = false.obs;
         duration.value = "";
         amount.value = "";
         selectedPaymentMethod.value = "";
+        stripePaymentIntentId.value = "";
+        stripePreAuthAmount.value = "";
 
         return true;
       }

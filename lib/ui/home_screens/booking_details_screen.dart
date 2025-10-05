@@ -1,5 +1,8 @@
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
+import 'package:customer/services/stripe_service.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/controller/home_controller.dart';
 import 'package:customer/model/contact_model.dart';
 import 'package:customer/model/qr_route_model.dart';
@@ -537,18 +540,45 @@ class BookingDetailsScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          homeController.selectedPaymentMethod.value.isNotEmpty
-                              ? homeController.selectedPaymentMethod.value
-                              : "Select Payment type".tr,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: homeController
-                                    .selectedPaymentMethod.value.isNotEmpty
-                                ? Theme.of(context).textTheme.bodyLarge?.color
-                                : Colors.grey[600],
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              homeController.selectedPaymentMethod.value.isNotEmpty
+                                  ? homeController.selectedPaymentMethod.value
+                                  : "Select Payment type".tr,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: homeController
+                                        .selectedPaymentMethod.value.isNotEmpty
+                                    ? Theme.of(context).textTheme.bodyLarge?.color
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            if (homeController.selectedPaymentMethod.value
+                                    .toLowerCase()
+                                    .contains('stripe') &&
+                                homeController.stripePaymentIntentId.value.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        size: 14, color: Colors.green),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Payment Authorized',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       Icon(
@@ -1133,11 +1163,122 @@ class BookingDetailsScreen extends StatelessWidget {
         method,
         style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
       ),
-      onTap: () {
-        controller.selectedPaymentMethod.value = method;
+      onTap: () async {
+        // Close the dialog first
         Get.back();
+
+        // If Stripe is selected, trigger payment authorization immediately
+        if (method.toLowerCase().contains('stripe')) {
+          await _handleStripeSelection(context, controller, method);
+        } else {
+          // For other payment methods, just set it
+          controller.selectedPaymentMethod.value = method;
+        }
       },
     );
+  }
+
+  Future<void> _handleStripeSelection(
+      BuildContext context, HomeController controller, String method) async {
+    try {
+      // Validate required data
+      if (controller.amount.value.isEmpty) {
+        ShowToastDialog.showToast("Please calculate route first");
+        return;
+      }
+
+      ShowToastDialog.showLoader("Authorizing payment...");
+
+      // Calculate total amount including taxes
+      double totalAmount = double.parse(controller.amount.value);
+      if (Constant.taxList != null) {
+        for (var tax in Constant.taxList!) {
+          totalAmount += Constant()
+              .calculateTax(amount: controller.amount.value, taxModel: tax);
+        }
+      }
+
+      // Get Stripe configuration
+      final stripeConfig = controller.paymentModel.value.strip;
+      if (stripeConfig == null ||
+          stripeConfig.stripeSecret == null ||
+          stripeConfig.clientpublishableKey == null) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Stripe is not configured properly");
+        return;
+      }
+
+      // Initialize Stripe publishable key
+      Stripe.publishableKey = stripeConfig.clientpublishableKey!;
+      Stripe.merchantIdentifier = 'BuzRyde';
+      await Stripe.instance.applySettings();
+
+      // Initialize Stripe service
+      final stripeService = StripeService(
+        stripeSecret: stripeConfig.stripeSecret!,
+        publishableKey: stripeConfig.clientpublishableKey!,
+      );
+
+      // Create pre-authorization
+      final preAuthResult = await stripeService.createPreAuthorization(
+        amount: totalAmount.toStringAsFixed(2),
+        currency: Constant.currencyModel?.code?.toLowerCase() ?? 'usd',
+      );
+
+      if (preAuthResult['success'] == true) {
+        // Initialize payment sheet
+        await stripeService.initPaymentSheet(
+          paymentIntentClientSecret: preAuthResult['clientSecret'],
+          merchantDisplayName: 'BuzRyde',
+        );
+
+        ShowToastDialog.closeLoader();
+
+        // Present payment sheet
+        final paymentResult = await stripeService.presentPaymentSheet();
+
+        if (paymentResult != null) {
+          // Store payment intent details in controller for later use
+          controller.stripePaymentIntentId.value =
+              preAuthResult['paymentIntentId'];
+          controller.stripePreAuthAmount.value =
+              totalAmount.toStringAsFixed(2);
+          controller.selectedPaymentMethod.value = method;
+
+          ShowToastDialog.showToast("Payment authorized successfully",
+              position: EasyLoadingToastPosition.top);
+        } else {
+          ShowToastDialog.showToast("Payment authorization cancelled");
+        }
+      } else {
+        ShowToastDialog.closeLoader();
+
+        final errorMsg = preAuthResult['error'].toString();
+        if (errorMsg.toLowerCase().contains('insufficient') ||
+            errorMsg.toLowerCase().contains('balance') ||
+            errorMsg.toLowerCase().contains('declined')) {
+          ShowToastDialog.showToast("Insufficient balance");
+        } else {
+          ShowToastDialog.showToast(
+              "Failed to authorize payment. Please try again.");
+        }
+      }
+    } catch (e) {
+      ShowToastDialog.closeLoader();
+
+      // Check if error is related to insufficient funds
+      final errorMsg = e.toString().toLowerCase();
+      if (errorMsg.contains('insufficient') ||
+          errorMsg.contains('balance') ||
+          errorMsg.contains('declined') ||
+          errorMsg.contains('card_declined')) {
+        ShowToastDialog.showToast("Insufficient balance");
+      } else if (errorMsg.contains('cancelled') || errorMsg.contains('cancel')) {
+        ShowToastDialog.showToast("Payment authorization cancelled");
+      } else {
+        ShowToastDialog.showToast("Payment authorization failed: $e");
+      }
+    }
   }
 
   showAlertDialog(BuildContext context) {

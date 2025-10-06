@@ -738,7 +738,7 @@ class BookingDetailsScreen extends StatelessWidget {
           }
         }
 
-        // Step 3: Wallet balance check
+        // Step 3: Balance check for Wallet and Stripe
         if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
           final user =
               await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
@@ -746,9 +746,23 @@ class BookingDetailsScreen extends StatelessWidget {
             double walletBalance = double.parse(user.walletAmount ?? "0.0");
 
             if (walletBalance < payableAmount) {
-              ShowToastDialog.showToast(
-                  "Insufficient balance. Please top up your wallet or choose another payment method.");
-              return; // Don't proceed if balance is not enough
+              ShowToastDialog.showToast("Insufficient balance");
+              return;
+            }
+          }
+        } else if (controller.selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
+          // Validate Stripe payment is authorized
+          if (controller.stripePaymentIntentId.value.isEmpty) {
+            ShowToastDialog.showToast("Insufficient balance");
+            return;
+          }
+
+          // Verify the authorization amount is sufficient
+          if (controller.stripePreAuthAmount.value.isNotEmpty) {
+            double authorizedAmount = double.parse(controller.stripePreAuthAmount.value);
+            if (authorizedAmount < payableAmount) {
+              ShowToastDialog.showToast("Insufficient balance");
+              return;
             }
           }
         }
@@ -1248,10 +1262,19 @@ class BookingDetailsScreen extends StatelessWidget {
           ShowToastDialog.showToast("Payment authorized successfully",
               position: EasyLoadingToastPosition.top);
         } else {
-          ShowToastDialog.showToast("Payment authorization cancelled");
+          // User cancelled - clear payment method and show toast
+          controller.selectedPaymentMethod.value = "";
+          controller.stripePaymentIntentId.value = "";
+          controller.stripePreAuthAmount.value = "";
+          ShowToastDialog.showToast("Insufficient balance");
         }
       } else {
         ShowToastDialog.closeLoader();
+
+        // Clear any partial data
+        controller.selectedPaymentMethod.value = "";
+        controller.stripePaymentIntentId.value = "";
+        controller.stripePreAuthAmount.value = "";
 
         final errorMsg = preAuthResult['error'].toString();
         if (errorMsg.toLowerCase().contains('insufficient') ||
@@ -1259,25 +1282,19 @@ class BookingDetailsScreen extends StatelessWidget {
             errorMsg.toLowerCase().contains('declined')) {
           ShowToastDialog.showToast("Insufficient balance");
         } else {
-          ShowToastDialog.showToast(
-              "Failed to authorize payment. Please try again.");
+          ShowToastDialog.showToast("Insufficient balance");
         }
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
 
-      // Check if error is related to insufficient funds
-      final errorMsg = e.toString().toLowerCase();
-      if (errorMsg.contains('insufficient') ||
-          errorMsg.contains('balance') ||
-          errorMsg.contains('declined') ||
-          errorMsg.contains('card_declined')) {
-        ShowToastDialog.showToast("Insufficient balance");
-      } else if (errorMsg.contains('cancelled') || errorMsg.contains('cancel')) {
-        ShowToastDialog.showToast("Payment authorization cancelled");
-      } else {
-        ShowToastDialog.showToast("Payment authorization failed: $e");
-      }
+      // Clear any partial data on error
+      controller.selectedPaymentMethod.value = "";
+      controller.stripePaymentIntentId.value = "";
+      controller.stripePreAuthAmount.value = "";
+
+      // Always show "Insufficient balance" for any error
+      ShowToastDialog.showToast("Insufficient balance");
     }
   }
 

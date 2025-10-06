@@ -550,13 +550,40 @@ class PaymentOrderScreen extends StatelessWidget {
               children: [
                 Icon(Icons.payment, color: AppColors.primary, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  controller.selectedPaymentMethod.value.isNotEmpty
-                      ? controller.selectedPaymentMethod.value
-                      : "Payment method not selected",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.selectedPaymentMethod.value.isNotEmpty
+                            ? controller.selectedPaymentMethod.value
+                            : "Payment method not selected",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      if (controller.selectedPaymentMethod.value.toLowerCase().contains('stripe') &&
+                          controller.orderModel.value.paymentIntentId != null &&
+                          controller.orderModel.value.paymentIntentId!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, size: 14, color: Colors.green),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Payment Pre-Authorized',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],

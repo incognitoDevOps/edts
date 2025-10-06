@@ -595,7 +595,24 @@ class PaymentOrderController extends GetxController {
       if (captureResult['success'] == true) {
         print("✅ Pre-authorization captured successfully");
         orderModel.value.paymentIntentStatus = 'captured';
+        orderModel.value.paymentStatus = true;
+
+        // Create transaction record for Stripe capture
+        WalletTransactionModel stripeTransaction = WalletTransactionModel(
+          id: Constant.getUuid(),
+          amount: finalAmount.toStringAsFixed(2),
+          createdDate: Timestamp.now(),
+          paymentType: "Stripe",
+          transactionId: orderModel.value.id,
+          userId: FireStoreUtils.getCurrentUid(),
+          orderType: "city",
+          userType: "customer",
+          note: "Stripe payment captured - Ride ID: ${orderModel.value.id}",
+        );
+
+        await FireStoreUtils.setWalletTransaction(stripeTransaction);
         await FireStoreUtils.setOrder(orderModel.value);
+        print("💾 Transaction history saved for payment: ${stripeTransaction.id}");
       } else {
         print("❌ Failed to capture pre-authorization: ${captureResult['error']}");
         ShowToastDialog.showToast(

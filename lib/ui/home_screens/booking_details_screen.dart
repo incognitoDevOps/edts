@@ -1,10 +1,7 @@
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/services/stripe_service.dart';
-<<<<<<< HEAD
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-=======
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/controller/home_controller.dart';
@@ -549,12 +546,8 @@ class BookingDetailsScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-<<<<<<< HEAD
                               homeController
                                       .selectedPaymentMethod.value.isNotEmpty
-=======
-                              homeController.selectedPaymentMethod.value.isNotEmpty
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
                                   ? homeController.selectedPaymentMethod.value
                                   : "Select Payment type".tr,
                               style: GoogleFonts.poppins(
@@ -562,26 +555,18 @@ class BookingDetailsScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                                 color: homeController
                                         .selectedPaymentMethod.value.isNotEmpty
-<<<<<<< HEAD
                                     ? Theme.of(context)
                                         .textTheme
                                         .bodyLarge
                                         ?.color
-=======
-                                    ? Theme.of(context).textTheme.bodyLarge?.color
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
                                     : Colors.grey[600],
                               ),
                             ),
                             if (homeController.selectedPaymentMethod.value
                                     .toLowerCase()
                                     .contains('stripe') &&
-<<<<<<< HEAD
                                 homeController
                                     .stripePaymentIntentId.value.isNotEmpty)
-=======
-                                homeController.stripePaymentIntentId.value.isNotEmpty)
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Row(
@@ -775,7 +760,6 @@ class BookingDetailsScreen extends StatelessWidget {
             double walletBalance = double.parse(user.walletAmount ?? "0.0");
 
             if (walletBalance < payableAmount) {
-<<<<<<< HEAD
               ShowToastDialog.showToast(
                   "Insufficient funds. Please check your payment method.");
               return;
@@ -788,32 +772,16 @@ class BookingDetailsScreen extends StatelessWidget {
           if (controller.stripePaymentIntentId.value.isEmpty) {
             ShowToastDialog.showToast(
                 "Insufficient funds. Please check your payment method.");
-=======
-              ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
-              return;
-            }
-          }
-        } else if (controller.selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
-          // Validate Stripe payment is authorized
-          if (controller.stripePaymentIntentId.value.isEmpty) {
-            ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
             return;
           }
 
           // Verify the authorization amount is sufficient
           if (controller.stripePreAuthAmount.value.isNotEmpty) {
-<<<<<<< HEAD
             double authorizedAmount =
                 double.parse(controller.stripePreAuthAmount.value);
             if (authorizedAmount < payableAmount) {
               ShowToastDialog.showToast(
                   "Insufficient funds. Please check your payment method.");
-=======
-            double authorizedAmount = double.parse(controller.stripePreAuthAmount.value);
-            if (authorizedAmount < payableAmount) {
-              ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
               return;
             }
           }
@@ -1245,14 +1213,10 @@ class BookingDetailsScreen extends StatelessWidget {
   }
 
   Future<void> _handleStripeSelection(
-<<<<<<< HEAD
     BuildContext context,
     HomeController controller,
     String method,
   ) async {
-=======
-      BuildContext context, HomeController controller, String method) async {
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
     try {
       // Validate required data
       if (controller.amount.value.isEmpty) {
@@ -1266,7 +1230,6 @@ class BookingDetailsScreen extends StatelessWidget {
       double totalAmount = double.parse(controller.amount.value);
       if (Constant.taxList != null) {
         for (var tax in Constant.taxList!) {
-<<<<<<< HEAD
           totalAmount += Constant().calculateTax(
             amount: controller.amount.value,
             taxModel: tax,
@@ -1275,14 +1238,6 @@ class BookingDetailsScreen extends StatelessWidget {
       }
 
       // Retrieve Stripe configuration
-=======
-          totalAmount += Constant()
-              .calculateTax(amount: controller.amount.value, taxModel: tax);
-        }
-      }
-
-      // Get Stripe configuration
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
       final stripeConfig = controller.paymentModel.value.strip;
       if (stripeConfig == null ||
           stripeConfig.stripeSecret == null ||
@@ -1292,19 +1247,11 @@ class BookingDetailsScreen extends StatelessWidget {
         return;
       }
 
-<<<<<<< HEAD
       // Initialize Stripe SDK
-=======
-      // Initialize Stripe publishable key
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
       Stripe.publishableKey = stripeConfig.clientpublishableKey!;
       Stripe.merchantIdentifier = 'BuzRyde';
       await Stripe.instance.applySettings();
 
-<<<<<<< HEAD
-=======
-      // Initialize Stripe service
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
       final stripeService = StripeService(
         stripeSecret: stripeConfig.stripeSecret!,
         publishableKey: stripeConfig.clientpublishableKey!,
@@ -1316,11 +1263,8 @@ class BookingDetailsScreen extends StatelessWidget {
         currency: Constant.currencyModel?.code?.toLowerCase() ?? 'usd',
       );
 
-<<<<<<< HEAD
       ShowToastDialog.closeLoader();
 
-=======
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
       if (preAuthResult['success'] == true) {
         // Initialize payment sheet
         await stripeService.initPaymentSheet(
@@ -1328,7 +1272,6 @@ class BookingDetailsScreen extends StatelessWidget {
           merchantDisplayName: 'BuzRyde',
         );
 
-<<<<<<< HEAD
         // Present payment sheet to the user and get detailed result
         final paymentResult = await stripeService.presentPaymentSheet();
 
@@ -1394,54 +1337,6 @@ class BookingDetailsScreen extends StatelessWidget {
         ShowToastDialog.showToast(
             "Payment authorization failed. Please try again.");
       }
-=======
-        ShowToastDialog.closeLoader();
-
-        // Present payment sheet
-        final paymentResult = await stripeService.presentPaymentSheet();
-
-        if (paymentResult != null) {
-          // Store payment intent details in controller for later use
-          controller.stripePaymentIntentId.value =
-              preAuthResult['paymentIntentId'];
-          controller.stripePreAuthAmount.value =
-              totalAmount.toStringAsFixed(2);
-          controller.selectedPaymentMethod.value = method;
-
-          // Show detailed notification about the hold
-          ShowToastDialog.showToast(
-              "${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} is currently on hold. You'll only be charged the final amount once the ride is complete. Any unused amount will be returned to your payment method.",
-              position: EasyLoadingToastPosition.center,
-              duration: const Duration(seconds: 5));
-        } else {
-          // User cancelled - clear payment method and show toast
-          controller.selectedPaymentMethod.value = "";
-          controller.stripePaymentIntentId.value = "";
-          controller.stripePreAuthAmount.value = "";
-          ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
-        }
-      } else {
-        ShowToastDialog.closeLoader();
-
-        // Clear any partial data
-        controller.selectedPaymentMethod.value = "";
-        controller.stripePaymentIntentId.value = "";
-        controller.stripePreAuthAmount.value = "";
-
-        ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
-      }
-      }
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-
-      // Clear any partial data on error
-      controller.selectedPaymentMethod.value = "";
-      controller.stripePaymentIntentId.value = "";
-      controller.stripePreAuthAmount.value = "";
-
-      // Always show "Insufficient funds" for any error
-      ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
->>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
     }
   }
 

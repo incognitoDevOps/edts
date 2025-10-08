@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:developer';
+<<<<<<< HEAD
 import 'package:flutter/material.dart';
+=======
+>>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
 import 'package:http/http.dart' as http;
 import 'package:flutter_stripe/flutter_stripe.dart';
 
@@ -156,6 +159,7 @@ class StripeService {
     }
   }
 
+<<<<<<< HEAD
   Future<Map<String, dynamic>> presentPaymentSheet() async {
     try {
       await Stripe.instance.presentPaymentSheet();
@@ -182,6 +186,14 @@ class StripeService {
         'message': 'Unexpected error occurred',
         'cancelled': false,
       };
+=======
+  Future<PaymentIntentResult?> presentPaymentSheet() async {
+    try {
+      return await Stripe.instance.presentPaymentSheet();
+    } catch (e) {
+      log('Error presenting payment sheet: $e');
+      return null;
+>>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
     }
   }
 

@@ -286,7 +286,11 @@ class PaymentOrderController extends GetxController {
           if (success) {
             print("✅ Pre-authorization released successfully");
             orderModel.value.paymentIntentStatus = 'cancelled';
+<<<<<<< HEAD
             orderModel.value.status = Constant.rideCanceled;
+=======
+            orderModel.value.status = Constant.rideCancelled;
+>>>>>>> 2a86eb9e1d28ce94e4da679953343aa65e96b9c5
             await FireStoreUtils.setOrder(orderModel.value);
             ShowToastDialog.showToast(
                 "Ride canceled. Your payment hold has been released.",

@@ -285,8 +285,12 @@ class PaymentOrderController extends GetxController {
           if (success) {
             print("✅ Pre-authorization released successfully");
             orderModel.value.paymentIntentStatus = 'cancelled';
+            orderModel.value.status = Constant.rideCancelled;
             await FireStoreUtils.setOrder(orderModel.value);
-            ShowToastDialog.showToast("Payment authorization released");
+            ShowToastDialog.showToast(
+                "Ride canceled. Your payment hold has been released.",
+                position: EasyLoadingToastPosition.center,
+                duration: const Duration(seconds: 4));
           } else {
             print("❌ Failed to release pre-authorization");
             ShowToastDialog.showToast(
@@ -596,6 +600,12 @@ class PaymentOrderController extends GetxController {
         print("✅ Pre-authorization captured successfully");
         orderModel.value.paymentIntentStatus = 'captured';
         orderModel.value.paymentStatus = true;
+        orderModel.value.status = Constant.rideComplete;
+
+        // Get the originally authorized amount for comparison
+        double authorizedAmount = orderModel.value.preAuthAmount != null
+            ? double.parse(orderModel.value.preAuthAmount!)
+            : finalAmount;
 
         // Create transaction record for Stripe capture
         WalletTransactionModel stripeTransaction = WalletTransactionModel(
@@ -613,6 +623,20 @@ class PaymentOrderController extends GetxController {
         await FireStoreUtils.setWalletTransaction(stripeTransaction);
         await FireStoreUtils.setOrder(orderModel.value);
         print("💾 Transaction history saved for payment: ${stripeTransaction.id}");
+
+        // Notify user about capture with details
+        if (finalAmount < authorizedAmount) {
+          double difference = authorizedAmount - finalAmount;
+          ShowToastDialog.showToast(
+              "Payment of ${Constant.amountShow(amount: finalAmount.toStringAsFixed(2))} captured successfully. ${Constant.amountShow(amount: difference.toStringAsFixed(2))} returned to your card.",
+              position: EasyLoadingToastPosition.center,
+              duration: const Duration(seconds: 5));
+        } else {
+          ShowToastDialog.showToast(
+              "Payment of ${Constant.amountShow(amount: finalAmount.toStringAsFixed(2))} captured successfully.",
+              position: EasyLoadingToastPosition.center,
+              duration: const Duration(seconds: 4));
+        }
       } else {
         print("❌ Failed to capture pre-authorization: ${captureResult['error']}");
         ShowToastDialog.showToast(

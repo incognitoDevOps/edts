@@ -746,14 +746,14 @@ class BookingDetailsScreen extends StatelessWidget {
             double walletBalance = double.parse(user.walletAmount ?? "0.0");
 
             if (walletBalance < payableAmount) {
-              ShowToastDialog.showToast("Insufficient balance");
+              ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
               return;
             }
           }
         } else if (controller.selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
           // Validate Stripe payment is authorized
           if (controller.stripePaymentIntentId.value.isEmpty) {
-            ShowToastDialog.showToast("Insufficient balance");
+            ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
             return;
           }
 
@@ -761,7 +761,7 @@ class BookingDetailsScreen extends StatelessWidget {
           if (controller.stripePreAuthAmount.value.isNotEmpty) {
             double authorizedAmount = double.parse(controller.stripePreAuthAmount.value);
             if (authorizedAmount < payableAmount) {
-              ShowToastDialog.showToast("Insufficient balance");
+              ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
               return;
             }
           }
@@ -1259,14 +1259,17 @@ class BookingDetailsScreen extends StatelessWidget {
               totalAmount.toStringAsFixed(2);
           controller.selectedPaymentMethod.value = method;
 
-          ShowToastDialog.showToast("Payment authorized successfully",
-              position: EasyLoadingToastPosition.top);
+          // Show detailed notification about the hold
+          ShowToastDialog.showToast(
+              "${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} is currently on hold. You'll only be charged the final amount once the ride is complete. Any unused amount will be returned to your payment method.",
+              position: EasyLoadingToastPosition.center,
+              duration: const Duration(seconds: 5));
         } else {
           // User cancelled - clear payment method and show toast
           controller.selectedPaymentMethod.value = "";
           controller.stripePaymentIntentId.value = "";
           controller.stripePreAuthAmount.value = "";
-          ShowToastDialog.showToast("Insufficient balance");
+          ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
         }
       } else {
         ShowToastDialog.closeLoader();
@@ -1276,14 +1279,8 @@ class BookingDetailsScreen extends StatelessWidget {
         controller.stripePaymentIntentId.value = "";
         controller.stripePreAuthAmount.value = "";
 
-        final errorMsg = preAuthResult['error'].toString();
-        if (errorMsg.toLowerCase().contains('insufficient') ||
-            errorMsg.toLowerCase().contains('balance') ||
-            errorMsg.toLowerCase().contains('declined')) {
-          ShowToastDialog.showToast("Insufficient balance");
-        } else {
-          ShowToastDialog.showToast("Insufficient balance");
-        }
+        ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
+      }
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
@@ -1293,8 +1290,8 @@ class BookingDetailsScreen extends StatelessWidget {
       controller.stripePaymentIntentId.value = "";
       controller.stripePreAuthAmount.value = "";
 
-      // Always show "Insufficient balance" for any error
-      ShowToastDialog.showToast("Insufficient balance");
+      // Always show "Insufficient funds" for any error
+      ShowToastDialog.showToast("Insufficient funds. Please check your payment method.");
     }
   }
 

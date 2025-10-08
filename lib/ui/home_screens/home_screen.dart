@@ -930,7 +930,7 @@ class HomeScreen extends StatelessWidget {
                                                   .tr);
                                         } else if (double.parse(
                                                 controller.distance.value) <=
-                                            2) {
+                                            0.5) {
                                           ShowToastDialog.showToast(
                                               "Please select more than two ${Constant.distanceType} location"
                                                   .tr);
@@ -1031,7 +1031,7 @@ class HomeScreen extends StatelessWidget {
                                                   .tr);
                                         } else if (double.parse(
                                                 controller.distance.value) <=
-                                            2) {
+                                            0.5) {
                                           ShowToastDialog.showToast(
                                               "Please select more than two ${Constant.distanceType} location"
                                                   .tr);

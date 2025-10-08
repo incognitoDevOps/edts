@@ -22,6 +22,8 @@ import 'package:customer/utils/notification_service.dart';
 import 'package:customer/utils/utils.dart';
 import 'package:customer/widget/geoflutterfire/src/geoflutterfire.dart';
 import 'package:customer/widget/geoflutterfire/src/models/point.dart';
+import 'package:customer/services/stripe_service.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:geocoding/geocoding.dart';
@@ -273,6 +275,8 @@ var isInstantBooking = false.obs;
   Rx<PaymentModel> paymentModel = PaymentModel().obs;
 
   RxString selectedPaymentMethod = "".obs;
+  RxString stripePaymentIntentId = "".obs;
+  RxString stripePreAuthAmount = "".obs;
   RxList airPortList = <AriPortModel>[].obs;
 
   getPaymentData() async {
@@ -428,7 +432,7 @@ var isInstantBooking = false.obs;
         return false;
       }
 
-      if (distance.value.isEmpty || double.parse(distance.value) <= 2) {
+      if (distance.value.isEmpty || double.parse(distance.value) <= 0.5) {
         ShowToastDialog.showToast(
             "Please select more than two ${Constant.distanceType} location".tr);
         return false;
@@ -507,38 +511,22 @@ var isInstantBooking = false.obs;
       orderModel.taxList = Constant.taxList;
 
       // Handle Stripe pre-authorization for ride booking
-      if (selectedPaymentMethod.value.toLowerCase() == "stripe") {
-        try {
-          ShowToastDialog.showLoader("Authorizing payment...");
-
-          // Calculate total amount including taxes
-          double totalAmount = double.parse(orderModel.offerRate!);
-          if (Constant.taxList != null) {
-            for (var tax in Constant.taxList!) {
-              totalAmount += Constant()
-                  .calculateTax(amount: orderModel.offerRate!, taxModel: tax);
-            }
-          }
-
-          // Create Stripe payment intent with manual capture
-          Map<String, dynamic>? paymentIntentData =
-              await _createStripePreAuth(totalAmount.toString());
-
-          if (paymentIntentData != null &&
-              !paymentIntentData.containsKey("error")) {
-            orderModel.paymentIntentId = paymentIntentData['id'];
-            ShowToastDialog.closeLoader();
-          } else {
-            ShowToastDialog.closeLoader();
-            ShowToastDialog.showToast(
-                "Failed to authorize payment. Please try again.");
-            return false;
-          }
-        } catch (e) {
-          ShowToastDialog.closeLoader();
-          ShowToastDialog.showToast("Payment authorization failed: $e");
+      if (selectedPaymentMethod.value.toLowerCase() == "stripe" ||
+          selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
+        // Check if we already have a payment intent ID from the payment selection
+        if (stripePaymentIntentId.value.isEmpty) {
+          ShowToastDialog.showToast(
+              "Please select Stripe payment method again to authorize payment");
           return false;
         }
+
+        // Use the stored payment intent details
+        orderModel.paymentIntentId = stripePaymentIntentId.value;
+        orderModel.preAuthAmount = stripePreAuthAmount.value;
+        orderModel.paymentIntentStatus = 'requires_capture';
+        orderModel.preAuthCreatedAt = Timestamp.now();
+
+        print("✅ Using pre-authorized payment: ${stripePaymentIntentId.value}");
       }
 
       if (selectedTakingRide.value.fullName != "Myself") {
@@ -592,6 +580,8 @@ var isInstantBooking = false.obs;
         duration.value = "";
         amount.value = "";
         selectedPaymentMethod.value = "";
+        stripePaymentIntentId.value = "";
+        stripePreAuthAmount.value = "";
 
         return true;
       }
@@ -640,4 +630,18 @@ var isInstantBooking = false.obs;
       return null;
     }
   }
+
+  /// Reset all payment-related state
+void resetPaymentState() {
+  selectedPaymentMethod.value = "";
+  stripePaymentIntentId.value = "";
+  stripePreAuthAmount.value = "";
+  
+  // Also clear any payment-related form fields if needed
+  if (offerYourRateController.value.text.isNotEmpty) {
+    offerYourRateController.value.clear();
+  }
+  
+  print("🔄 Payment state reset");
+}
 }

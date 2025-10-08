@@ -1,5 +1,9 @@
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
+import 'package:customer/services/stripe_service.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/controller/home_controller.dart';
 import 'package:customer/model/contact_model.dart';
 import 'package:customer/model/qr_route_model.dart';
@@ -139,7 +143,8 @@ class BookingDetailsScreen extends StatelessWidget {
                       width: 40,
                       height: 40,
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(AppColors.primary),
                         strokeWidth: 3,
                       ),
                     ),
@@ -537,18 +542,50 @@ class BookingDetailsScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          homeController.selectedPaymentMethod.value.isNotEmpty
-                              ? homeController.selectedPaymentMethod.value
-                              : "Select Payment type".tr,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: homeController
-                                    .selectedPaymentMethod.value.isNotEmpty
-                                ? Theme.of(context).textTheme.bodyLarge?.color
-                                : Colors.grey[600],
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              homeController
+                                      .selectedPaymentMethod.value.isNotEmpty
+                                  ? homeController.selectedPaymentMethod.value
+                                  : "Select Payment type".tr,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: homeController
+                                        .selectedPaymentMethod.value.isNotEmpty
+                                    ? Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            if (homeController.selectedPaymentMethod.value
+                                    .toLowerCase()
+                                    .contains('stripe') &&
+                                homeController
+                                    .stripePaymentIntentId.value.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        size: 14, color: Colors.green),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Payment Authorized',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       Icon(
@@ -569,25 +606,28 @@ class BookingDetailsScreen extends StatelessWidget {
     return Obx(() {
       final isBooking = homeController.isBooking.value;
       final isInstantBooking = homeController.isInstantBooking.value;
-      
+
       return Row(
         children: [
           Expanded(
             child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: isBooking ? null : () => _handleInstantBooking(context, homeController),
-                icon: isInstantBooking 
+                onPressed: isBooking
+                    ? null
+                    : () => _handleInstantBooking(context, homeController),
+                icon: isInstantBooking
                     ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : Icon(Icons.qr_code, color: Colors.white),
-                label: isInstantBooking 
+                label: isInstantBooking
                     ? Text(
                         "Processing...".tr,
                         style: GoogleFonts.poppins(
@@ -605,7 +645,7 @@ class BookingDetailsScreen extends StatelessWidget {
                         ),
                       ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isBooking 
+                  backgroundColor: isBooking
                       ? AppColors.primary.withOpacity(0.5)
                       : AppColors.primary.withOpacity(0.8),
                   elevation: 0,
@@ -622,14 +662,17 @@ class BookingDetailsScreen extends StatelessWidget {
             child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: isBooking ? null : () => _handleBookRide(context, homeController),
+                onPressed: isBooking
+                    ? null
+                    : () => _handleBookRide(context, homeController),
                 icon: isBooking && !isInstantBooking
                     ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : Icon(Icons.directions_car, color: Colors.white),
@@ -651,11 +694,12 @@ class BookingDetailsScreen extends StatelessWidget {
                         ),
                       ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isBooking 
-                      ? Colors.grey[400]!
-                      : AppColors.primary,
+                  backgroundColor:
+                      isBooking ? Colors.grey[400]! : AppColors.primary,
                   elevation: isBooking ? 0 : 2,
-                  shadowColor: isBooking ? Colors.transparent : AppColors.primary.withOpacity(0.3),
+                  shadowColor: isBooking
+                      ? Colors.transparent
+                      : AppColors.primary.withOpacity(0.3),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -678,7 +722,7 @@ class BookingDetailsScreen extends StatelessWidget {
       ShowToastDialog.showToast("Please select source location".tr);
     } else if (controller.destinationLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select destination location".tr);
-    } else if (double.parse(controller.distance.value) <= 1) {
+    } else if (double.parse(controller.distance.value) <=0.5) {
       ShowToastDialog.showToast(
           "Please select more than one ${Constant.distanceType} location".tr);
     } else if (controller.selectedType.value.offerRate == true &&
@@ -708,17 +752,37 @@ class BookingDetailsScreen extends StatelessWidget {
           }
         }
 
-        // Step 3: Wallet balance check
+        // Step 3: Balance check for Wallet and Stripe
         if (controller.selectedPaymentMethod.value.toLowerCase() == "wallet") {
-          final user =
-              await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+          final user = await FireStoreUtils.getUserProfile(
+              FireStoreUtils.getCurrentUid());
           if (user != null) {
             double walletBalance = double.parse(user.walletAmount ?? "0.0");
 
             if (walletBalance < payableAmount) {
               ShowToastDialog.showToast(
-                  "Insufficient balance. Please top up your wallet or choose another payment method.");
-              return; // Don't proceed if balance is not enough
+                  "Insufficient funds. Please check your payment method.");
+              return;
+            }
+          }
+        } else if (controller.selectedPaymentMethod.value
+            .toLowerCase()
+            .contains("stripe")) {
+          // Validate Stripe payment is authorized
+          if (controller.stripePaymentIntentId.value.isEmpty) {
+            ShowToastDialog.showToast(
+                "Insufficient funds. Please check your payment method.");
+            return;
+          }
+
+          // Verify the authorization amount is sufficient
+          if (controller.stripePreAuthAmount.value.isNotEmpty) {
+            double authorizedAmount =
+                double.parse(controller.stripePreAuthAmount.value);
+            if (authorizedAmount < payableAmount) {
+              ShowToastDialog.showToast(
+                  "Insufficient funds. Please check your payment method.");
+              return;
             }
           }
         }
@@ -1133,11 +1197,147 @@ class BookingDetailsScreen extends StatelessWidget {
         method,
         style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
       ),
-      onTap: () {
-        controller.selectedPaymentMethod.value = method;
+      onTap: () async {
+        // Close the dialog first
         Get.back();
+
+        // If Stripe is selected, trigger payment authorization immediately
+        if (method.toLowerCase().contains('stripe')) {
+          await _handleStripeSelection(context, controller, method);
+        } else {
+          // For other payment methods, just set it
+          controller.selectedPaymentMethod.value = method;
+        }
       },
     );
+  }
+
+  Future<void> _handleStripeSelection(
+    BuildContext context,
+    HomeController controller,
+    String method,
+  ) async {
+    try {
+      // Validate required data
+      if (controller.amount.value.isEmpty) {
+        ShowToastDialog.showToast("Please calculate route first");
+        return;
+      }
+
+      ShowToastDialog.showLoader("Authorizing payment...");
+
+      // Calculate total amount including taxes
+      double totalAmount = double.parse(controller.amount.value);
+      if (Constant.taxList != null) {
+        for (var tax in Constant.taxList!) {
+          totalAmount += Constant().calculateTax(
+            amount: controller.amount.value,
+            taxModel: tax,
+          );
+        }
+      }
+
+      // Retrieve Stripe configuration
+      final stripeConfig = controller.paymentModel.value.strip;
+      if (stripeConfig == null ||
+          stripeConfig.stripeSecret == null ||
+          stripeConfig.clientpublishableKey == null) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Stripe is not configured properly");
+        return;
+      }
+
+      // Initialize Stripe SDK
+      Stripe.publishableKey = stripeConfig.clientpublishableKey!;
+      Stripe.merchantIdentifier = 'BuzRyde';
+      await Stripe.instance.applySettings();
+
+      final stripeService = StripeService(
+        stripeSecret: stripeConfig.stripeSecret!,
+        publishableKey: stripeConfig.clientpublishableKey!,
+      );
+
+      // Create pre-authorization
+      final preAuthResult = await stripeService.createPreAuthorization(
+        amount: totalAmount.toStringAsFixed(2),
+        currency: Constant.currencyModel?.code?.toLowerCase() ?? 'usd',
+      );
+
+      ShowToastDialog.closeLoader();
+
+      if (preAuthResult['success'] == true) {
+        // Initialize payment sheet
+        await stripeService.initPaymentSheet(
+          paymentIntentClientSecret: preAuthResult['clientSecret'],
+          merchantDisplayName: 'BuzRyde',
+        );
+
+        // Present payment sheet to the user and get detailed result
+        final paymentResult = await stripeService.presentPaymentSheet();
+
+        if (paymentResult['success'] == true) {
+          // Payment successful - Save payment details
+          controller.stripePaymentIntentId.value =
+              preAuthResult['paymentIntentId'];
+          controller.stripePreAuthAmount.value = totalAmount.toStringAsFixed(2);
+          controller.selectedPaymentMethod.value = method;
+
+          // Notify user of the payment hold
+          ShowToastDialog.showToast(
+            "${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} is currently on hold. "
+            "You'll only be charged the final amount once the ride is complete. "
+            "Any unused amount will be returned to your payment method.",
+            position: EasyLoadingToastPosition.center,
+            duration: const Duration(seconds: 5),
+          );
+        } else {
+          // Payment failed or was cancelled
+          controller.resetPaymentState();
+
+          if (paymentResult['cancelled'] == true) {
+            ShowToastDialog.showToast("Payment authorization was cancelled.");
+          } else if (paymentResult['message'] != null) {
+            // Show specific error message from Stripe
+            ShowToastDialog.showToast(
+                "Payment authorization failed: ${paymentResult['message']}");
+          } else {
+            ShowToastDialog.showToast(
+                "Payment authorization failed. Please check your payment method and try again.");
+          }
+        }
+      } else {
+        // Pre-authorization failed
+        controller.resetPaymentState();
+        final errorMessage = preAuthResult['error'] ?? 'Unknown error';
+        ShowToastDialog.showToast("Payment setup failed: $errorMessage");
+      }
+    } catch (e) {
+      ShowToastDialog.closeLoader();
+      controller.resetPaymentState();
+
+      // Handle specific Stripe errors
+      if (e is StripeException) {
+        switch (e.error.code) {
+          case FailureCode.Canceled:
+            ShowToastDialog.showToast("Payment authorization was cancelled.");
+            break;
+          case FailureCode.Failed:
+            ShowToastDialog.showToast(
+                "Payment authorization failed. Please check your card details and try again.");
+            break;
+          case FailureCode.Timeout:
+            ShowToastDialog.showToast(
+                "Payment authorization timed out. Please try again.");
+            break;
+          default:
+            ShowToastDialog.showToast(
+                "Payment authorization failed: ${e.error.localizedMessage ?? 'Unknown error'}");
+        }
+      } else {
+        ShowToastDialog.showToast(
+            "Payment authorization failed. Please try again.");
+      }
+    }
   }
 
   showAlertDialog(BuildContext context) {

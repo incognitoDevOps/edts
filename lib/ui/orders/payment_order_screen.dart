@@ -647,13 +647,35 @@ class PaymentOrderScreen extends StatelessWidget {
           print("   Payment Intent ID: ${controller.orderModel.value.paymentIntentId}");
           controller.capturePreAuthorization(amount: amount);
         } else {
-          // This should not happen - payment should be authorized during booking
-          print("❌ No payment intent found - this is an error condition");
-          ShowToastDialog.showToast(
-            "Payment authorization not found. Please contact support or rebook your ride.",
-            position: EasyLoadingToastPosition.center,
-            duration: const Duration(seconds: 5),
-          );
+          print("❌ No payment intent found - attempting to reload order...");
+          ShowToastDialog.showLoader("Verifying payment authorization...");
+
+          try {
+            final freshOrder = await FireStoreUtils.getOrder(controller.orderModel.value.id!);
+
+            if (freshOrder != null && freshOrder.paymentIntentId != null && freshOrder.paymentIntentId!.isNotEmpty) {
+              print("✅ Payment intent recovered from database");
+              controller.orderModel.value = freshOrder;
+              ShowToastDialog.closeLoader();
+              controller.capturePreAuthorization(amount: amount);
+            } else {
+              ShowToastDialog.closeLoader();
+              print("❌ Payment intent not found in database either");
+              ShowToastDialog.showToast(
+                "Payment authorization not found. This ride may have been paid with a different method or the authorization expired. Please contact support with order ID: ${controller.orderModel.value.id}",
+                position: EasyLoadingToastPosition.center,
+                duration: const Duration(seconds: 7),
+              );
+            }
+          } catch (e) {
+            ShowToastDialog.closeLoader();
+            print("❌ Error recovering payment intent: $e");
+            ShowToastDialog.showToast(
+              "Unable to verify payment authorization. Please contact support.",
+              position: EasyLoadingToastPosition.center,
+              duration: const Duration(seconds: 5),
+            );
+          }
         }
         break;
       case 'razorpay':

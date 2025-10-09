@@ -49,7 +49,24 @@ class PaymentOrderController extends GetxController {
   getArgument() async {
     dynamic argumentData = Get.arguments;
     if (argumentData != null) {
-      orderModel.value = argumentData['orderModel'];
+      OrderModel passedOrder = argumentData['orderModel'];
+
+      print("🔄 Reloading order from Firestore to get latest data...");
+      print("   Order ID: ${passedOrder.id}");
+      print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
+
+      final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+
+      if (freshOrder != null) {
+        orderModel.value = freshOrder;
+        print("✅ Order reloaded successfully");
+        print("   Fresh paymentIntentId: ${freshOrder.paymentIntentId}");
+        print("   Fresh preAuthAmount: ${freshOrder.preAuthAmount}");
+        print("   Fresh paymentIntentStatus: ${freshOrder.paymentIntentStatus}");
+      } else {
+        print("⚠️  Failed to reload order, using passed order model");
+        orderModel.value = passedOrder;
+      }
     }
     update();
   }

@@ -132,65 +132,92 @@ class PaymentOrderController extends GetxController {
     update();
   }
 
-  // Stripe pre-authorization methods
+  // Stripe pre-authorization methods - DEPRECATED
+  // These methods are kept for backward compatibility but should not be used
+  // The payment intent should be created during booking, not at payment screen
   Future<void> createPreAuthorization({required String amount}) async {
-    if (paymentModel.value.strip?.stripeSecret == null) {
-      ShowToastDialog.showToast("Stripe not configured");
-      return;
-    }
-
-    try {
-      ShowToastDialog.showLoader("Authorizing payment...");
-      Map<String, dynamic>? paymentIntentData = await createStripeIntent(
-        amount: amount,
-        captureMethod: 'manual', // This creates a pre-authorization
-      );
-
-      if (paymentIntentData!.containsKey("error")) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Failed to create pre-authorization");
-      } else {
-        // Store the payment intent ID for later capture
-        orderModel.value.paymentIntentId = paymentIntentData['id'];
-        await FireStoreUtils.setOrder(orderModel.value);
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Payment pre-authorized successfully");
-      }
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-      log("Pre-authorization error: $e");
-      ShowToastDialog.showToast("Pre-authorization failed: $e");
-    }
+    print("⚠️  createPreAuthorization called - This should not happen!");
+    print("   Payment authorization should occur during booking, not at payment screen");
+    ShowToastDialog.showToast("Payment authorization error. Please try rebooking.");
   }
 
   Future<void> capturePreAuthorization({required String amount}) async {
-    if (orderModel.value.paymentIntentId == null) {
-      ShowToastDialog.showToast("No pre-authorization found");
+    if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
+      print("❌ No payment intent found for capture");
+      ShowToastDialog.showToast("No payment authorization found. Cannot process payment.");
       return;
     }
 
     try {
+      print("💳 [STRIPE CAPTURE] Starting capture process...");
+      print("   Payment Intent ID: ${orderModel.value.paymentIntentId}");
+      print("   Amount to capture: $amount");
+
       ShowToastDialog.showLoader("Processing payment...");
-      final response = await http.post(
-        Uri.parse(
-            'https://api.stripe.com/v1/payment_intents/${orderModel.value.paymentIntentId}/capture'),
-        headers: {
-          'Authorization': 'Bearer ${paymentModel.value.strip!.stripeSecret}',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: {
-          'amount_to_capture':
-              ((double.parse(amount) * 100).round()).toString(),
-        },
+
+      final stripeConfig = paymentModel.value.strip;
+      if (stripeConfig == null || stripeConfig.stripeSecret == null) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Stripe not configured properly");
+        return;
+      }
+
+      final stripeService = StripeService(
+        stripeSecret: stripeConfig.stripeSecret!,
+        publishableKey: stripeConfig.clientpublishableKey ?? '',
       );
 
-      if (response.statusCode == 200) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Payment captured successfully");
+      final captureResult = await stripeService.capturePreAuthorization(
+        paymentIntentId: orderModel.value.paymentIntentId!,
+        finalAmount: amount,
+      );
+
+      ShowToastDialog.closeLoader();
+
+      if (captureResult['success'] == true) {
+        print("✅ Payment captured successfully");
+
+        final authorizedAmount = orderModel.value.preAuthAmount != null
+            ? double.parse(orderModel.value.preAuthAmount!)
+            : double.parse(amount);
+        final capturedAmount = double.parse(amount);
+
+        WalletTransactionModel captureTransaction = WalletTransactionModel(
+          id: Constant.getUuid(),
+          amount: "-$amount",
+          createdDate: Timestamp.now(),
+          paymentType: "Stripe",
+          transactionId: orderModel.value.id,
+          userId: FireStoreUtils.getCurrentUid(),
+          orderType: "city",
+          userType: "customer",
+          note: "Stripe payment captured for ride ${orderModel.value.id}",
+        );
+
+        await FireStoreUtils.setWalletTransaction(captureTransaction);
+
+        orderModel.value.paymentIntentStatus = 'captured';
+        orderModel.value.paymentStatus = true;
+
+        if (capturedAmount < authorizedAmount) {
+          final difference = authorizedAmount - capturedAmount;
+          ShowToastDialog.showToast(
+            "Payment captured successfully. ${Constant.amountShow(amount: difference.toStringAsFixed(2))} will be returned to your card.",
+            position: EasyLoadingToastPosition.center,
+            duration: const Duration(seconds: 5),
+          );
+        } else {
+          ShowToastDialog.showToast(
+            "Payment captured successfully",
+            position: EasyLoadingToastPosition.center,
+            duration: const Duration(seconds: 3),
+          );
+        }
+
         completeOrder();
       } else {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Failed to capture payment");
+        print("❌ Failed to capture payment: ${captureResult['error']}");
+        ShowToastDialog.showToast("Payment capture failed. Please contact support.");
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
@@ -200,24 +227,50 @@ class PaymentOrderController extends GetxController {
   }
 
   Future<void> cancelPreAuthorization() async {
-    if (orderModel.value.paymentIntentId == null) {
+    if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
+      print("ℹ️  No payment intent to cancel");
       return;
     }
 
     try {
-      final response = await http.post(
-        Uri.parse(
-            'https://api.stripe.com/v1/payment_intents/${orderModel.value.paymentIntentId}/cancel'),
-        headers: {
-          'Authorization': 'Bearer ${paymentModel.value.strip!.stripeSecret}',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+      print("🔄 Cancelling payment intent: ${orderModel.value.paymentIntentId}");
+
+      final stripeConfig = paymentModel.value.strip;
+      if (stripeConfig == null || stripeConfig.stripeSecret == null) {
+        print("❌ Stripe not configured");
+        return;
+      }
+
+      final stripeService = StripeService(
+        stripeSecret: stripeConfig.stripeSecret!,
+        publishableKey: stripeConfig.clientpublishableKey ?? '',
       );
 
-      if (response.statusCode == 200) {
-        log("Pre-authorization cancelled successfully");
+      final success = await stripeService.releasePreAuthorization(
+        paymentIntentId: orderModel.value.paymentIntentId!,
+      );
+
+      if (success) {
+        print("✅ Payment intent cancelled successfully");
+
+        WalletTransactionModel cancelTransaction = WalletTransactionModel(
+          id: Constant.getUuid(),
+          amount: "0",
+          createdDate: Timestamp.now(),
+          paymentType: "Stripe",
+          transactionId: orderModel.value.id,
+          userId: FireStoreUtils.getCurrentUid(),
+          orderType: "city",
+          userType: "customer",
+          note: "Stripe pre-authorization released for ride ${orderModel.value.id}",
+        );
+
+        await FireStoreUtils.setWalletTransaction(cancelTransaction);
+
+        orderModel.value.paymentIntentStatus = 'cancelled';
+        await FireStoreUtils.setOrder(orderModel.value);
       } else {
-        log("Failed to cancel pre-authorization");
+        print("❌ Failed to cancel payment intent");
       }
     } catch (e) {
       log("Cancel pre-authorization error: $e");
@@ -267,9 +320,15 @@ class PaymentOrderController extends GetxController {
   // Method to handle ride cancellation and refunds
   Future<void> handleRideCancellation() async {
     try {
+      print("🔄 [CANCELLATION] Processing ride cancellation...");
+      print("   Order ID: ${orderModel.value.id}");
+      print("   Payment Method: ${selectedPaymentMethod.value}");
+      print("   Payment Intent ID: ${orderModel.value.paymentIntentId}");
+
       if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
               selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
-          orderModel.value.paymentIntentId != null) {
+          orderModel.value.paymentIntentId != null &&
+          orderModel.value.paymentIntentId!.isNotEmpty) {
         print("🔄 Cancelling Stripe pre-authorization...");
 
         final stripeConfig = paymentModel.value.strip;
@@ -285,9 +344,28 @@ class PaymentOrderController extends GetxController {
 
           if (success) {
             print("✅ Pre-authorization released successfully");
+
+            // Create transaction record for cancellation
+            WalletTransactionModel cancellationTransaction = WalletTransactionModel(
+              id: Constant.getUuid(),
+              amount: "0",
+              createdDate: Timestamp.now(),
+              paymentType: "Stripe",
+              transactionId: orderModel.value.id,
+              userId: FireStoreUtils.getCurrentUid(),
+              orderType: "city",
+              userType: "customer",
+              note: "Ride cancelled - Stripe authorization released for ride #${orderModel.value.id}",
+            );
+
+            await FireStoreUtils.setWalletTransaction(cancellationTransaction);
+            print("💾 Cancellation transaction saved: ${cancellationTransaction.id}");
+
             orderModel.value.paymentIntentStatus = 'cancelled';
             orderModel.value.status = Constant.rideCanceled;
+            orderModel.value.updateDate = Timestamp.now();
             await FireStoreUtils.setOrder(orderModel.value);
+
             ShowToastDialog.showToast(
                 "Ride canceled. Your payment hold has been released.",
                 position: EasyLoadingToastPosition.center,
@@ -299,22 +377,42 @@ class PaymentOrderController extends GetxController {
           }
         }
       } else if (selectedPaymentMethod.value.toLowerCase() == "wallet") {
-        // Refund wallet amount
-        final amount = calculateAmount().toString();
-        WalletTransactionModel refundTransaction = WalletTransactionModel(
-            id: Constant.getUuid(),
-            amount: amount,
-            createdDate: Timestamp.now(),
-            paymentType: "wallet",
-            transactionId: orderModel.value.id,
-            userId: FireStoreUtils.getCurrentUid(),
-            orderType: "city",
-            userType: "customer",
-            note: "Ride cancellation refund");
+        print("🔄 Processing wallet refund...");
 
-        await FireStoreUtils.setWalletTransaction(refundTransaction);
-        await FireStoreUtils.updateUserWallet(amount: amount);
-        ShowToastDialog.showToast("Amount refunded to your wallet");
+        // Only refund if payment was already deducted
+        if (orderModel.value.paymentStatus == true) {
+          final amount = calculateAmount().toString();
+
+          WalletTransactionModel refundTransaction = WalletTransactionModel(
+              id: Constant.getUuid(),
+              amount: amount,
+              createdDate: Timestamp.now(),
+              paymentType: "wallet",
+              transactionId: orderModel.value.id,
+              userId: FireStoreUtils.getCurrentUid(),
+              orderType: "city",
+              userType: "customer",
+              note: "Ride cancellation refund for ride #${orderModel.value.id}");
+
+          await FireStoreUtils.setWalletTransaction(refundTransaction);
+          await FireStoreUtils.updateUserWallet(amount: amount);
+
+          print("✅ Wallet refund processed");
+          ShowToastDialog.showToast("Amount refunded to your wallet");
+        } else {
+          print("ℹ️  No wallet refund needed - payment not yet deducted");
+        }
+
+        orderModel.value.status = Constant.rideCanceled;
+        orderModel.value.updateDate = Timestamp.now();
+        await FireStoreUtils.setOrder(orderModel.value);
+      } else if (selectedPaymentMethod.value.toLowerCase() == "cash") {
+        // For cash, just update status
+        print("ℹ️  Cash payment - no refund needed");
+        orderModel.value.status = Constant.rideCanceled;
+        orderModel.value.updateDate = Timestamp.now();
+        await FireStoreUtils.setOrder(orderModel.value);
+        ShowToastDialog.showToast("Ride canceled successfully");
       }
     } catch (e) {
       log("Error handling ride cancellation: $e");
@@ -571,14 +669,14 @@ class PaymentOrderController extends GetxController {
     try {
       print("💳 [STRIPE] Starting pre-authorization capture...");
 
-      if (orderModel.value.paymentIntentId == null) {
-        print("⚠️  No payment intent ID found");
+      if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
+        print("⚠️  No payment intent ID found - skipping automatic capture");
         return;
       }
 
       final stripeConfig = paymentModel.value.strip;
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {
-        print("⚠️  Stripe not configured");
+        print("⚠️  Stripe not configured - skipping capture");
         return;
       }
 
@@ -590,6 +688,7 @@ class PaymentOrderController extends GetxController {
       // Calculate final amount
       final finalAmount = calculateAmount();
       print("💰 Final amount to capture: \$${finalAmount.toStringAsFixed(2)}");
+      print("💰 Originally authorized: \$${orderModel.value.preAuthAmount ?? 'Unknown'}");
 
       // Capture the pre-authorization
       final captureResult = await stripeService.capturePreAuthorization(
@@ -601,47 +700,51 @@ class PaymentOrderController extends GetxController {
         print("✅ Pre-authorization captured successfully");
         orderModel.value.paymentIntentStatus = 'captured';
         orderModel.value.paymentStatus = true;
-        orderModel.value.status = Constant.rideComplete;
 
         // Get the originally authorized amount for comparison
         double authorizedAmount = orderModel.value.preAuthAmount != null
             ? double.parse(orderModel.value.preAuthAmount!)
             : finalAmount;
 
-        // Create transaction record for Stripe capture
-        WalletTransactionModel stripeTransaction = WalletTransactionModel(
+        // Create transaction record for customer (debit)
+        WalletTransactionModel customerTransaction = WalletTransactionModel(
           id: Constant.getUuid(),
-          amount: finalAmount.toStringAsFixed(2),
+          amount: "-${finalAmount.toStringAsFixed(2)}",
           createdDate: Timestamp.now(),
           paymentType: "Stripe",
           transactionId: orderModel.value.id,
           userId: FireStoreUtils.getCurrentUid(),
           orderType: "city",
           userType: "customer",
-          note: "Stripe payment captured - Ride ID: ${orderModel.value.id}",
+          note: "Stripe payment for ride #${orderModel.value.id}",
         );
 
-        await FireStoreUtils.setWalletTransaction(stripeTransaction);
-        await FireStoreUtils.setOrder(orderModel.value);
-        print("💾 Transaction history saved for payment: ${stripeTransaction.id}");
+        await FireStoreUtils.setWalletTransaction(customerTransaction);
+        print("💾 Customer transaction history saved: ${customerTransaction.id}");
 
-        // Notify user about capture with details
+        // If there's a difference, create a refund transaction record
         if (finalAmount < authorizedAmount) {
           double difference = authorizedAmount - finalAmount;
-          ShowToastDialog.showToast(
-              "Payment of ${Constant.amountShow(amount: finalAmount.toStringAsFixed(2))} captured successfully. ${Constant.amountShow(amount: difference.toStringAsFixed(2))} returned to your card.",
-              position: EasyLoadingToastPosition.center,
-              duration: const Duration(seconds: 5));
-        } else {
-          ShowToastDialog.showToast(
-              "Payment of ${Constant.amountShow(amount: finalAmount.toStringAsFixed(2))} captured successfully.",
-              position: EasyLoadingToastPosition.center,
-              duration: const Duration(seconds: 4));
+
+          WalletTransactionModel refundTransaction = WalletTransactionModel(
+            id: Constant.getUuid(),
+            amount: difference.toStringAsFixed(2),
+            createdDate: Timestamp.now(),
+            paymentType: "Stripe",
+            transactionId: orderModel.value.id,
+            userId: FireStoreUtils.getCurrentUid(),
+            orderType: "city",
+            userType: "customer",
+            note: "Stripe hold release - unused authorization for ride #${orderModel.value.id}",
+          );
+
+          await FireStoreUtils.setWalletTransaction(refundTransaction);
+          print("💾 Refund transaction history saved: ${refundTransaction.id}");
         }
+
+        await FireStoreUtils.setOrder(orderModel.value);
       } else {
         print("❌ Failed to capture pre-authorization: ${captureResult['error']}");
-        ShowToastDialog.showToast(
-            "Payment capture failed. Please contact support.");
       }
     } catch (e) {
       print("❌ Error capturing pre-authorization: $e");

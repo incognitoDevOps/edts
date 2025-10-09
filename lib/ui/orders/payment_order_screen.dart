@@ -626,12 +626,12 @@ class PaymentOrderScreen extends StatelessWidget {
   void _handlePayment(PaymentOrderController controller) {
     final paymentMethod = controller.selectedPaymentMethod.value;
     final amount = controller.calculateAmount().toString();
-    
+
     if (paymentMethod.isEmpty) {
       ShowToastDialog.showToast("Please select payment method");
       return;
     }
-    
+
     switch (paymentMethod.toLowerCase()) {
       case 'cash':
         controller.completeCashOrder();
@@ -640,11 +640,20 @@ class PaymentOrderScreen extends StatelessWidget {
         controller.processWalletPayment(amount: amount);
         break;
       case 'stripe':
-        // For ride completion, capture the pre-authorized amount
-        if (controller.orderModel.value.paymentIntentId != null) {
+        // CRITICAL: Check if payment was pre-authorized during booking
+        if (controller.orderModel.value.paymentIntentId != null &&
+            controller.orderModel.value.paymentIntentId!.isNotEmpty) {
+          print("✅ Using pre-authorized payment from booking");
+          print("   Payment Intent ID: ${controller.orderModel.value.paymentIntentId}");
           controller.capturePreAuthorization(amount: amount);
         } else {
-          controller.stripeMakePayment(amount: amount);
+          // This should not happen - payment should be authorized during booking
+          print("❌ No payment intent found - this is an error condition");
+          ShowToastDialog.showToast(
+            "Payment authorization not found. Please contact support or rebook your ride.",
+            position: EasyLoadingToastPosition.center,
+            duration: const Duration(seconds: 5),
+          );
         }
         break;
       case 'razorpay':

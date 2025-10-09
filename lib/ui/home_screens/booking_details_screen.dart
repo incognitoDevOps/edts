@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/controller/home_controller.dart';
 import 'package:customer/model/contact_model.dart';
 import 'package:customer/model/qr_route_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/themes/text_field_them.dart';
 import 'package:customer/ui/qr_code_screen.dart';
@@ -1281,6 +1282,26 @@ class BookingDetailsScreen extends StatelessWidget {
               preAuthResult['paymentIntentId'];
           controller.stripePreAuthAmount.value = totalAmount.toStringAsFixed(2);
           controller.selectedPaymentMethod.value = method;
+
+          // IMPORTANT: Log the authorization in transaction history
+          try {
+            WalletTransactionModel authTransaction = WalletTransactionModel(
+              id: Constant.getUuid(),
+              amount: "0",
+              createdDate: Timestamp.now(),
+              paymentType: "Stripe",
+              transactionId: preAuthResult['paymentIntentId'],
+              userId: FireStoreUtils.getCurrentUid(),
+              orderType: "city",
+              userType: "customer",
+              note: "Stripe pre-authorization hold: ${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} - Payment Intent: ${preAuthResult['paymentIntentId']}",
+            );
+
+            await FireStoreUtils.setWalletTransaction(authTransaction);
+            print("💾 Authorization transaction logged: ${authTransaction.id}");
+          } catch (e) {
+            print("⚠️  Failed to log authorization transaction: $e");
+          }
 
           // Notify user of the payment hold
           ShowToastDialog.showToast(

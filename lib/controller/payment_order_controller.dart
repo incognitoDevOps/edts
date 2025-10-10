@@ -915,11 +915,31 @@ class PaymentOrderController extends GetxController {
       // Reset payment processing flag at the end
       isPaymentProcessing.value = false;
 
-      // Handle Stripe pre-authorization capture
+      // CRITICAL: Handle Stripe pre-authorization capture BEFORE proceeding
       if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
               selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
           orderModel.value.paymentIntentId != null) {
-        await _captureStripePreAuthorization();
+        print("💳 [STRIPE] Detected Stripe payment, ensuring capture...");
+
+        final captureSuccess = await _captureStripePreAuthorization();
+
+        if (!captureSuccess) {
+          print("❌ CRITICAL: Stripe capture failed!");
+          ShowToastDialog.closeLoader();
+          ShowToastDialog.showToast(
+            "Payment capture failed. Please contact support with order ID: ${orderModel.value.id}",
+            duration: const Duration(seconds: 5),
+          );
+
+          // Still complete the order but mark for manual review
+          orderModel.value.status = "Payment Pending Review";
+          await FireStoreUtils.setOrder(orderModel.value);
+
+          isPaymentProcessing.value = false;
+          return;
+        }
+
+        print("✅ Stripe payment captured successfully, continuing with order completion");
       }
 
       // DEBUG: Check order state before starting
@@ -1130,20 +1150,38 @@ class PaymentOrderController extends GetxController {
     });
   }
 
-  // Capture Stripe pre-authorization when ride completes
-  Future<void> _captureStripePreAuthorization() async {
+  // GUARANTEED Stripe capture - called automatically during order completion
+  Future<bool> _captureStripePreAuthorization() async {
     try {
-      print("💳 [STRIPE] Starting pre-authorization capture...");
+      print("💳 [STRIPE AUTO-CAPTURE] Starting automatic capture...");
 
       if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
-        print("⚠️  No payment intent ID found - skipping automatic capture");
-        return;
+        print("❌ CRITICAL: No payment intent ID found!");
+        print("   This should never happen for Stripe orders");
+        return false;
+      }
+
+      // Check current status
+      final currentStatus = orderModel.value.paymentIntentStatus ?? 'unknown';
+      print("📊 Current payment status: $currentStatus");
+
+      // If already captured/succeeded, skip
+      if (currentStatus == 'captured' || currentStatus == 'succeeded') {
+        print("✅ Payment already captured, skipping");
+        return true;
+      }
+
+      // If not in capturable state, log error
+      if (currentStatus != 'requires_capture') {
+        print("❌ Payment intent not in capturable state: $currentStatus");
+        print("   Payment Intent ID: ${orderModel.value.paymentIntentId}");
+        // Still attempt capture as Stripe might accept it
       }
 
       final stripeConfig = paymentModel.value.strip;
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {
-        print("⚠️  Stripe not configured - skipping capture");
-        return;
+        print("❌ Stripe not configured - cannot capture");
+        return false;
       }
 
       final stripeService = StripeService(
@@ -1156,15 +1194,17 @@ class PaymentOrderController extends GetxController {
       print("💰 Final amount to capture: \$${finalAmount.toStringAsFixed(2)}");
       print("💰 Originally authorized: \$${orderModel.value.preAuthAmount ?? 'Unknown'}");
 
-      // Capture the pre-authorization
-      final captureResult = await stripeService.capturePreAuthorization(
+      // Capture the pre-authorization with retry logic
+      final captureResult = await _captureWithRetry(
+        stripeService: stripeService,
         paymentIntentId: orderModel.value.paymentIntentId!,
         finalAmount: finalAmount.toStringAsFixed(2),
+        maxRetries: 3,
       );
 
       if (captureResult['success'] == true) {
         print("✅ Pre-authorization captured successfully");
-        orderModel.value.paymentIntentStatus = 'captured';
+        orderModel.value.paymentIntentStatus = 'succeeded';
         orderModel.value.paymentStatus = true;
 
         // Get the originally authorized amount for comparison
@@ -1182,7 +1222,7 @@ class PaymentOrderController extends GetxController {
           userId: FireStoreUtils.getCurrentUid(),
           orderType: "city",
           userType: "customer",
-          note: "Stripe payment for ride #${orderModel.value.id}",
+          note: "Stripe payment captured for ride #${orderModel.value.id}",
         );
 
         await FireStoreUtils.setWalletTransaction(customerTransaction);
@@ -1209,11 +1249,128 @@ class PaymentOrderController extends GetxController {
         }
 
         await FireStoreUtils.setOrder(orderModel.value);
+        return true;
       } else {
         print("❌ Failed to capture pre-authorization: ${captureResult['error']}");
+
+        // Log to Firebase for admin monitoring
+        await _logCaptureFailure(
+          orderId: orderModel.value.id!,
+          paymentIntentId: orderModel.value.paymentIntentId!,
+          error: captureResult['error'].toString(),
+        );
+
+        return false;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print("❌ Error capturing pre-authorization: $e");
+      print("📋 Stack trace: $stackTrace");
+
+      // Log to Firebase for admin monitoring
+      await _logCaptureFailure(
+        orderId: orderModel.value.id!,
+        paymentIntentId: orderModel.value.paymentIntentId ?? 'unknown',
+        error: e.toString(),
+      );
+
+      return false;
+    }
+  }
+
+  /// Capture with automatic retry logic for network failures
+  Future<Map<String, dynamic>> _captureWithRetry({
+    required StripeService stripeService,
+    required String paymentIntentId,
+    required String finalAmount,
+    int maxRetries = 3,
+  }) async {
+    int attempt = 0;
+    Map<String, dynamic>? lastResult;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      print("🔄 Capture attempt $attempt of $maxRetries");
+
+      try {
+        lastResult = await stripeService.capturePreAuthorization(
+          paymentIntentId: paymentIntentId,
+          finalAmount: finalAmount,
+        );
+
+        if (lastResult['success'] == true) {
+          print("✅ Capture succeeded on attempt $attempt");
+          return lastResult;
+        }
+
+        // Check if error is retryable
+        final errorMessage = lastResult['error']?.toString() ?? '';
+        if (errorMessage.contains('already been captured') ||
+            errorMessage.contains('already succeeded')) {
+          print("ℹ️  Payment already captured, treating as success");
+          return {'success': true, 'data': 'already_captured'};
+        }
+
+        if (!_isRetryableError(errorMessage)) {
+          print("❌ Non-retryable error, stopping: $errorMessage");
+          return lastResult;
+        }
+
+        // Wait before retry with exponential backoff
+        if (attempt < maxRetries) {
+          final waitSeconds = attempt * 2;
+          print("⏳ Waiting ${waitSeconds}s before retry...");
+          await Future.delayed(Duration(seconds: waitSeconds));
+        }
+      } catch (e) {
+        print("❌ Capture attempt $attempt failed: $e");
+        lastResult = {'success': false, 'error': e.toString()};
+
+        if (attempt < maxRetries) {
+          final waitSeconds = attempt * 2;
+          await Future.delayed(Duration(seconds: waitSeconds));
+        }
+      }
+    }
+
+    return lastResult ?? {'success': false, 'error': 'All retry attempts failed'};
+  }
+
+  /// Check if error is retryable
+  bool _isRetryableError(String error) {
+    final retryablePatterns = [
+      'network',
+      'timeout',
+      'connection',
+      'temporarily unavailable',
+      'rate limit',
+    ];
+
+    return retryablePatterns.any((pattern) =>
+      error.toLowerCase().contains(pattern));
+  }
+
+  /// Log capture failure to Firebase for admin monitoring
+  Future<void> _logCaptureFailure({
+    required String orderId,
+    required String paymentIntentId,
+    required String error,
+  }) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('capture_failures')
+          .add({
+        'orderId': orderId,
+        'paymentIntentId': paymentIntentId,
+        'error': error,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': FireStoreUtils.getCurrentUid(),
+        'amount': calculateAmount().toString(),
+        'preAuthAmount': orderModel.value.preAuthAmount,
+        'paymentIntentStatus': orderModel.value.paymentIntentStatus,
+      });
+      print("📝 Capture failure logged to Firebase for admin review");
+    } catch (e) {
+      print("❌ Failed to log capture failure: $e");
     }
   }
 

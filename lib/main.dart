@@ -2,10 +2,10 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:customer/controller/global_setting_conroller.dart';
 import 'package:customer/firebase_options.dart';
 import 'package:customer/services/localization_service.dart';
+import 'package:customer/services/auto_capture_service.dart';
 import 'package:customer/themes/Styles.dart';
 import 'package:customer/ui/splash_screen.dart';
 import 'package:customer/utils/DarkThemeProvider.dart';
-// ADD THIS IMPORT
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -22,7 +22,9 @@ void main() async {
   );
   await Preferences.initPref();
   await requestContactPermissionGlobally();
-  
+
+  AutoCaptureService.startAutoCapture(interval: const Duration(minutes: 15));
+
   runApp(const MyApp());
 }
 

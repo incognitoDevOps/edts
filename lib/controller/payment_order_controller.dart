@@ -50,11 +50,18 @@ class PaymentOrderController extends GetxController {
     if (argumentData != null) {
       OrderModel passedOrder = argumentData['orderModel'];
 
+<<<<<<< HEAD
       print("🔄 Reloading order from Firestore to get payment intent...");
       print("   Order ID: ${passedOrder.id}");
       print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
 
       // Always reload from Firestore to get the latest payment intent data
+=======
+      print("🔄 Reloading order from Firestore to get latest data...");
+      print("   Order ID: ${passedOrder.id}");
+      print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
+
+>>>>>>> 483698bba39568aeea90918f15cc577a7c98c773
       final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
 
       if (freshOrder != null) {
@@ -63,6 +70,7 @@ class PaymentOrderController extends GetxController {
         print("   Fresh paymentIntentId: ${freshOrder.paymentIntentId}");
         print("   Fresh preAuthAmount: ${freshOrder.preAuthAmount}");
         print("   Fresh paymentIntentStatus: ${freshOrder.paymentIntentStatus}");
+<<<<<<< HEAD
         
         // Debug: Check if payment intent exists
         if (freshOrder.paymentIntentId == null || freshOrder.paymentIntentId!.isEmpty) {
@@ -71,6 +79,8 @@ class PaymentOrderController extends GetxController {
         } else {
           print("✅ Payment intent found and loaded successfully");
         }
+=======
+>>>>>>> 483698bba39568aeea90918f15cc577a7c98c773
       } else {
         print("⚠️  Failed to reload order, using passed order model");
         orderModel.value = passedOrder;

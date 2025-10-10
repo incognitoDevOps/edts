@@ -500,14 +500,28 @@ class HomeController extends GetxController {
           return false;
         }
 
+        // CRITICAL: Store payment intent data with validation
         orderModel.paymentIntentId = stripePaymentIntentId.value;
         orderModel.preAuthAmount = stripePreAuthAmount.value;
         orderModel.paymentIntentStatus = 'requires_capture';
         orderModel.preAuthCreatedAt = Timestamp.now();
 
-        print("✅ Storing payment intent in order:");
-        print("   PaymentIntent ID: ${stripePaymentIntentId.value}");
-        print("   Pre-auth Amount: ${stripePreAuthAmount.value}");
+        // VALIDATION: Ensure payment intent data is set
+        if (orderModel.paymentIntentId == null || orderModel.paymentIntentId!.isEmpty) {
+          print("❌ CRITICAL ERROR: Payment intent ID is empty!");
+          ShowToastDialog.showToast("Payment authorization error. Please try again.");
+          return false;
+        }
+
+        if (orderModel.preAuthAmount == null || orderModel.preAuthAmount!.isEmpty) {
+          print("❌ WARNING: Pre-auth amount is empty!");
+          orderModel.preAuthAmount = amount.value;
+        }
+
+        print("✅ Payment intent data validated and stored:");
+        print("   PaymentIntent ID: ${orderModel.paymentIntentId}");
+        print("   Pre-auth Amount: ${orderModel.preAuthAmount}");
+        print("   Status: ${orderModel.paymentIntentStatus}");
       }
 
       // Set if booking for someone else

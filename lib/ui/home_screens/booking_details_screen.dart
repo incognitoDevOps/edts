@@ -1283,6 +1283,12 @@ class BookingDetailsScreen extends StatelessWidget {
           controller.stripePreAuthAmount.value = totalAmount.toStringAsFixed(2);
           controller.selectedPaymentMethod.value = method;
 
+          // DEBUG: Print payment intent details
+        print("✅ Stripe Payment Authorized Successfully:");
+        print("   PaymentIntent ID: ${preAuthResult['paymentIntentId']}");
+        print("   Amount: ${totalAmount.toStringAsFixed(2)}");
+        print("   Client Secret: ${preAuthResult['clientSecret']}");
+
           // IMPORTANT: Log the authorization in transaction history
           try {
             WalletTransactionModel authTransaction = WalletTransactionModel(

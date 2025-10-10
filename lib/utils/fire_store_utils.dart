@@ -723,6 +723,16 @@ class FireStoreUtils {
           .then((value) {
         if (value.exists && value.data() != null) {
           orderModel = OrderModel.fromJson(value.data()!);
+
+          print("getOrder: Successfully loaded order $orderId");
+          if (orderModel!.paymentIntentId != null && orderModel!.paymentIntentId!.isNotEmpty) {
+            print("   💳 Payment Intent found:");
+            print("     ID: ${orderModel!.paymentIntentId}");
+            print("     Pre-auth amount: ${orderModel!.preAuthAmount}");
+            print("     Status: ${orderModel!.paymentIntentStatus}");
+          } else {
+            print("   ℹ️  No payment intent data in this order");
+          }
         }
       });
     } catch (error) {
@@ -887,6 +897,16 @@ class FireStoreUtils {
           print("     Amount: ${orderModel.adminCommission!.amount}");
         } else {
           print("   ⚠️ WARNING: No commission data in saved order");
+        }
+
+        // Debug: Verify payment intent data was saved
+        if (orderModel.paymentIntentId != null && orderModel.paymentIntentId!.isNotEmpty) {
+          print("   💳 Payment Intent data saved:");
+          print("     ID: ${orderModel.paymentIntentId}");
+          print("     Pre-auth amount: ${orderModel.preAuthAmount}");
+          print("     Status: ${orderModel.paymentIntentStatus}");
+        } else {
+          print("   ℹ️  No payment intent data (may be using different payment method)");
         }
       });
     } catch (error) {

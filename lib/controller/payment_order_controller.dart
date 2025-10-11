@@ -51,24 +51,57 @@ class PaymentOrderController extends GetxController {
     if (argumentData != null) {
       OrderModel passedOrder = argumentData['orderModel'];
 
-      print("🔄 Reloading order from Firestore to get latest data...");
+      print("🔄 [PAYMENT LOAD] Loading order with payment recovery...");
       print("   Order ID: ${passedOrder.id}");
       print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
 
-      final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+      try {
+        final freshOrder = await _reloadOrderWithRetry(passedOrder.id!, maxRetries: 3);
 
-      if (freshOrder != null) {
-        orderModel.value = freshOrder;
-        print("✅ Order reloaded successfully");
-        print("   Fresh paymentIntentId: ${freshOrder.paymentIntentId}");
-        print("   Fresh preAuthAmount: ${freshOrder.preAuthAmount}");
-        print("   Fresh paymentIntentStatus: ${freshOrder.paymentIntentStatus}");
-      } else {
-        print("⚠️  Failed to reload order, using passed order model");
+        if (freshOrder != null) {
+          orderModel.value = freshOrder;
+          print("✅ [PAYMENT LOAD] Order loaded successfully");
+          print("   Payment Intent ID: ${freshOrder.paymentIntentId}");
+          print("   Pre-auth Amount: ${freshOrder.preAuthAmount}");
+          print("   Status: ${freshOrder.paymentIntentStatus}");
+          print("   Created: ${freshOrder.preAuthCreatedAt}");
+        } else {
+          print("⚠️  [PAYMENT LOAD] Failed to reload, using passed order");
+          orderModel.value = passedOrder;
+        }
+      } catch (e) {
+        print("❌ [PAYMENT LOAD] Error: $e");
         orderModel.value = passedOrder;
       }
     }
     update();
+  }
+
+  Future<OrderModel?> _reloadOrderWithRetry(String orderId, {int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("   Attempt $attempt to reload order...");
+
+        final order = await FireStoreUtils.getOrder(orderId);
+
+        if (order != null) {
+          print("   ✓ Order loaded on attempt $attempt");
+          return order;
+        }
+
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      } catch (e) {
+        print("   ✗ Attempt $attempt failed: $e");
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      }
+    }
+
+    print("   ✗ All reload attempts failed");
+    return null;
   }
 
   Rx<PaymentModel> paymentModel = PaymentModel().obs;
@@ -160,13 +193,20 @@ class PaymentOrderController extends GetxController {
 
   Future<void> capturePreAuthorization({required String amount}) async {
     if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
-      print("❌ No payment intent found for capture");
+      print("❌ [CAPTURE] No payment intent found");
       ShowToastDialog.showToast("No payment authorization found. Cannot process payment.");
       return;
     }
 
+    if (isPaymentProcessing.value) {
+      print("⚠️  [CAPTURE] Payment already in progress");
+      return;
+    }
+
+    isPaymentProcessing.value = true;
+
     try {
-      print("💳 [STRIPE CAPTURE] Starting capture process...");
+      print("💳 [CAPTURE] Starting capture with retry...");
       print("   Payment Intent ID: ${orderModel.value.paymentIntentId}");
       print("   Amount to capture: $amount");
 
@@ -175,6 +215,7 @@ class PaymentOrderController extends GetxController {
       final stripeConfig = paymentModel.value.strip;
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {
         ShowToastDialog.closeLoader();
+        isPaymentProcessing.value = false;
         ShowToastDialog.showToast("Stripe not configured properly");
         return;
       }
@@ -184,15 +225,44 @@ class PaymentOrderController extends GetxController {
         publishableKey: stripeConfig.clientpublishableKey ?? '',
       );
 
-      final captureResult = await stripeService.capturePreAuthorization(
-        paymentIntentId: orderModel.value.paymentIntentId!,
-        finalAmount: amount,
-      );
+      bool captureSuccess = false;
+      int maxRetries = 3;
+
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          print("   Capture attempt $attempt of $maxRetries...");
+
+          final captureResult = await stripeService.capturePreAuthorization(
+            paymentIntentId: orderModel.value.paymentIntentId!,
+            finalAmount: amount,
+          );
+
+          if (captureResult['success'] == true) {
+            print("✅ [CAPTURE] Successful on attempt $attempt");
+            captureSuccess = true;
+            break;
+          } else {
+            print("❌ [CAPTURE] Attempt $attempt failed: ${captureResult['error']}");
+
+            if (attempt < maxRetries) {
+              final delay = Duration(seconds: attempt * 2);
+              print("   Retrying in ${delay.inSeconds} seconds...");
+              await Future.delayed(delay);
+            }
+          }
+        } catch (e) {
+          print("❌ [CAPTURE] Exception on attempt $attempt: $e");
+
+          if (attempt < maxRetries) {
+            await Future.delayed(Duration(seconds: attempt * 2));
+          }
+        }
+      }
 
       ShowToastDialog.closeLoader();
 
-      if (captureResult['success'] == true) {
-        print("✅ Payment captured successfully");
+      if (captureSuccess) {
+        print("✅ [CAPTURE] Payment captured successfully");
 
         final authorizedAmount = orderModel.value.preAuthAmount != null
             ? double.parse(orderModel.value.preAuthAmount!)
@@ -215,9 +285,27 @@ class PaymentOrderController extends GetxController {
 
         orderModel.value.paymentIntentStatus = 'captured';
         orderModel.value.paymentStatus = true;
+        orderModel.value.paymentCapturedAt = Timestamp.now();
+
+        await FireStoreUtils.setOrder(orderModel.value);
 
         if (capturedAmount < authorizedAmount) {
           final difference = authorizedAmount - capturedAmount;
+
+          WalletTransactionModel refundTransaction = WalletTransactionModel(
+            id: Constant.getUuid(),
+            amount: difference.toStringAsFixed(2),
+            createdDate: Timestamp.now(),
+            paymentType: "Stripe",
+            transactionId: orderModel.value.id,
+            userId: FireStoreUtils.getCurrentUid(),
+            orderType: "city",
+            userType: "customer",
+            note: "Unused pre-authorization released for ride ${orderModel.value.id}",
+          );
+
+          await FireStoreUtils.setWalletTransaction(refundTransaction);
+
           ShowToastDialog.showToast(
             "Payment captured successfully. ${Constant.amountShow(amount: difference.toStringAsFixed(2))} will be returned to your card.",
             position: EasyLoadingToastPosition.center,
@@ -233,28 +321,33 @@ class PaymentOrderController extends GetxController {
 
         completeOrder();
       } else {
-        print("❌ Failed to capture payment: ${captureResult['error']}");
-        ShowToastDialog.showToast("Payment capture failed. Please contact support.");
+        print("❌ [CAPTURE] All retry attempts failed");
+        ShowToastDialog.showToast(
+          "Payment capture failed after multiple attempts. Please contact support with order ID: ${orderModel.value.id}",
+          duration: const Duration(seconds: 7),
+        );
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
-      log("Capture error: $e");
+      log("❌ [CAPTURE] Fatal error: $e");
       ShowToastDialog.showToast("Payment capture failed: $e");
+    } finally {
+      isPaymentProcessing.value = false;
     }
   }
 
   Future<void> cancelPreAuthorization() async {
     if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
-      print("ℹ️  No payment intent to cancel");
+      print("ℹ️  [CANCEL] No payment intent to cancel");
       return;
     }
 
     try {
-      print("🔄 Cancelling payment intent: ${orderModel.value.paymentIntentId}");
+      print("🔄 [CANCEL] Cancelling payment intent: ${orderModel.value.paymentIntentId}");
 
       final stripeConfig = paymentModel.value.strip;
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {
-        print("❌ Stripe not configured");
+        print("❌ [CANCEL] Stripe not configured");
         return;
       }
 
@@ -268,7 +361,7 @@ class PaymentOrderController extends GetxController {
       );
 
       if (success) {
-        print("✅ Payment intent cancelled successfully");
+        print("✅ [CANCEL] Payment intent cancelled successfully");
 
         WalletTransactionModel cancelTransaction = WalletTransactionModel(
           id: Constant.getUuid(),
@@ -285,12 +378,15 @@ class PaymentOrderController extends GetxController {
         await FireStoreUtils.setWalletTransaction(cancelTransaction);
 
         orderModel.value.paymentIntentStatus = 'cancelled';
+        orderModel.value.paymentCanceledAt = Timestamp.now();
         await FireStoreUtils.setOrder(orderModel.value);
+
+        print("💾 [CANCEL] Cancellation data saved to Firestore");
       } else {
-        print("❌ Failed to cancel payment intent");
+        print("❌ [CANCEL] Failed to cancel payment intent");
       }
     } catch (e) {
-      log("Cancel pre-authorization error: $e");
+      log("❌ [CANCEL] Error: $e");
     }
   }
 
@@ -379,6 +475,7 @@ class PaymentOrderController extends GetxController {
             print("💾 Cancellation transaction saved: ${cancellationTransaction.id}");
 
             orderModel.value.paymentIntentStatus = 'cancelled';
+            orderModel.value.paymentCanceledAt = Timestamp.now();
             orderModel.value.status = Constant.rideCanceled;
             orderModel.value.updateDate = Timestamp.now();
             await FireStoreUtils.setOrder(orderModel.value);

@@ -41,6 +41,8 @@ class OrderModel {
   String? preAuthAmount;
   String? paymentIntentStatus;
   Timestamp? preAuthCreatedAt;
+  Timestamp? paymentCapturedAt;
+  Timestamp? paymentCanceledAt;
 
   OrderModel(
       {this.position,
@@ -72,7 +74,9 @@ class OrderModel {
       this.paymentIntentId,
       this.preAuthAmount,
       this.paymentIntentStatus,
-      this.preAuthCreatedAt});
+      this.preAuthCreatedAt,
+      this.paymentCapturedAt,
+      this.paymentCanceledAt});
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     serviceId = json['serviceId'];
@@ -106,6 +110,8 @@ class OrderModel {
     preAuthAmount = json['preAuthAmount'];
     paymentIntentStatus = json['paymentIntentStatus'];
     preAuthCreatedAt = json['preAuthCreatedAt'];
+    paymentCapturedAt = json['paymentCapturedAt'];
+    paymentCanceledAt = json['paymentCanceledAt'];
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
       json['taxList'].forEach((v) {
@@ -145,6 +151,8 @@ class OrderModel {
     data['preAuthAmount'] = preAuthAmount;
     data['paymentIntentStatus'] = paymentIntentStatus;
     data['preAuthCreatedAt'] = preAuthCreatedAt;
+    data['paymentCapturedAt'] = paymentCapturedAt;
+    data['paymentCanceledAt'] = paymentCanceledAt;
     data['id'] = id;
     data['userId'] = userId;
     data['paymentType'] = paymentType;

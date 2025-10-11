@@ -38,6 +38,7 @@ class PaymentOrderController extends GetxController {
 
   @override
   void onInit() {
+    // TODO: implement onInit
     getArgument();
     getPaymentData();
     super.onInit();
@@ -50,11 +51,10 @@ class PaymentOrderController extends GetxController {
     if (argumentData != null) {
       OrderModel passedOrder = argumentData['orderModel'];
 
-      print("🔄 Reloading order from Firestore to get payment intent...");
+      print("🔄 Reloading order from Firestore to get latest data...");
       print("   Order ID: ${passedOrder.id}");
       print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
 
-      // Always reload from Firestore to get the latest payment intent data
       final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
 
       if (freshOrder != null) {
@@ -63,14 +63,6 @@ class PaymentOrderController extends GetxController {
         print("   Fresh paymentIntentId: ${freshOrder.paymentIntentId}");
         print("   Fresh preAuthAmount: ${freshOrder.preAuthAmount}");
         print("   Fresh paymentIntentStatus: ${freshOrder.paymentIntentStatus}");
-        
-        // Debug: Check if payment intent exists
-        if (freshOrder.paymentIntentId == null || freshOrder.paymentIntentId!.isEmpty) {
-          print("❌ CRITICAL: No payment intent found in Firestore order!");
-          print("   This means the payment intent was not saved during booking");
-        } else {
-          print("✅ Payment intent found and loaded successfully");
-        }
       } else {
         print("⚠️  Failed to reload order, using passed order model");
         orderModel.value = passedOrder;
@@ -155,469 +147,6 @@ class PaymentOrderController extends GetxController {
 
     isLoading.value = false;
     update();
-  }
-
-  // ========== MAIN PAYMENT PROCESSING ==========
-
-  /// Main payment processing method
-  Future<void> processPayment() async {
-    if (isPaymentProcessing.value) return;
-
-    try {
-      isPaymentProcessing.value = true;
-      final amount = calculateAmount().toStringAsFixed(2);
-
-      print("💳 [PAYMENT] Starting payment process...");
-      print("   Amount: $amount");
-      print("   Method: ${selectedPaymentMethod.value}");
-      print("   Payment Intent ID: ${orderModel.value.paymentIntentId}");
-      print("   Payment Intent Status: ${orderModel.value.paymentIntentStatus}");
-
-      // Handle Stripe payments with pre-authorization
-      if (selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
-        await _handleStripePayment(amount);
-      }
-      // Handle other payment methods
-      else {
-        await _handleOtherPaymentMethods(amount);
-      }
-    } catch (e) {
-      isPaymentProcessing.value = false;
-      log("Payment processing error: $e");
-      ShowToastDialog.showToast("Payment failed: ${e.toString()}");
-    }
-  }
-
-  /// Handle Stripe payment with pre-authorization capture
-  Future<void> _handleStripePayment(String amount) async {
-    try {
-      // Check if we have a pre-authorized payment to capture
-      if (orderModel.value.paymentIntentId != null &&
-          orderModel.value.paymentIntentId!.isNotEmpty) {
-        
-        if (orderModel.value.paymentIntentStatus == 'requires_capture') {
-          print("💳 [STRIPE] Capturing pre-authorized payment...");
-          await _captureStripePayment(amount);
-        } else if (orderModel.value.paymentIntentStatus == 'succeeded') {
-          print("ℹ️  Payment already captured, completing order...");
-          await _completePaymentSuccess();
-        } else {
-          print("❌ Payment intent in unexpected state: ${orderModel.value.paymentIntentStatus}");
-          ShowToastDialog.showToast("Payment status error. Please contact support.");
-          isPaymentProcessing.value = false;
-        }
-      } else {
-        // No payment intent found - this is the main issue
-        print("❌ CRITICAL: No payment intent found for order ${orderModel.value.id}");
-        _handleMissingPaymentIntent(amount);
-      }
-    } catch (e) {
-      isPaymentProcessing.value = false;
-      log("Stripe payment error: $e");
-      ShowToastDialog.showToast("Stripe payment failed: ${e.toString()}");
-    }
-  }
-
-  /// Handle missing payment intent scenario
-  void _handleMissingPaymentIntent(String amount) {
-    print("🔄 Attempting to handle missing payment intent...");
-    
-    ShowToastDialog.showToast(
-      "Payment authorization not found. Please contact support for assistance.",
-      position: EasyLoadingToastPosition.center,
-      duration: const Duration(seconds: 5),
-    );
-    
-    // Option 1: Allow user to pay with another method
-    // Option 2: Show support contact information
-    // For now, just reset the processing state
-    isPaymentProcessing.value = false;
-    
-    // You could show a dialog here with options:
-    _showPaymentRecoveryOptions(amount);
-  }
-
-  void _showPaymentRecoveryOptions(String amount) {
-    showDialog(
-      context: Get.context!,
-      builder: (context) => AlertDialog(
-        title: Text("Payment Recovery Needed"),
-        content: Text(
-          "We couldn't find your original payment authorization. "
-          "This might mean:\n\n"
-          "• The payment hold was released\n"
-          "• There was a technical issue\n"
-          "• The ride was cancelled and rebooked\n\n"
-          "Please contact support or try another payment method."
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text("Contact Support"),
-          ),
-          TextButton(
-            onPressed: () {
-              Get.back();
-              // Option to try another payment method
-              _showAlternativePaymentMethods(amount);
-            },
-            child: Text("Try Another Method"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAlternativePaymentMethods(String amount) {
-    showDialog(
-      context: Get.context!,
-      builder: (context) => AlertDialog(
-        title: Text("Select Payment Method"),
-        content: Text("Please choose an alternative payment method to complete your ride."),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Get.back();
-              selectedPaymentMethod.value = "Cash";
-              _handleCashPayment();
-            },
-            child: Text("Cash"),
-          ),
-          TextButton(
-            onPressed: () {
-              Get.back();
-              selectedPaymentMethod.value = "Wallet";
-              _handleWalletPayment(amount);
-            },
-            child: Text("Wallet"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Capture Stripe payment
-  Future<void> _captureStripePayment(String amount) async {
-    try {
-      ShowToastDialog.showLoader("Processing payment...");
-
-      final stripeConfig = paymentModel.value.strip;
-      if (stripeConfig == null || stripeConfig.stripeSecret == null) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Stripe not configured properly");
-        isPaymentProcessing.value = false;
-        return;
-      }
-
-      final stripeService = StripeService(
-        stripeSecret: stripeConfig.stripeSecret!,
-        publishableKey: stripeConfig.clientpublishableKey ?? '',
-      );
-
-      print("💰 Capturing payment intent: ${orderModel.value.paymentIntentId}");
-      print("💰 Amount to capture: $amount");
-
-      // Capture the pre-authorization
-      final captureResult = await stripeService.capturePreAuthorization(
-        paymentIntentId: orderModel.value.paymentIntentId!,
-        finalAmount: amount,
-      );
-
-      if (captureResult['success'] == true) {
-        print("✅ Payment captured successfully!");
-        
-        // Update order with capture details
-        orderModel.value.paymentIntentStatus = 'succeeded';
-        orderModel.value.paymentCapturedAt = Timestamp.now();
-        orderModel.value.paymentStatus = true;
-        
-        // Record transaction
-        await _recordPaymentTransaction(
-          orderModel.value.userId!,
-          orderModel.value.id!,
-          amount,
-          'ride_payment_captured',
-          'Ride payment completed - ${orderModel.value.sourceLocationName} to ${orderModel.value.destinationLocationName}',
-        );
-
-        await _completePaymentSuccess();
-      } else {
-        ShowToastDialog.closeLoader();
-        print("❌ Failed to capture payment: ${captureResult['error']}");
-        ShowToastDialog.showToast("Payment capture failed: ${captureResult['error']}");
-        isPaymentProcessing.value = false;
-      }
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-      isPaymentProcessing.value = false;
-      log("Stripe capture error: $e");
-      ShowToastDialog.showToast("Payment capture failed: ${e.toString()}");
-    }
-  }
-
-  /// Handle wallet payment
-  Future<void> _handleWalletPayment(String amount) async {
-    try {
-      ShowToastDialog.showLoader("Processing wallet payment...");
-
-      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-      if (user == null) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("User information not available");
-        isPaymentProcessing.value = false;
-        return;
-      }
-
-      double walletBalance = double.parse(user.walletAmount ?? "0.0");
-      double paymentAmount = double.parse(amount);
-
-      if (walletBalance < paymentAmount) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Insufficient Funds. Please top up your wallet.");
-        isPaymentProcessing.value = false;
-        return;
-      }
-
-      // Deduct amount from wallet
-      WalletTransactionModel debitTransaction = WalletTransactionModel(
-        id: Constant.getUuid(),
-        amount: "-$amount",
-        createdDate: Timestamp.now(),
-        paymentType: "wallet",
-        transactionId: orderModel.value.id,
-        userId: FireStoreUtils.getCurrentUid(),
-        orderType: "city",
-        userType: "customer",
-        note: "Ride payment deducted for ride #${orderModel.value.id}",
-      );
-
-      await FireStoreUtils.setWalletTransaction(debitTransaction);
-      await FireStoreUtils.updateUserWallet(amount: "-$amount");
-
-      print("✅ Wallet payment processed successfully");
-      await _completePaymentSuccess();
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-      isPaymentProcessing.value = false;
-      ShowToastDialog.showToast("Wallet payment failed: $e");
-    }
-  }
-
-  /// Handle cash payment
-  Future<void> _handleCashPayment() async {
-    try {
-      ShowToastDialog.showLoader("Completing ride...");
-      
-      orderModel.value.paymentStatus = true;
-      orderModel.value.status = Constant.rideComplete;
-      orderModel.value.updateDate = Timestamp.now();
-
-      await FireStoreUtils.setOrder(orderModel.value);
-
-      ShowToastDialog.closeLoader();
-      ShowToastDialog.showToast("Ride completed successfully with cash payment");
-      
-      Get.back();
-      isPaymentProcessing.value = false;
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-      isPaymentProcessing.value = false;
-      ShowToastDialog.showToast("Error completing cash payment: $e");
-    }
-  }
-
-  /// Handle other payment methods
-  Future<void> _handleOtherPaymentMethods(String amount) async {
-    // Use existing payment flows for other methods
-    isPaymentProcessing.value = false;
-    
-    if (selectedPaymentMethod.value.toLowerCase() == "razorpay") {
-      openCheckout(amount: double.parse(amount), orderId: orderModel.value.id!);
-    }
-    // Add other payment methods as needed
-  }
-
-  /// Complete payment success flow
-  Future<void> _completePaymentSuccess() async {
-    try {
-      ShowToastDialog.showLoader("Finalizing payment...");
-
-      // Update order status
-      orderModel.value.paymentStatus = true;
-      orderModel.value.status = Constant.rideComplete;
-      orderModel.value.updateDate = Timestamp.now();
-
-      print("✅ Payment successful, completing order...");
-
-      // Process driver payment and commission
-      await _processDriverPayment();
-
-      // Send notification to driver
-      if (driverUserModel.value.fcmToken != null) {
-        Map<String, dynamic> playLoad = <String, dynamic>{
-          "type": "city_order_payment_complete",
-          "orderId": orderModel.value.id
-        };
-
-        await SendNotification.sendOneNotification(
-          token: driverUserModel.value.fcmToken.toString(),
-          title: 'Payment Received',
-          body: '${userModel.value.fullName} has paid for the completed ride.',
-          payload: playLoad,
-        );
-      }
-
-      // Handle referral if first order
-      await FireStoreUtils.getFirestOrderOrNOt(orderModel.value).then((value) async {
-        if (value == true) {
-          await FireStoreUtils.updateReferralAmount(orderModel.value);
-        }
-      });
-
-      // Final order save
-      await FireStoreUtils.setOrder(orderModel.value).then((value) {
-        if (value == true) {
-          ShowToastDialog.closeLoader();
-          print("🎉 PAYMENT COMPLETE SUCCESSFULLY!");
-          ShowToastDialog.showToast("Payment completed successfully");
-          Get.back();
-        } else {
-          ShowToastDialog.closeLoader();
-          ShowToastDialog.showToast("Failed to save order");
-        }
-      });
-
-      isPaymentProcessing.value = false;
-    } catch (e) {
-      ShowToastDialog.closeLoader();
-      isPaymentProcessing.value = false;
-      log("Error completing payment: $e");
-      ShowToastDialog.showToast("Error completing payment: ${e.toString()}");
-    }
-  }
-
-  /// Process driver payment and commission
-  Future<void> _processDriverPayment() async {
-    try {
-      final amount = calculateAmount();
-      
-      // Create wallet transaction for driver
-      WalletTransactionModel transactionModel = WalletTransactionModel(
-        id: Constant.getUuid(),
-        amount: amount.toString(),
-        createdDate: Timestamp.now(),
-        paymentType: selectedPaymentMethod.value,
-        transactionId: orderModel.value.id,
-        userId: orderModel.value.driverId.toString(),
-        orderType: "city",
-        userType: "driver",
-        note: "Ride amount credited for ride #${orderModel.value.id}",
-      );
-
-      await FireStoreUtils.setWalletTransaction(transactionModel);
-      await FireStoreUtils.updateDriverWallet(
-        amount: amount.toString(),
-        driverId: orderModel.value.driverId.toString(),
-      );
-
-      // Handle admin commission
-      if (orderModel.value.adminCommission != null &&
-          orderModel.value.adminCommission!.isEnabled == true) {
-        double baseAmount;
-        try {
-          baseAmount = double.parse(orderModel.value.finalRate.toString()) -
-              double.parse(couponAmount.value.toString());
-        } catch (e) {
-          print("❌ Error calculating base amount, using finalRate only");
-          baseAmount =
-              double.tryParse(orderModel.value.finalRate.toString()) ?? 0.0;
-        }
-
-        // Use the new helper method to calculate commission based on driver's payment method
-        double commissionAmount = _calculateDriverCommission(baseAmount,
-            orderModel.value.adminCommission!, driverUserModel.value);
-
-        print("📊 Final commission amount: $commissionAmount");
-
-        // Only deduct commission if it's greater than 0
-        if (commissionAmount > 0) {
-          WalletTransactionModel adminCommissionWallet = WalletTransactionModel(
-              id: Constant.getUuid(),
-              amount: "-$commissionAmount",
-              createdDate: Timestamp.now(),
-              paymentType: selectedPaymentMethod.value,
-              transactionId: orderModel.value.id,
-              orderType: "city",
-              userType: "driver",
-              userId: orderModel.value.driverId.toString(),
-              note: "Admin commission debited");
-
-          await FireStoreUtils.setWalletTransaction(adminCommissionWallet);
-          await FireStoreUtils.updateDriverWallet(
-              amount: "-$commissionAmount",
-              driverId: orderModel.value.driverId.toString());
-          print("✅ Admin commission processed");
-        } else {
-          print("ℹ️  No commission to deduct (amount is 0)");
-        }
-      } else {
-        print("ℹ️  No admin commission to process");
-      }
-      
-    } catch (e) {
-      log("Error processing driver payment: $e");
-      rethrow;
-    }
-  }
-
-  /// Record payment transaction
-  Future<void> _recordPaymentTransaction(
-    String userId, String rideId, String amount, String type, String description) async {
-    try {
-      final transaction = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'userId': userId,
-        'rideId': rideId,
-        'amount': amount,
-        'type': type,
-        'description': description,
-        'createdAt': Timestamp.now(),
-        'currency': 'CAD',
-      };
-
-      await FirebaseFirestore.instance
-          .collection(CollectionName.walletTransaction)
-          .doc(transaction['id'] as String?)
-          .set(transaction);
-
-      print('✅ Transaction recorded: $type - $amount');
-    } catch (e) {
-      print('❌ Error recording transaction: $e');
-    }
-  }
-
-  // ========== EXISTING METHODS ==========
-  // Keep all your existing methods below (calculateAmount, etc.)
-  Rx<CouponModel> selectedCouponModel = CouponModel().obs;
-  RxString couponAmount = "0.0".obs;
-
-  double calculateAmount() {
-    RxString taxAmount = "0.0".obs;
-    if (orderModel.value.taxList != null) {
-      for (var element in orderModel.value.taxList!) {
-        taxAmount.value = (double.parse(taxAmount.value) +
-                Constant().calculateTax(
-                    amount:
-                        (double.parse(orderModel.value.finalRate.toString()) -
-                                double.parse(couponAmount.value.toString()))
-                            .toString(),
-                    taxModel: element))
-            .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
-      }
-    }
-    return (double.parse(orderModel.value.finalRate.toString()) -
-            double.parse(couponAmount.value.toString())) +
-        double.parse(taxAmount.value);
   }
 
   // Stripe pre-authorization methods - DEPRECATED
@@ -1128,6 +657,28 @@ class PaymentOrderController extends GetxController {
         ShowToastDialog.showToast("Payment method update successfully");
       }
     });
+  }
+
+  Rx<CouponModel> selectedCouponModel = CouponModel().obs;
+  RxString couponAmount = "0.0".obs;
+
+  double calculateAmount() {
+    RxString taxAmount = "0.0".obs;
+    if (orderModel.value.taxList != null) {
+      for (var element in orderModel.value.taxList!) {
+        taxAmount.value = (double.parse(taxAmount.value) +
+                Constant().calculateTax(
+                    amount:
+                        (double.parse(orderModel.value.finalRate.toString()) -
+                                double.parse(couponAmount.value.toString()))
+                            .toString(),
+                    taxModel: element))
+            .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
+      }
+    }
+    return (double.parse(orderModel.value.finalRate.toString()) -
+            double.parse(couponAmount.value.toString())) +
+        double.parse(taxAmount.value);
   }
 
   // Capture Stripe pre-authorization when ride completes

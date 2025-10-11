@@ -114,8 +114,6 @@ class OrderModel {
     }
   }
 
-  set paymentCapturedAt(Timestamp paymentCapturedAt) {}
-
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['serviceId'] = serviceId;

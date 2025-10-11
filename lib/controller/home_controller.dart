@@ -65,7 +65,7 @@ class HomeController extends GetxController {
   ];
 
   var isBooking = false.obs;
-  var isInstantBooking = false.obs;
+var isInstantBooking = false.obs;
 
   @override
   void onInit() {
@@ -384,38 +384,38 @@ class HomeController extends GetxController {
   /// Enhanced ride booking method with proper driver finding
   Future<bool> bookRide() async {
     try {
-      // Validate payment method
+      // Validate all required fields
       if (selectedPaymentMethod.value.isEmpty) {
         ShowToastDialog.showToast("Please select Payment Method".tr);
         return false;
       }
 
-      // Validate wallet balance if selected
+      // Check wallet balance if wallet payment is selected
       if (selectedPaymentMethod.value.toLowerCase() == "wallet") {
-        final user =
-            await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
-        if (user != null) {
-          userModel.value = user;
-          double walletBalance = double.parse(user.walletAmount ?? "0.0");
-          double payableAmount = double.parse(amount.value);
+        await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid())
+            .then((user) {
+          if (user != null) {
+            userModel.value = user;
+            double walletBalance = double.parse(user.walletAmount ?? "0.0");
+            double payableAmount = double.parse(amount.value);
 
-          // Add tax
-          if (Constant.taxList != null) {
-            for (var tax in Constant.taxList!) {
-              payableAmount +=
-                  Constant().calculateTax(amount: amount.value, taxModel: tax);
+            // Add tax calculation to payable amount
+            if (Constant.taxList != null) {
+              for (var tax in Constant.taxList!) {
+                payableAmount += Constant()
+                    .calculateTax(amount: amount.value, taxModel: tax);
+              }
+            }
+
+            if (walletBalance < payableAmount) {
+              ShowToastDialog.showToast(
+                  "Insufficient balance. Please top up your wallet or choose another payment method.");
+              return false;
             }
           }
-
-          if (walletBalance < payableAmount) {
-            ShowToastDialog.showToast(
-                "Insufficient balance. Please top up your wallet or choose another payment method.");
-            return false;
-          }
-        }
+        });
       }
 
-      // Validate source/destination
       if (sourceLocationController.value.text.isEmpty) {
         ShowToastDialog.showToast("Please select source location".tr);
         return false;
@@ -444,7 +444,7 @@ class HomeController extends GetxController {
         return false;
       }
 
-      // Check for pending payment
+      // Check for pending payments
       bool isPaymentNotCompleted = await FireStoreUtils.paymentStatusCheck();
       if (isPaymentNotCompleted) {
         ShowToastDialog.showToast(
@@ -452,7 +452,7 @@ class HomeController extends GetxController {
         return false;
       }
 
-      // Create and populate OrderModel
+      // Create order model
       OrderModel orderModel = OrderModel();
       orderModel.id = Constant.getUuid();
       orderModel.userId = FireStoreUtils.getCurrentUid();
@@ -473,56 +473,74 @@ class HomeController extends GetxController {
       orderModel.paymentType = selectedPaymentMethod.value;
       orderModel.paymentStatus = false;
       orderModel.service = selectedType.value;
-      orderModel.taxList = Constant.taxList;
-      orderModel.otp = Constant.getReferralCode();
 
-      // Handle admin commission
+      // Set admin commission - always use the global commission settings
       if (Constant.adminCommission != null) {
         orderModel.adminCommission = Constant.adminCommission;
         print(
             "✅ Added admin commission to order: ${Constant.adminCommission!.toJson()}");
       } else {
         print("⚠️  No global admin commission available");
+        // Create a default commission to avoid null errors
         orderModel.adminCommission = AdminCommission(
-          isEnabled: false,
-          type: "percentage",
-          amount: "0",
-          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
-        );
+            isEnabled: false,
+            type: "percentage",
+            amount: "0",
+            flatRatePromotion:
+                FlatRatePromotion(isEnabled: false, amount: 0.0));
       }
 
-      // Handle Stripe pre-authorization
+      // Debug: Log what commission was set
+      if (orderModel.adminCommission != null) {
+        print("🧾 Order commission details:");
+        print("   Enabled: ${orderModel.adminCommission!.isEnabled}");
+        print("   Type: ${orderModel.adminCommission!.type}");
+        print("   Amount: ${orderModel.adminCommission!.amount}");
+        if (orderModel.adminCommission!.flatRatePromotion != null) {
+          print(
+              "   Flat Rate Enabled: ${orderModel.adminCommission!.flatRatePromotion!.isEnabled}");
+          print(
+              "   Flat Rate Amount: ${orderModel.adminCommission!.flatRatePromotion!.amount}");
+        }
+      } else {
+        print(
+            "❌ CRITICAL: Order commission is null after attempted assignment");
+      }
+
+      orderModel.otp = Constant.getReferralCode();
+      orderModel.taxList = Constant.taxList;
+
+      // Handle Stripe pre-authorization for ride booking
       if (selectedPaymentMethod.value.toLowerCase() == "stripe" ||
           selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
+        // Check if we already have a payment intent ID from the payment selection
         if (stripePaymentIntentId.value.isEmpty) {
           ShowToastDialog.showToast(
               "Please select Stripe payment method again to authorize payment");
           return false;
         }
 
+        // Use the stored payment intent details
         orderModel.paymentIntentId = stripePaymentIntentId.value;
         orderModel.preAuthAmount = stripePreAuthAmount.value;
         orderModel.paymentIntentStatus = 'requires_capture';
         orderModel.preAuthCreatedAt = Timestamp.now();
 
-        print("✅ Storing payment intent in order:");
-        print("   PaymentIntent ID: ${stripePaymentIntentId.value}");
-        print("   Pre-auth Amount: ${stripePreAuthAmount.value}");
+        print("✅ Using pre-authorized payment: ${stripePaymentIntentId.value}");
       }
 
-      // Set if booking for someone else
       if (selectedTakingRide.value.fullName != "Myself") {
         orderModel.someOneElse = selectedTakingRide.value;
       }
 
-      // Setup GeoFirePoint
+      // Create geofire position
       GeoFirePoint position = Geoflutterfire().point(
           latitude: sourceLocationLAtLng.value.latitude!,
           longitude: sourceLocationLAtLng.value.longitude!);
       orderModel.position =
           Positions(geoPoint: position.geoPoint, geohash: position.hash);
 
-      // Determine zone
+      // Find appropriate zone
       bool zoneFound = false;
       for (int i = 0; i < zoneList.length; i++) {
         if (Constant.isPointInPolygon(
@@ -539,7 +557,8 @@ class HomeController extends GetxController {
 
       if (!zoneFound) {
         ShowToastDialog.showToast(
-            "Services are currently unavailable in the selected location. Please reach out to the administrator for assistance.");
+          "Services are currently unavailable in the selected location. Please reach out to the administrator for assistance.",
+        );
         return false;
       }
 
@@ -547,10 +566,8 @@ class HomeController extends GetxController {
       bool success = await FireStoreUtils.placeRideRequest(orderModel);
 
       if (success) {
-        print(
-            "✅ Order created with payment intent: ${orderModel.paymentIntentId}");
-
-        // Verify commission data stored
+        // Verify the commission was saved to Firestore
+        print("🔍 Verifying commission data was saved to Firestore...");
         await FireStoreUtils.verifyOrderCommission(orderModel.id!);
 
         // Clear form data
@@ -563,8 +580,8 @@ class HomeController extends GetxController {
         duration.value = "";
         amount.value = "";
         selectedPaymentMethod.value = "";
+        stripePaymentIntentId.value = "";
         stripePreAuthAmount.value = "";
-        // DO NOT clear stripePaymentIntentId here – keep for later use
 
         return true;
       }
@@ -615,16 +632,16 @@ class HomeController extends GetxController {
   }
 
   /// Reset all payment-related state
-  void resetPaymentState() {
-    selectedPaymentMethod.value = "";
-    stripePaymentIntentId.value = "";
-    stripePreAuthAmount.value = "";
-
-    // Also clear any payment-related form fields if needed
-    if (offerYourRateController.value.text.isNotEmpty) {
-      offerYourRateController.value.clear();
-    }
-
-    print("🔄 Payment state reset");
+void resetPaymentState() {
+  selectedPaymentMethod.value = "";
+  stripePaymentIntentId.value = "";
+  stripePreAuthAmount.value = "";
+  
+  // Also clear any payment-related form fields if needed
+  if (offerYourRateController.value.text.isNotEmpty) {
+    offerYourRateController.value.clear();
   }
+  
+  print("🔄 Payment state reset");
+}
 }

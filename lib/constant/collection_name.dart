@@ -21,6 +21,4 @@ class CollectionName {
   static const String freightVehicle = "freight_vehicle";
   static const String airPorts = "airports";
   static const String zone = "zone";
-
-  // static String userWalletHistory;
 }

@@ -520,36 +520,13 @@ var isInstantBooking = false.obs;
           return false;
         }
 
-<<<<<<< HEAD
         // Use the stored payment intent details
-=======
-        // CRITICAL: Store payment intent data with validation
->>>>>>> 25f24ee074f60768f870bbeb0964466e4f013871
         orderModel.paymentIntentId = stripePaymentIntentId.value;
         orderModel.preAuthAmount = stripePreAuthAmount.value;
         orderModel.paymentIntentStatus = 'requires_capture';
         orderModel.preAuthCreatedAt = Timestamp.now();
 
-<<<<<<< HEAD
         print("✅ Using pre-authorized payment: ${stripePaymentIntentId.value}");
-=======
-        // VALIDATION: Ensure payment intent data is set
-        if (orderModel.paymentIntentId == null || orderModel.paymentIntentId!.isEmpty) {
-          print("❌ CRITICAL ERROR: Payment intent ID is empty!");
-          ShowToastDialog.showToast("Payment authorization error. Please try again.");
-          return false;
-        }
-
-        if (orderModel.preAuthAmount == null || orderModel.preAuthAmount!.isEmpty) {
-          print("❌ WARNING: Pre-auth amount is empty!");
-          orderModel.preAuthAmount = amount.value;
-        }
-
-        print("✅ Payment intent data validated and stored:");
-        print("   PaymentIntent ID: ${orderModel.paymentIntentId}");
-        print("   Pre-auth Amount: ${orderModel.preAuthAmount}");
-        print("   Status: ${orderModel.paymentIntentStatus}");
->>>>>>> 25f24ee074f60768f870bbeb0964466e4f013871
       }
 
       if (selectedTakingRide.value.fullName != "Myself") {

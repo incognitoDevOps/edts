@@ -50,6 +50,7 @@ class PaymentOrderController extends GetxController {
   if (argumentData != null) {
     OrderModel passedOrder = argumentData['orderModel'];
 
+<<<<<<< HEAD
     print("🔄 [PAYMENT LOAD] Loading order with payment recovery...");
     print("   Order ID: ${passedOrder.id}");
     print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
@@ -73,6 +74,28 @@ class PaymentOrderController extends GetxController {
         await getPaymentData();
       } else {
         print("⚠️  [PAYMENT LOAD] Failed to reload, using passed order");
+=======
+      print("🔄 [PAYMENT LOAD] Loading order with payment recovery...");
+      print("   Order ID: ${passedOrder.id}");
+      print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
+
+      try {
+        final freshOrder = await _reloadOrderWithRetry(passedOrder.id!, maxRetries: 3);
+
+        if (freshOrder != null) {
+          orderModel.value = freshOrder;
+          print("✅ [PAYMENT LOAD] Order loaded successfully");
+          print("   Payment Intent ID: ${freshOrder.paymentIntentId}");
+          print("   Pre-auth Amount: ${freshOrder.preAuthAmount}");
+          print("   Status: ${freshOrder.paymentIntentStatus}");
+          print("   Created: ${freshOrder.preAuthCreatedAt}");
+        } else {
+          print("⚠️  [PAYMENT LOAD] Failed to reload, using passed order");
+          orderModel.value = passedOrder;
+        }
+      } catch (e) {
+        print("❌ [PAYMENT LOAD] Error: $e");
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
         orderModel.value = passedOrder;
         await getPaymentData();
       }
@@ -86,7 +109,38 @@ class PaymentOrderController extends GetxController {
     isLoading.value = false;
     update();
   }
+<<<<<<< HEAD
 }
+=======
+
+  Future<OrderModel?> _reloadOrderWithRetry(String orderId, {int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("   Attempt $attempt to reload order...");
+
+        final order = await FireStoreUtils.getOrder(orderId);
+
+        if (order != null) {
+          print("   ✓ Order loaded on attempt $attempt");
+          return order;
+        }
+
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      } catch (e) {
+        print("   ✗ Attempt $attempt failed: $e");
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      }
+    }
+
+    print("   ✗ All reload attempts failed");
+    return null;
+  }
+
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
   Rx<PaymentModel> paymentModel = PaymentModel().obs;
   Rx<UserModel> userModel = UserModel().obs;
   Rx<DriverUserModel> driverUserModel = DriverUserModel().obs;
@@ -192,11 +246,17 @@ Future<void> _loadDriverInformationWithFallback() async {
   }
 
   Future<void> capturePreAuthorization({required String amount}) async {
+<<<<<<< HEAD
     if (orderModel.value.paymentIntentId == null ||
         orderModel.value.paymentIntentId!.isEmpty) {
       print("❌ [CAPTURE] No payment intent found");
       ShowToastDialog.showToast(
           "No payment authorization found. Cannot process payment.");
+=======
+    if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
+      print("❌ [CAPTURE] No payment intent found");
+      ShowToastDialog.showToast("No payment authorization found. Cannot process payment.");
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
       return;
     }
 
@@ -244,8 +304,12 @@ Future<void> _loadDriverInformationWithFallback() async {
             captureSuccess = true;
             break;
           } else {
+<<<<<<< HEAD
             print(
                 "❌ [CAPTURE] Attempt $attempt failed: ${captureResult['error']}");
+=======
+            print("❌ [CAPTURE] Attempt $attempt failed: ${captureResult['error']}");
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
 
             if (attempt < maxRetries) {
               final delay = Duration(seconds: attempt * 2);
@@ -304,8 +368,12 @@ Future<void> _loadDriverInformationWithFallback() async {
             userId: FireStoreUtils.getCurrentUid(),
             orderType: "city",
             userType: "customer",
+<<<<<<< HEAD
             note:
                 "Unused pre-authorization released for ride ${orderModel.value.id}",
+=======
+            note: "Unused pre-authorization released for ride ${orderModel.value.id}",
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
           );
 
           await FireStoreUtils.setWalletTransaction(refundTransaction);
@@ -341,15 +409,23 @@ Future<void> _loadDriverInformationWithFallback() async {
   }
 
   Future<void> cancelPreAuthorization() async {
+<<<<<<< HEAD
     if (orderModel.value.paymentIntentId == null ||
         orderModel.value.paymentIntentId!.isEmpty) {
+=======
+    if (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty) {
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
       print("ℹ️  [CANCEL] No payment intent to cancel");
       return;
     }
 
     try {
+<<<<<<< HEAD
       print(
           "🔄 [CANCEL] Cancelling payment intent: ${orderModel.value.paymentIntentId}");
+=======
+      print("🔄 [CANCEL] Cancelling payment intent: ${orderModel.value.paymentIntentId}");
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
 
       final stripeConfig = paymentModel.value.strip;
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {

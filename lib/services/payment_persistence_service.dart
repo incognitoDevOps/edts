@@ -23,7 +23,11 @@ class PaymentPersistenceService {
       await _firestore
           .collection(CollectionName.orders)
           .doc(order.id)
+<<<<<<< HEAD
           .set(orderData, SetOptions(merge: true));
+=======
+          .set(orderData, SetDocumentOptions(merge: true));
+>>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
 
       await _verifyPaymentDataSaved(order.id!);
 

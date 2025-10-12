@@ -1,4 +1,3 @@
-
 import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/payment_order_controller.dart';
@@ -62,9 +61,13 @@ class PaymentOrderScreen extends StatelessWidget {
                               _buildDriverSection(context, controller, themeChange),
                               const SizedBox(height: 20),
 
-                              // Vehicle Details Section
-                              _buildVehicleSection(context, controller, themeChange),
-                              const SizedBox(height: 20),
+                              // Vehicle Details Section (only show if driver exists)
+                              if (controller.orderModel.value.driverId != null && 
+                                  controller.orderModel.value.driverId!.isNotEmpty)
+                                _buildVehicleSection(context, controller, themeChange),
+                              if (controller.orderModel.value.driverId != null && 
+                                  controller.orderModel.value.driverId!.isNotEmpty)
+                                const SizedBox(height: 20),
 
                               // Location Section
                               _buildLocationSection(context, controller, themeChange),
@@ -125,17 +128,66 @@ class PaymentOrderScreen extends StatelessWidget {
               return _buildDriverLoadingState();
             }
             
+            // Check if driver ID exists and is valid
+            if (controller.orderModel.value.driverId == null || 
+                controller.orderModel.value.driverId!.isEmpty) {
+              return _buildNoDriverState();
+            }
+            
             if (controller.driverError.value.isNotEmpty) {
               return _buildDriverErrorState(controller.driverError.value);
             }
             
-            return DriverView(
-              driverId: controller.orderModel.value.driverId,
-              amount: controller.orderModel.value.finalRate ?? "0",
-              showCallButton: true,
-              showMessageButton: true,
-            );
+            // Only show DriverView if we have a valid driver
+            if (controller.driverUserModel.value.id != null) {
+              return DriverView(
+                driverId: controller.orderModel.value.driverId,
+                amount: controller.orderModel.value.finalRate ?? "0",
+                showCallButton: true,
+                showMessageButton: true,
+              );
+            } else {
+              return _buildDriverErrorState("Driver information not available");
+            }
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoDriverState() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.person_off, color: Colors.orange, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "No Driver Assigned",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.orange,
+                  ),
+                ),
+                Text(
+                  "This ride doesn't have a driver assigned",
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.orange.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -208,6 +260,7 @@ class PaymentOrderScreen extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildVehicleSection(BuildContext context, PaymentOrderController controller, DarkThemeProvider themeChange) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -236,44 +289,41 @@ class PaymentOrderScreen extends StatelessWidget {
             style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
           ),
           const SizedBox(height: 12),
-          FutureBuilder<DriverUserModel?>(
-            future: FireStoreUtils.getDriver(controller.orderModel.value.driverId ?? ""),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _buildVehicleLoadingState();
-              }
-              
-              if (snapshot.hasError || snapshot.data == null) {
-                return _buildVehicleErrorState("Vehicle information not available");
-              }
-              
-              final vehicle = snapshot.data!.vehicleInformation;
-              if (vehicle == null) {
-                return _buildVehicleErrorState("Vehicle details not found");
-              }
-              
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildVehicleDetail(
-                    icon: Icons.directions_car,
-                    label: "Type",
-                    value: vehicle.vehicleType ?? "Unknown",
-                  ),
-                  _buildVehicleDetail(
-                    icon: Icons.palette,
-                    label: "Color",
-                    value: vehicle.vehicleColor ?? "Unknown",
-                  ),
-                  _buildVehicleDetail(
-                    icon: Icons.confirmation_number,
-                    label: "Number",
-                    value: vehicle.vehicleNumber ?? "Unknown",
-                  ),
-                ],
-              );
-            },
-          ),
+          Obx(() {
+            if (controller.isDriverLoading.value) {
+              return _buildVehicleLoadingState();
+            }
+            
+            if (controller.driverUserModel.value.id == null) {
+              return _buildVehicleErrorState("Vehicle information not available");
+            }
+            
+            final vehicle = controller.driverUserModel.value.vehicleInformation;
+            if (vehicle == null) {
+              return _buildVehicleErrorState("Vehicle details not found");
+            }
+            
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildVehicleDetail(
+                  icon: Icons.directions_car,
+                  label: "Type",
+                  value: vehicle.vehicleType ?? "Unknown",
+                ),
+                _buildVehicleDetail(
+                  icon: Icons.palette,
+                  label: "Color",
+                  value: vehicle.vehicleColor ?? "Unknown",
+                ),
+                _buildVehicleDetail(
+                  icon: Icons.confirmation_number,
+                  label: "Number",
+                  value: vehicle.vehicleNumber ?? "Unknown",
+                ),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -685,5 +735,4 @@ class PaymentOrderScreen extends StatelessWidget {
         ShowToastDialog.showToast("Payment method not supported");
     }
   }
-
 }

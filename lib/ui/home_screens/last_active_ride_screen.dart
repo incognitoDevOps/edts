@@ -1,3 +1,4 @@
+import 'package:customer/constant/collection_name.dart';
 import 'package:customer/constant/send_notification.dart';
 import 'package:customer/model/order_model.dart';
 import 'package:customer/model/driver_user_model.dart';
@@ -25,10 +26,13 @@ class LastActiveRideScreen extends StatelessWidget {
   const LastActiveRideScreen({Key? key}) : super(key: key);
 
   // Add a controller to manage the map
-  static final Completer<GoogleMapController> _mapController = Completer<GoogleMapController>();
+  static final Completer<GoogleMapController> _mapController =
+      Completer<GoogleMapController>();
 
-  Future<List<LatLng>> _getRoutePolyline(LatLng origin, LatLng destination) async {
-    final apiKey = 'AIzaSyAPh6pqfLxj5rOL1IIY4yB2aayrL5UrRfg'; // Google Maps API key
+  Future<List<LatLng>> _getRoutePolyline(
+      LatLng origin, LatLng destination) async {
+    final apiKey =
+        'AIzaSyAPh6pqfLxj5rOL1IIY4yB2aayrL5UrRfg'; // Google Maps API key
     final url =
         'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=driving&key=$apiKey';
     final response = await http.get(Uri.parse(url));
@@ -74,7 +78,7 @@ class LastActiveRideScreen extends StatelessWidget {
   Stream<DriverUserModel?> _getDriverUpdates(String driverId) {
     return FireStoreUtils.getDriverLocationUpdates(driverId);
   }
-  
+
   /// Enhanced method to monitor ride status
   Stream<OrderModel?> _getRideUpdates(String orderId) {
     return FireStoreUtils.monitorRideStatus(orderId);
@@ -83,7 +87,7 @@ class LastActiveRideScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = FireStoreUtils.getCurrentUid();
-    
+
     // Enhanced stream builder with better error handling
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -101,9 +105,10 @@ class LastActiveRideScreen extends StatelessWidget {
       builder: (context, snapshot) {
         // Handle connection states
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
-        
+
         if (snapshot.hasError) {
           print("❌ Error in ride stream: ${snapshot.error}");
           return Scaffold(
@@ -124,7 +129,7 @@ class LastActiveRideScreen extends StatelessWidget {
             ),
           );
         }
-        
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           // No rides found, go back to home
           Future.microtask(() {
@@ -132,22 +137,93 @@ class LastActiveRideScreen extends StatelessWidget {
           });
           return const SizedBox();
         }
-        
+
         // Get the most recent active ride
-        final rides = snapshot.data!.docs.map((doc) => OrderModel.fromJson(doc.data() as Map<String, dynamic>)).toList();
-        final activeRides = rides.where((r) => r.status != Constant.rideComplete && r.status != Constant.rideCanceled).toList();
-        final completedUnpaid = rides.where((r) => r.status == Constant.rideComplete && (r.paymentStatus == null || r.paymentStatus == false)).toList();
-        
+        final rides = snapshot.data!.docs
+            .map((doc) =>
+                OrderModel.fromJson(doc.data() as Map<String, dynamic>))
+            .toList();
+        final activeRides = rides
+            .where((r) =>
+                r.status != Constant.rideComplete &&
+                r.status != Constant.rideCanceled)
+            .toList();
+        final completedUnpaid = rides
+            .where((r) =>
+                r.status == Constant.rideComplete &&
+                (r.paymentStatus == null || r.paymentStatus == false))
+            .toList();
+
         if (activeRides.isEmpty && completedUnpaid.isNotEmpty) {
-          // Always navigate to payment screen if ride is complete and unpaid
-          Future.microtask(() {
+          Future.microtask(() async {
+            final unpaidOrder = completedUnpaid.first;
+
+            print(
+                "🔄 [PAYMENT NAV] Starting payment navigation for: ${unpaidOrder.id}");
+            print("   Original payment data:");
+            print("     paymentIntentId: ${unpaidOrder.paymentIntentId}");
+            print("     preAuthAmount: ${unpaidOrder.preAuthAmount}");
+            print("     paymentType: ${unpaidOrder.paymentType}");
+
+            // 🔥 CRITICAL: First try direct Firestore read without recovery
+            print("🔍 [PAYMENT NAV] Attempting direct Firestore read...");
+            final directOrder = await FirebaseFirestore.instance
+                .collection(CollectionName.orders)
+                .doc(unpaidOrder.id!)
+                .get();
+
+            if (directOrder.exists) {
+              final directData = directOrder.data()!;
+              print("🔍 [PAYMENT NAV] Direct Firestore data:");
+              print("   paymentIntentId: ${directData['paymentIntentId']}");
+              print("   preAuthAmount: ${directData['preAuthAmount']}");
+              print(
+                  "   paymentIntentStatus: ${directData['paymentIntentStatus']}");
+
+              // If direct read has payment data, use it
+              if (directData['paymentIntentId'] != null &&
+                  directData['paymentIntentId'].toString().isNotEmpty) {
+                final freshOrder = OrderModel.fromJson(directData);
+                print(
+                    "✅ [PAYMENT NAV] Using direct Firestore data with payment info");
+                Get.offAll(() => const PaymentOrderScreen(), arguments: {
+                  "orderModel": freshOrder,
+                });
+                return;
+              }
+            }
+
+            // If direct read failed, try recovery
+            print(
+                "🔄 [PAYMENT NAV] Direct read failed, attempting recovery...");
+            final recoveredOrder =
+                await FireStoreUtils.getOrderWithPaymentRecovery(
+                    unpaidOrder.id!);
+
+            OrderModel finalOrder = recoveredOrder ?? unpaidOrder;
+
+            // Final check before navigation
+            if ((finalOrder.paymentIntentId == null ||
+                    finalOrder.paymentIntentId!.isEmpty) &&
+                (finalOrder.paymentType?.toLowerCase().contains("stripe") ==
+                    true)) {
+              print("🚨 [PAYMENT NAV] CRITICAL: No payment data available!");
+              print(
+                  "   This indicates the payment data was never saved to Firestore during booking");
+
+              ShowToastDialog.showToast(
+                  "Payment authorization data was lost. Please contact support with order ID: ${finalOrder.id}",
+                  duration: Duration(seconds: 5));
+              return;
+            }
+
             Get.offAll(() => const PaymentOrderScreen(), arguments: {
-              "orderModel": completedUnpaid.first,
+              "orderModel": finalOrder,
             });
           });
           return const SizedBox();
         }
-        
+
         if (activeRides.isEmpty) {
           // No active rides and no unpaid completed rides, go to home
           Future.microtask(() {
@@ -155,22 +231,24 @@ class LastActiveRideScreen extends StatelessWidget {
           });
           return const SizedBox();
         }
-        
+
         activeRides.sort((a, b) {
           final aDate = a.createdDate ?? Timestamp(0, 0);
           final bDate = b.createdDate ?? Timestamp(0, 0);
           return bDate.compareTo(aDate);
         });
-        
+
         final order = activeRides.first;
-        
+
         print("📱 Displaying ride: ${order.id} with status: ${order.status}");
-        
-        if (order.status == Constant.rideComplete && order.paymentStatus == true) {
+
+        if (order.status == Constant.rideComplete &&
+            order.paymentStatus == true) {
           // Payment is complete, show confirmation and Rate Driver button
           return Scaffold(
             appBar: AppBar(
-              title: Text('Ride Complete', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+              title: Text('Ride Complete',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
@@ -180,7 +258,11 @@ class LastActiveRideScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 80),
                   const SizedBox(height: 24),
-                  Text('Payment Confirmed!', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.green)),
+                  Text('Payment Confirmed!',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                          color: Colors.green)),
                   const SizedBox(height: 32),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.star, color: Colors.amber),
@@ -188,9 +270,12 @@ class LastActiveRideScreen extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                       foregroundColor: Colors.white,
-                      textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      textStyle: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600, fontSize: 18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
                       // Remove 'const' before ReviewScreen to fix the error
@@ -205,13 +290,14 @@ class LastActiveRideScreen extends StatelessWidget {
             ),
           );
         }
-        
+
         // Enhanced ride display with real-time updates
         return Scaffold(
           extendBodyBehindAppBar: true,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: Text('Your Ride', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            title: Text('Your Ride',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
             actions: [
@@ -238,79 +324,106 @@ class LastActiveRideScreen extends StatelessWidget {
           body: Stack(
             children: [
               // Map view (fullscreen, under content)
-              if (order.sourceLocationLAtLng != null && order.destinationLocationLAtLng != null)
+              if (order.sourceLocationLAtLng != null &&
+                  order.destinationLocationLAtLng != null)
                 StreamBuilder<DriverUserModel?>(
-                  stream: order.driverId != null ? _getDriverUpdates(order.driverId!) : null,
+                  stream: order.driverId != null
+                      ? _getDriverUpdates(order.driverId!)
+                      : null,
                   builder: (context, driverSnapshot) {
                     return FutureBuilder<List<LatLng>>(
                       future: _getRoutePolyline(
-                        LatLng(order.sourceLocationLAtLng!.latitude ?? 0.0, order.sourceLocationLAtLng!.longitude ?? 0.0),
-                        LatLng(order.destinationLocationLAtLng!.latitude ?? 0.0, order.destinationLocationLAtLng!.longitude ?? 0.0),
+                        LatLng(order.sourceLocationLAtLng!.latitude ?? 0.0,
+                            order.sourceLocationLAtLng!.longitude ?? 0.0),
+                        LatLng(order.destinationLocationLAtLng!.latitude ?? 0.0,
+                            order.destinationLocationLAtLng!.longitude ?? 0.0),
                       ),
                       builder: (context, routeSnapshot) {
-                        final points = routeSnapshot.data ?? [
-                          LatLng(order.sourceLocationLAtLng!.latitude ?? 0.0, order.sourceLocationLAtLng!.longitude ?? 0.0),
-                          LatLng(order.destinationLocationLAtLng!.latitude ?? 0.0, order.destinationLocationLAtLng!.longitude ?? 0.0),
-                        ];
-                        
-                        final pickup = LatLng(order.sourceLocationLAtLng!.latitude ?? 0.0, order.sourceLocationLAtLng!.longitude ?? 0.0);
-                        final dropoff = LatLng(order.destinationLocationLAtLng!.latitude ?? 0.0, order.destinationLocationLAtLng!.longitude ?? 0.0);
-                        
+                        final points = routeSnapshot.data ??
+                            [
+                              LatLng(
+                                  order.sourceLocationLAtLng!.latitude ?? 0.0,
+                                  order.sourceLocationLAtLng!.longitude ?? 0.0),
+                              LatLng(
+                                  order.destinationLocationLAtLng!.latitude ??
+                                      0.0,
+                                  order.destinationLocationLAtLng!.longitude ??
+                                      0.0),
+                            ];
+
+                        final pickup = LatLng(
+                            order.sourceLocationLAtLng!.latitude ?? 0.0,
+                            order.sourceLocationLAtLng!.longitude ?? 0.0);
+                        final dropoff = LatLng(
+                            order.destinationLocationLAtLng!.latitude ?? 0.0,
+                            order.destinationLocationLAtLng!.longitude ?? 0.0);
+
                         // Create markers set
                         Set<Marker> markers = {
                           Marker(
                             markerId: const MarkerId('pickup'),
                             position: pickup,
                             infoWindow: const InfoWindow(title: 'Pickup'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueGreen),
                           ),
                           Marker(
                             markerId: const MarkerId('dropoff'),
                             position: dropoff,
                             infoWindow: const InfoWindow(title: 'Drop-off'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueRed),
                           ),
                         };
-                        
+
                         // Add driver marker if available
-                        if (driverSnapshot.hasData && 
+                        if (driverSnapshot.hasData &&
                             driverSnapshot.data?.location?.latitude != null &&
                             driverSnapshot.data?.location?.longitude != null) {
                           final driverLocation = LatLng(
                             driverSnapshot.data!.location!.latitude!,
                             driverSnapshot.data!.location!.longitude!,
                           );
-                          
+
                           markers.add(Marker(
                             markerId: const MarkerId('driver'),
                             position: driverLocation,
                             infoWindow: InfoWindow(
-                              title: 'Driver: ${driverSnapshot.data?.fullName ?? "Driver"}',
+                              title:
+                                  'Driver: ${driverSnapshot.data?.fullName ?? "Driver"}',
                               snippet: 'Current location',
                             ),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueBlue),
                             rotation: driverSnapshot.data?.rotation ?? 0.0,
                           ));
                         }
-                        
+
                         // Calculate bounds
                         LatLngBounds bounds;
-                        if (pickup.latitude > dropoff.latitude && pickup.longitude > dropoff.longitude) {
-                          bounds = LatLngBounds(southwest: dropoff, northeast: pickup);
+                        if (pickup.latitude > dropoff.latitude &&
+                            pickup.longitude > dropoff.longitude) {
+                          bounds = LatLngBounds(
+                              southwest: dropoff, northeast: pickup);
                         } else if (pickup.longitude > dropoff.longitude) {
                           bounds = LatLngBounds(
-                            southwest: LatLng(pickup.latitude, dropoff.longitude),
-                            northeast: LatLng(dropoff.latitude, pickup.longitude),
+                            southwest:
+                                LatLng(pickup.latitude, dropoff.longitude),
+                            northeast:
+                                LatLng(dropoff.latitude, pickup.longitude),
                           );
                         } else if (pickup.latitude > dropoff.latitude) {
                           bounds = LatLngBounds(
-                            southwest: LatLng(dropoff.latitude, pickup.longitude),
-                            northeast: LatLng(pickup.latitude, dropoff.longitude),
+                            southwest:
+                                LatLng(dropoff.latitude, pickup.longitude),
+                            northeast:
+                                LatLng(pickup.latitude, dropoff.longitude),
                           );
                         } else {
-                          bounds = LatLngBounds(southwest: pickup, northeast: dropoff);
+                          bounds = LatLngBounds(
+                              southwest: pickup, northeast: dropoff);
                         }
-                        
+
                         return Positioned.fill(
                           child: GoogleMap(
                             initialCameraPosition: CameraPosition(
@@ -333,7 +446,8 @@ class LastActiveRideScreen extends StatelessWidget {
                               if (!_mapController.isCompleted) {
                                 _mapController.complete(controller);
                               }
-                              await Future.delayed(const Duration(milliseconds: 300));
+                              await Future.delayed(
+                                  const Duration(milliseconds: 300));
                               controller.animateCamera(
                                 CameraUpdate.newLatLngBounds(bounds, 80),
                               );
@@ -344,13 +458,47 @@ class LastActiveRideScreen extends StatelessWidget {
                     );
                   },
                 ),
-              
+
               // Enhanced foreground content with real-time updates
               StreamBuilder<OrderModel?>(
                 stream: _getRideUpdates(order.id!),
                 builder: (context, orderSnapshot) {
-                  final currentOrder = orderSnapshot.data ?? order;
-                  
+                  OrderModel currentOrder;
+
+                  if (orderSnapshot.hasData && orderSnapshot.data != null) {
+                    currentOrder = orderSnapshot.data!;
+
+                    // 🔥 CRITICAL: Preserve ALL payment data when order updates
+                    if ((currentOrder.paymentIntentId == null ||
+                            currentOrder.paymentIntentId!.isEmpty) &&
+                        (order.paymentIntentId != null &&
+                            order.paymentIntentId!.isNotEmpty)) {
+                      print(
+                          "🔄 [STREAM UPDATE] Preserving ALL payment data in stream update");
+
+                      // Preserve ALL payment fields
+                      currentOrder.paymentIntentId = order.paymentIntentId;
+                      currentOrder.preAuthAmount = order.preAuthAmount;
+                      currentOrder.paymentIntentStatus =
+                          order.paymentIntentStatus;
+                      currentOrder.preAuthCreatedAt =
+                          order.preAuthCreatedAt; // 🔥 This was missing!
+                      currentOrder.paymentCapturedAt = order.paymentCapturedAt;
+                      currentOrder.paymentCanceledAt = order.paymentCanceledAt;
+
+                      print("💾 Preserved payment data:");
+                      print(
+                          "   paymentIntentId: ${currentOrder.paymentIntentId}");
+                      print("   preAuthAmount: ${currentOrder.preAuthAmount}");
+                      print(
+                          "   paymentIntentStatus: ${currentOrder.paymentIntentStatus}");
+                      print(
+                          "   preAuthCreatedAt: ${currentOrder.preAuthCreatedAt}");
+                    }
+                  } else {
+                    currentOrder = order;
+                  }
+
                   return DraggableScrollableSheet(
                     initialChildSize: 0.45,
                     minChildSize: 0.35,
@@ -375,82 +523,94 @@ class LastActiveRideScreen extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
                         children: [
                           Center(
-                            child: Container(
-                              width: 40, 
-                              height: 4, 
-                              margin: const EdgeInsets.only(bottom: 12), 
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300], 
-                                borderRadius: BorderRadius.circular(2)
-                              )
-                            )
-                          ),
-                          
+                              child: Container(
+                                  width: 40,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                      color: Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(2)))),
+
                           _StatusBanner(
                             status: currentOrder.status ?? '',
-                            driverFound: currentOrder.acceptedDriverId != null && 
-                                        currentOrder.acceptedDriverId!.isNotEmpty && 
-                                        (currentOrder.status == Constant.ridePlaced),
+                            driverFound: currentOrder.acceptedDriverId !=
+                                    null &&
+                                currentOrder.acceptedDriverId!.isNotEmpty &&
+                                (currentOrder.status == Constant.ridePlaced),
                           ),
-                          
+
                           // Driver information when found
-                          if (currentOrder.driverId != null && currentOrder.driverId!.isNotEmpty)
+                          if (currentOrder.driverId != null &&
+                              currentOrder.driverId!.isNotEmpty)
                             StreamBuilder<DriverUserModel?>(
                               stream: _getDriverUpdates(currentOrder.driverId!),
                               builder: (context, driverSnapshot) {
-                                if (driverSnapshot.hasData && driverSnapshot.data != null) {
+                                if (driverSnapshot.hasData &&
+                                    driverSnapshot.data != null) {
                                   final driver = driverSnapshot.data!;
-                                  return _DriverInfoCard(driver: driver, order: currentOrder);
+                                  return _DriverInfoCard(
+                                      driver: driver, order: currentOrder);
                                 }
                                 return const SizedBox();
                               },
                             ),
-                          
+
                           // Show driver selection when multiple drivers respond
-                          if (currentOrder.acceptedDriverId != null && 
-                              currentOrder.acceptedDriverId!.isNotEmpty && 
+                          if (currentOrder.acceptedDriverId != null &&
+                              currentOrder.acceptedDriverId!.isNotEmpty &&
                               currentOrder.status == Constant.ridePlaced)
-                            ...currentOrder.acceptedDriverId!.map((driverId) => 
-                              FutureBuilder<DriverUserModel?>(
-                                future: FireStoreUtils.getDriver(driverId),
-                                builder: (context, driverSnapshot) {
-                                  if (driverSnapshot.connectionState == ConnectionState.waiting) {
-                                    return Constant.loader();
-                                  }
-                                  if (!driverSnapshot.hasData || driverSnapshot.data == null) {
-                                    return const SizedBox();
-                                  }
-                                  final driverModel = driverSnapshot.data!;
-                                  return _AcceptRejectDriverModal(
-                                    order: currentOrder,
-                                    driverModel: driverModel,
-                                  );
-                                },
-                              )
-                            ).toList(),
-                          
+                            ...currentOrder.acceptedDriverId!
+                                .map((driverId) =>
+                                    FutureBuilder<DriverUserModel?>(
+                                      future:
+                                          FireStoreUtils.getDriver(driverId),
+                                      builder: (context, driverSnapshot) {
+                                        if (driverSnapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return Constant.loader();
+                                        }
+                                        if (!driverSnapshot.hasData ||
+                                            driverSnapshot.data == null) {
+                                          return const SizedBox();
+                                        }
+                                        final driverModel =
+                                            driverSnapshot.data!;
+                                        return _AcceptRejectDriverModal(
+                                          order: currentOrder,
+                                          driverModel: driverModel,
+                                        );
+                                      },
+                                    ))
+                                .toList(),
+
                           // Ride timer for active rides
-                          if (currentOrder.status == Constant.rideActive && currentOrder.createdDate != null)
+                          if (currentOrder.status == Constant.rideActive &&
+                              currentOrder.createdDate != null)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
                                 children: [
-                                  Icon(Icons.timer, color: Colors.teal.shade300),
+                                  Icon(Icons.timer,
+                                      color: Colors.teal.shade300),
                                   const SizedBox(width: 6),
-                                  _RideTimer(startTime: currentOrder.createdDate!),
+                                  _RideTimer(
+                                      startTime: currentOrder.createdDate!),
                                   const Spacer(),
                                   if (currentOrder.distance != null)
                                     Row(
                                       children: [
-                                        Icon(Icons.directions_car, color: Colors.teal.shade300),
+                                        Icon(Icons.directions_car,
+                                            color: Colors.teal.shade300),
                                         const SizedBox(width: 4),
-                                        Text('Distance: ${currentOrder.distance}', style: GoogleFonts.poppins()),
+                                        Text(
+                                            'Distance: ${currentOrder.distance}',
+                                            style: GoogleFonts.poppins()),
                                       ],
                                     ),
                                 ],
                               ),
                             ),
-                          
+
                           // Ride details card
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -459,81 +619,117 @@ class LastActiveRideScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(16),
                               color: Theme.of(context).cardColor,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 16),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     LocationView(
-                                      sourceLocation: currentOrder.sourceLocationName,
-                                      destinationLocation: currentOrder.destinationLocationName,
+                                      sourceLocation:
+                                          currentOrder.sourceLocationName,
+                                      destinationLocation:
+                                          currentOrder.destinationLocationName,
                                     ),
                                     const SizedBox(height: 16),
                                     Row(
                                       children: [
-                                        Icon(Icons.attach_money, color: Colors.teal.shade400, size: 20),
-                                        const SizedBox(width: 4),
-                                        Text(currentOrder.finalRate ?? currentOrder.offerRate ?? '-', 
-                                             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        const SizedBox(width: 16),
-                                        Icon(Icons.payment, color: Colors.teal.shade400, size: 20),
-                                        const SizedBox(width: 4),
-                                        Text(currentOrder.paymentType ?? '-', style: GoogleFonts.poppins()),
-                                        const Spacer(),
-                                        Icon(Icons.calendar_today, color: Colors.teal.shade400, size: 18),
+                                        Icon(Icons.attach_money,
+                                            color: Colors.teal.shade400,
+                                            size: 20),
                                         const SizedBox(width: 4),
                                         Text(
-                                          currentOrder.createdDate != null 
-                                            ? DateFormat('MMM d, h:mm a').format(currentOrder.createdDate!.toDate()) 
-                                            : '-', 
-                                          style: GoogleFonts.poppins(fontSize: 13)
-                                        ),
+                                            currentOrder.finalRate ??
+                                                currentOrder.offerRate ??
+                                                '-',
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16)),
+                                        const SizedBox(width: 16),
+                                        Icon(Icons.payment,
+                                            color: Colors.teal.shade400,
+                                            size: 20),
+                                        const SizedBox(width: 4),
+                                        Text(currentOrder.paymentType ?? '-',
+                                            style: GoogleFonts.poppins()),
+                                        const Spacer(),
+                                        Icon(Icons.calendar_today,
+                                            color: Colors.teal.shade400,
+                                            size: 18),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                            currentOrder.createdDate != null
+                                                ? DateFormat('MMM d, h:mm a')
+                                                    .format(currentOrder
+                                                        .createdDate!
+                                                        .toDate())
+                                                : '-',
+                                            style: GoogleFonts.poppins(
+                                                fontSize: 13)),
                                       ],
                                     ),
                                     const SizedBox(height: 10),
                                     Row(
                                       children: [
-                                        Text('Payment: ', style: GoogleFonts.poppins()),
+                                        Text('Payment: ',
+                                            style: GoogleFonts.poppins()),
                                         Text(
-                                          currentOrder.paymentStatus == true ? 'Paid' : 'Unpaid', 
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.bold, 
-                                            color: currentOrder.paymentStatus == true ? Colors.teal : Colors.red
-                                          )
-                                        ),
+                                            currentOrder.paymentStatus == true
+                                                ? 'Paid'
+                                                : 'Unpaid',
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold,
+                                                color: currentOrder
+                                                            .paymentStatus ==
+                                                        true
+                                                    ? Colors.teal
+                                                    : Colors.red)),
                                         const Spacer(),
                                         if (currentOrder.otp != null)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: Colors.teal.shade50,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Row(
                                               children: [
-                                                const Icon(Icons.lock, size: 16, color: Colors.teal),
+                                                const Icon(Icons.lock,
+                                                    size: 16,
+                                                    color: Colors.teal),
                                                 const SizedBox(width: 4),
-                                                Text('OTP: ${currentOrder.otp}', 
-                                                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.teal)),
+                                                Text('OTP: ${currentOrder.otp}',
+                                                    style: GoogleFonts.poppins(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Colors.teal)),
                                               ],
                                             ),
                                           ),
                                       ],
                                     ),
-                                    
+
                                     // Live progress indicator for in-progress rides
-                                    if (currentOrder.status == Constant.rideInProgress)
+                                    if (currentOrder.status ==
+                                        Constant.rideInProgress)
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Divider(),
-                                          Text('Live Route Progress', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                                          Text('Live Route Progress',
+                                              style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600)),
                                           const SizedBox(height: 8),
                                           LinearProgressIndicator(
-                                            value: 0.5, // TODO: Calculate actual progress based on driver location
+                                            value:
+                                                0.5, // TODO: Calculate actual progress based on driver location
                                             backgroundColor: Colors.grey[200],
                                             color: Colors.teal,
                                             minHeight: 6,
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
                                         ],
                                       ),
@@ -542,30 +738,34 @@ class LastActiveRideScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          
+
                           // Additional ride information
                           if (currentOrder.someOneElse != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Row(
                                 children: [
-                                  Icon(Icons.person, color: Colors.teal.shade400),
+                                  Icon(Icons.person,
+                                      color: Colors.teal.shade400),
                                   const SizedBox(width: 8),
-                                  Text('Ride for: ${currentOrder.someOneElse?.fullName ?? '-'}', 
-                                       style: GoogleFonts.poppins()),
+                                  Text(
+                                      'Ride for: ${currentOrder.someOneElse?.fullName ?? '-'}',
+                                      style: GoogleFonts.poppins()),
                                 ],
                               ),
                             ),
-                          
+
                           if (currentOrder.coupon != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Row(
                                 children: [
-                                  Icon(Icons.local_offer, color: Colors.teal.shade400),
+                                  Icon(Icons.local_offer,
+                                      color: Colors.teal.shade400),
                                   const SizedBox(width: 8),
-                                  Text('Coupon: ${currentOrder.coupon?.code ?? '-'}', 
-                                       style: GoogleFonts.poppins()),
+                                  Text(
+                                      'Coupon: ${currentOrder.coupon?.code ?? '-'}',
+                                      style: GoogleFonts.poppins()),
                                 ],
                               ),
                             ),
@@ -575,14 +775,15 @@ class LastActiveRideScreen extends StatelessWidget {
                   );
                 },
               ),
-              
+
               // Enhanced persistent bottom action bar
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor.withOpacity(0.98),
                     boxShadow: [
@@ -601,7 +802,8 @@ class LastActiveRideScreen extends StatelessWidget {
                         label: 'Share Ride',
                         color: Colors.blueAccent,
                         onTap: () async {
-                          final shareText = 'I am on a BuzRyde!\nRide ID: ${order.id ?? '-'}\nPickup: ${order.sourceLocationName ?? '-'}\nDrop-off: ${order.destinationLocationName ?? '-'}\nFare: ${order.finalRate ?? order.offerRate ?? '-'}\nStatus: ${order.status ?? '-'}';
+                          final shareText =
+                              'I am on a BuzRyde!\nRide ID: ${order.id ?? '-'}\nPickup: ${order.sourceLocationName ?? '-'}\nDrop-off: ${order.destinationLocationName ?? '-'}\nFare: ${order.finalRate ?? order.offerRate ?? '-'}\nStatus: ${order.status ?? '-'}';
                           await Share.share(shareText);
                         },
                       ),
@@ -614,20 +816,55 @@ class LastActiveRideScreen extends StatelessWidget {
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: const Text('Cancel Ride'),
-                              content: const Text('Are you sure you want to cancel this ride?'),
+                              content: const Text(
+                                  'Are you sure you want to cancel this ride?'),
                               actions: [
-                                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('No')),
-                                TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Yes')),
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(false),
+                                    child: const Text('No')),
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(true),
+                                    child: const Text('Yes')),
                               ],
                             ),
                           );
                           if (confirm == true) {
                             ShowToastDialog.showLoader('Cancelling ride...');
+
+                            // 🔥 CRITICAL: Preserve ALL payment data when cancelling
+                            final String? preservedPaymentIntentId =
+                                order.paymentIntentId;
+                            final String? preservedPreAuthAmount =
+                                order.preAuthAmount;
+                            final String? preservedPaymentIntentStatus =
+                                order.paymentIntentStatus;
+                            final Timestamp? preservedPreAuthCreatedAt =
+                                order.preAuthCreatedAt;
+                            final Timestamp? preservedPaymentCapturedAt =
+                                order.paymentCapturedAt;
+                            final Timestamp? preservedPaymentCanceledAt =
+                                order.paymentCanceledAt;
+
                             order.status = Constant.rideCanceled;
+
+                            // Restore ALL preserved payment data
+                            order.paymentIntentId = preservedPaymentIntentId;
+                            order.preAuthAmount = preservedPreAuthAmount;
+                            order.paymentIntentStatus =
+                                preservedPaymentIntentStatus;
+                            order.preAuthCreatedAt = preservedPreAuthCreatedAt;
+                            order.paymentCapturedAt =
+                                preservedPaymentCapturedAt;
+                            order.paymentCanceledAt =
+                                preservedPaymentCanceledAt;
+
                             await FireStoreUtils.setOrder(order);
                             ShowToastDialog.closeLoader();
                             ShowToastDialog.showToast('Ride cancelled');
-                            Future.delayed(const Duration(milliseconds: 300), () {
+                            Future.delayed(const Duration(milliseconds: 300),
+                                () {
                               Get.offAllNamed('/');
                             });
                           }
@@ -643,20 +880,65 @@ class LastActiveRideScreen extends StatelessWidget {
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('Complete Ride'),
-                                content: const Text('Are you sure you want to mark this ride as completed?'),
+                                content: const Text(
+                                    'Are you sure you want to mark this ride as completed?'),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('No')),
-                                  TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Yes')),
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(false),
+                                      child: const Text('No')),
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(true),
+                                      child: const Text('Yes')),
                                 ],
                               ),
                             );
                             if (confirm == true) {
                               ShowToastDialog.showLoader('Completing ride...');
+
+                              // 🔥 CRITICAL: Preserve ALL payment data when completing ride
+                              final String? preservedPaymentIntentId =
+                                  order.paymentIntentId;
+                              final String? preservedPreAuthAmount =
+                                  order.preAuthAmount;
+                              final String? preservedPaymentIntentStatus =
+                                  order.paymentIntentStatus;
+                              final Timestamp? preservedPreAuthCreatedAt =
+                                  order.preAuthCreatedAt;
+                              final Timestamp? preservedPaymentCapturedAt =
+                                  order.paymentCapturedAt;
+                              final Timestamp? preservedPaymentCanceledAt =
+                                  order.paymentCanceledAt;
+
                               order.status = Constant.rideComplete;
+
+                              // Restore ALL preserved payment data
+                              order.paymentIntentId = preservedPaymentIntentId;
+                              order.preAuthAmount = preservedPreAuthAmount;
+                              order.paymentIntentStatus =
+                                  preservedPaymentIntentStatus;
+                              order.preAuthCreatedAt =
+                                  preservedPreAuthCreatedAt;
+                              order.paymentCapturedAt =
+                                  preservedPaymentCapturedAt;
+                              order.paymentCanceledAt =
+                                  preservedPaymentCanceledAt;
+
+                              print(
+                                  "💾 [COMPLETE RIDE] Preserving ALL payment data for completion:");
+                              print(
+                                  "   paymentIntentId: $preservedPaymentIntentId");
+                              print(
+                                  "   preAuthAmount: $preservedPreAuthAmount");
+                              print(
+                                  "   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+
                               await FireStoreUtils.setOrder(order);
                               ShowToastDialog.closeLoader();
                               ShowToastDialog.showToast('Ride completed');
-                              Future.delayed(const Duration(milliseconds: 300), () {
+                              Future.delayed(const Duration(milliseconds: 300),
+                                  () {
                                 Get.offAllNamed('/');
                               });
                             }
@@ -668,8 +950,11 @@ class LastActiveRideScreen extends StatelessWidget {
                           label: 'Message',
                           color: Colors.teal,
                           onTap: () async {
-                            final customer = await FireStoreUtils.getUserProfile(order.userId ?? '');
-                            final driver = await FireStoreUtils.getDriver(order.driverId!);
+                            final customer =
+                                await FireStoreUtils.getUserProfile(
+                                    order.userId ?? '');
+                            final driver =
+                                await FireStoreUtils.getDriver(order.driverId!);
                             if (customer != null && driver != null) {
                               Get.to(ChatScreens(
                                 driverId: driver.id,
@@ -690,11 +975,14 @@ class LastActiveRideScreen extends StatelessWidget {
                           label: 'Call Driver',
                           color: Colors.teal,
                           onTap: () async {
-                            final driver = await FireStoreUtils.getDriver(order.driverId!);
+                            final driver =
+                                await FireStoreUtils.getDriver(order.driverId!);
                             if (driver?.phoneNumber != null) {
-                              await Constant.makePhoneCall(driver!.phoneNumber!);
+                              await Constant.makePhoneCall(
+                                  driver!.phoneNumber!);
                             } else {
-                              ShowToastDialog.showToast("Driver phone number not available");
+                              ShowToastDialog.showToast(
+                                  "Driver phone number not available");
                             }
                           },
                         ),
@@ -714,9 +1002,9 @@ class LastActiveRideScreen extends StatelessWidget {
 class _DriverInfoCard extends StatelessWidget {
   final DriverUserModel driver;
   final OrderModel order;
-  
+
   const _DriverInfoCard({required this.driver, required this.order});
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -733,9 +1021,10 @@ class _DriverInfoCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundImage: driver.profilePic != null && driver.profilePic!.isNotEmpty
-                    ? NetworkImage(driver.profilePic!)
-                    : null,
+                backgroundImage:
+                    driver.profilePic != null && driver.profilePic!.isNotEmpty
+                        ? NetworkImage(driver.profilePic!)
+                        : null,
                 child: driver.profilePic == null || driver.profilePic!.isEmpty
                     ? const Icon(Icons.person)
                     : null,
@@ -747,7 +1036,10 @@ class _DriverInfoCard extends StatelessWidget {
                   children: [
                     Text(
                       driver.fullName ?? 'Driver',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey[600], fontSize: 16),
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                          fontSize: 16),
                     ),
                     if (driver.vehicleInformation != null)
                       Text(
@@ -757,7 +1049,9 @@ class _DriverInfoCard extends StatelessWidget {
                     if (driver.vehicleInformation?.vehicleNumber != null)
                       Text(
                         driver.vehicleInformation!.vehicleNumber!,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.grey[600]),
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600]),
                       ),
                   ],
                 ),
@@ -773,64 +1067,74 @@ class _DriverInfoCard extends StatelessWidget {
                           reviewCount: driver.reviewsCount ?? "0",
                           reviewSum: driver.reviewsSum ?? "0",
                         ),
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600]),
                       ),
                     ],
                   ),
-                  if (order.status == Constant.rideActive || order.status == Constant.rideInProgress)
+                  if (order.status == Constant.rideActive ||
+                      order.status == Constant.rideInProgress)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        order.status == Constant.rideActive ? 'En Route' : 'In Progress',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 10),
+                        order.status == Constant.rideActive
+                            ? 'En Route'
+                            : 'In Progress',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white, fontSize: 10),
                       ),
                     ),
                 ],
               ),
             ],
           ),
-          
+
           // Driver rules if available
-          if (driver.vehicleInformation?.driverRules != null && 
+          if (driver.vehicleInformation?.driverRules != null &&
               driver.vehicleInformation!.driverRules!.isNotEmpty)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
                 const Divider(),
-                Text('Driver Rules:', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text('Driver Rules:',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600, fontSize: 14)),
                 const SizedBox(height: 4),
-                ...driver.vehicleInformation!.driverRules!.map((rule) => 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        if (rule.image?.isNotEmpty == true)
-                          Container(
-                            width: 16,
-                            height: 16,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              color: Colors.grey[200],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.network(rule.image!, fit: BoxFit.cover),
-                            ),
+                ...driver.vehicleInformation!.driverRules!
+                    .map((rule) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              if (rule.image?.isNotEmpty == true)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: Colors.grey[200],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(rule.image!,
+                                        fit: BoxFit.cover),
+                                  ),
+                                ),
+                              Expanded(
+                                child: Text(rule.name ?? '-',
+                                    style: GoogleFonts.poppins(fontSize: 12)),
+                              ),
+                            ],
                           ),
-                        Expanded(
-                          child: Text(rule.name ?? '-', style: GoogleFonts.poppins(fontSize: 12)),
-                        ),
-                      ],
-                    ),
-                  )
-                ),
+                        )),
               ],
             ),
         ],
@@ -882,7 +1186,8 @@ class _RideTimerState extends State<_RideTimer> {
       children: [
         Icon(Icons.timer, color: Colors.teal),
         const SizedBox(width: 4),
-        Text('Ride Time: $h:$m:$s', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+        Text('Ride Time: $h:$m:$s',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -893,7 +1198,11 @@ class _UberActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _UberActionButton({required this.icon, required this.label, required this.color, required this.onTap});
+  const _UberActionButton(
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -912,7 +1221,9 @@ class _UberActionButton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(label, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: color)),
+        Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w500, color: color)),
       ],
     );
   }
@@ -997,7 +1308,9 @@ class _StatusBanner extends StatelessWidget {
             child: Icon(icon, color: color, size: 28, key: ValueKey(icon)),
           ),
           const SizedBox(width: 12),
-          Text(text, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: color, fontSize: 16)),
+          Text(text,
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600, color: color, fontSize: 16)),
           if (trailing != null) trailing,
         ],
       ),
@@ -1009,7 +1322,8 @@ class _StatusBanner extends StatelessWidget {
 class _AcceptRejectDriverModal extends StatelessWidget {
   final OrderModel order;
   final DriverUserModel driverModel;
-  const _AcceptRejectDriverModal({required this.order, required this.driverModel});
+  const _AcceptRejectDriverModal(
+      {required this.order, required this.driverModel});
 
   @override
   Widget build(BuildContext context) {
@@ -1031,8 +1345,10 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                   // Avatar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: driverModel.profilePic != null && driverModel.profilePic!.isNotEmpty
-                        ? Image.network(driverModel.profilePic!, width: 64, height: 64, fit: BoxFit.cover)
+                    child: driverModel.profilePic != null &&
+                            driverModel.profilePic!.isNotEmpty
+                        ? Image.network(driverModel.profilePic!,
+                            width: 64, height: 64, fit: BoxFit.cover)
                         : Container(
                             width: 64,
                             height: 64,
@@ -1046,32 +1362,51 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(driverModel.fullName ?? '-', 
-                             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(driverModel.fullName ?? '-',
+                            style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
                         const SizedBox(height: 4),
                         if (driverModel.vehicleInformation != null)
                           Row(
                             children: [
-                              Icon(Icons.directions_car, color: Colors.teal, size: 18),
+                              Icon(Icons.directions_car,
+                                  color: Colors.teal, size: 18),
                               const SizedBox(width: 4),
-                              Text(driverModel.vehicleInformation!.vehicleType ?? '-', 
-                                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                              Text(
+                                  driverModel.vehicleInformation!.vehicleType ??
+                                      '-',
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14)),
                               const SizedBox(width: 10),
-                              Icon(Icons.color_lens, color: Colors.teal, size: 18),
+                              Icon(Icons.color_lens,
+                                  color: Colors.teal, size: 18),
                               const SizedBox(width: 4),
-                              Text(driverModel.vehicleInformation!.vehicleColor ?? '-', 
-                                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                              Text(
+                                  driverModel
+                                          .vehicleInformation!.vehicleColor ??
+                                      '-',
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14)),
                             ],
                           ),
-                        if (driverModel.vehicleInformation?.vehicleNumber != null)
+                        if (driverModel.vehicleInformation?.vehicleNumber !=
+                            null)
                           Padding(
                             padding: const EdgeInsets.only(top: 2.0),
                             child: Row(
                               children: [
-                                Icon(Icons.confirmation_number, color: Colors.teal, size: 18),
+                                Icon(Icons.confirmation_number,
+                                    color: Colors.teal, size: 18),
                                 const SizedBox(width: 4),
-                                Text(driverModel.vehicleInformation!.vehicleNumber ?? '-', 
-                                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                                Text(
+                                    driverModel.vehicleInformation!
+                                            .vehicleNumber ??
+                                        '-',
+                                    style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14)),
                               ],
                             ),
                           ),
@@ -1080,11 +1415,11 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               // Divider
               const SizedBox(height: 14),
               Divider(color: Colors.grey[300], thickness: 1),
-              
+
               // Driver Rules
               if (driverModel.vehicleInformation?.driverRules != null &&
                   driverModel.vehicleInformation!.driverRules!.isNotEmpty)
@@ -1093,39 +1428,47 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Driver Rules:', 
-                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.teal)),
+                      Text('Driver Rules:',
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: Colors.teal)),
                       const SizedBox(height: 4),
-                      ...driverModel.vehicleInformation!.driverRules!.map<Widget>((rule) => 
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2.0),
-                          child: Row(
-                            children: [
-                              if (rule.image?.isNotEmpty == true)
-                                Container(
-                                  width: 20,
-                                  height: 20,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(4),
-                                    color: Colors.grey[200],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Image.network(rule.image!, fit: BoxFit.cover),
-                                  ),
+                      ...driverModel.vehicleInformation!.driverRules!
+                          .map<Widget>((rule) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2.0),
+                                child: Row(
+                                  children: [
+                                    if (rule.image?.isNotEmpty == true)
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          color: Colors.grey[200],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          child: Image.network(rule.image!,
+                                              fit: BoxFit.cover),
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: Text(rule.name ?? '-',
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 13)),
+                                    ),
+                                  ],
                                 ),
-                              Expanded(
-                                child: Text(rule.name ?? '-', style: GoogleFonts.poppins(fontSize: 13)),
-                              ),
-                            ],
-                          ),
-                        )
-                      ),
+                              )),
                     ],
                   ),
                 ),
-              
+
               // Action Buttons
               const SizedBox(height: 10),
               Row(
@@ -1133,10 +1476,12 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.close, color: Colors.redAccent),
-                      label: const Text('Reject', style: TextStyle(color: Colors.redAccent)),
+                      label: const Text('Reject',
+                          style: TextStyle(color: Colors.redAccent)),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.redAccent),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () async {
@@ -1152,7 +1497,8 @@ class _AcceptRejectDriverModal extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () async {
@@ -1168,60 +1514,100 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       ),
     );
   }
-  
+
   Future<void> _acceptDriver(OrderModel order, DriverUserModel driver) async {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
-      
+
+      // 🔥 CRITICAL: Preserve ALL payment data when updating order
+      final String? preservedPaymentIntentId = order.paymentIntentId;
+      final String? preservedPreAuthAmount = order.preAuthAmount;
+      final String? preservedPaymentIntentStatus = order.paymentIntentStatus;
+      final Timestamp? preservedPreAuthCreatedAt = order.preAuthCreatedAt;
+      final Timestamp? preservedPaymentCapturedAt = order.paymentCapturedAt;
+      final Timestamp? preservedPaymentCanceledAt = order.paymentCanceledAt;
+
       order.acceptedDriverId = [];
       order.driverId = driver.id.toString();
       order.status = Constant.rideActive;
-      
+
+      // Restore ALL preserved payment data
+      order.paymentIntentId = preservedPaymentIntentId;
+      order.preAuthAmount = preservedPreAuthAmount;
+      order.paymentIntentStatus = preservedPaymentIntentStatus;
+      order.preAuthCreatedAt = preservedPreAuthCreatedAt;
+      order.paymentCapturedAt = preservedPaymentCapturedAt;
+      order.paymentCanceledAt = preservedPaymentCanceledAt;
+
+      print("💾 [ACCEPT DRIVER] Preserving ALL payment data:");
+      print("   paymentIntentId: $preservedPaymentIntentId");
+      print("   preAuthAmount: $preservedPreAuthAmount");
+      print("   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+
       await FireStoreUtils.setOrder(order);
-      
+
       // Send notification to driver
       if (driver.fcmToken != null) {
         await SendNotification.sendOneNotification(
           token: driver.fcmToken!,
           title: 'Ride Confirmed'.tr,
-          body: 'Your ride request has been accepted by the passenger. Please proceed to the pickup location.'.tr,
+          body:
+              'Your ride request has been accepted by the passenger. Please proceed to the pickup location.'
+                  .tr,
           payload: {"type": "ride_accepted", "orderId": order.id},
         );
       }
-      
+
       ShowToastDialog.closeLoader();
       ShowToastDialog.showToast("Driver accepted! They are on their way.");
-      
     } catch (e) {
       ShowToastDialog.closeLoader();
       ShowToastDialog.showToast("Failed to accept driver: ${e.toString()}");
     }
   }
-  
+
   Future<void> _rejectDriver(OrderModel order, DriverUserModel driver) async {
     try {
+      // 🔥 CRITICAL: Preserve ALL payment data when updating order
+      final String? preservedPaymentIntentId = order.paymentIntentId;
+      final String? preservedPreAuthAmount = order.preAuthAmount;
+      final String? preservedPaymentIntentStatus = order.paymentIntentStatus;
+      final Timestamp? preservedPreAuthCreatedAt = order.preAuthCreatedAt;
+      final Timestamp? preservedPaymentCapturedAt = order.paymentCapturedAt;
+      final Timestamp? preservedPaymentCanceledAt = order.paymentCanceledAt;
+
       List<dynamic> rejectDriverId = order.rejectedDriverId ?? [];
       rejectDriverId.add(driver.id);
       List<dynamic> acceptDriverId = order.acceptedDriverId ?? [];
       acceptDriverId.remove(driver.id);
-      
+
       order.rejectedDriverId = rejectDriverId;
       order.acceptedDriverId = acceptDriverId;
-      
+
+      // Restore ALL preserved payment data
+      order.paymentIntentId = preservedPaymentIntentId;
+      order.preAuthAmount = preservedPreAuthAmount;
+      order.paymentIntentStatus = preservedPaymentIntentStatus;
+      order.preAuthCreatedAt = preservedPreAuthCreatedAt;
+      order.paymentCapturedAt = preservedPaymentCapturedAt;
+      order.paymentCanceledAt = preservedPaymentCanceledAt;
+
       await FireStoreUtils.setOrder(order);
-      
+
       // Send notification to driver
       if (driver.fcmToken != null) {
         await SendNotification.sendOneNotification(
           token: driver.fcmToken!,
           title: 'Ride Canceled'.tr,
-          body: 'The passenger has canceled the ride. No action is required from your end.'.tr,
+          body:
+              'The passenger has canceled the ride. No action is required from your end.'
+                  .tr,
           payload: {"type": "ride_rejected", "orderId": order.id},
         );
       }
-      
-      ShowToastDialog.showToast("Driver rejected. Looking for other drivers...");
-      
+
+      ShowToastDialog.showToast(
+          "Driver rejected. Looking for other drivers...");
     } catch (e) {
       ShowToastDialog.showToast("Failed to reject driver: ${e.toString()}");
     }

@@ -14,6 +14,7 @@ import 'package:customer/model/order_model.dart';
 import 'package:customer/model/payment_model.dart';
 import 'package:customer/model/service_model.dart';
 import 'package:customer/model/user_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
 import 'package:customer/model/zone_model.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/utils/Preferences.dart';
@@ -22,15 +23,12 @@ import 'package:customer/utils/notification_service.dart';
 import 'package:customer/utils/utils.dart';
 import 'package:customer/widget/geoflutterfire/src/geoflutterfire.dart';
 import 'package:customer/widget/geoflutterfire/src/models/point.dart';
-import 'package:customer/services/stripe_service.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:osm_nominatim/osm_nominatim.dart';
-import 'package:http/http.dart' as http;
 
 class HomeController extends GetxController {
   DashBoardController dashboardController = Get.put(DashBoardController());
@@ -65,7 +63,7 @@ class HomeController extends GetxController {
   ];
 
   var isBooking = false.obs;
-var isInstantBooking = false.obs;
+  var isInstantBooking = false.obs;
 
   @override
   void onInit() {
@@ -381,7 +379,7 @@ var isInstantBooking = false.obs;
     }
   }
 
-  /// Enhanced ride booking method with proper driver finding
+  /// Enhanced ride booking method with proper payment data preservation
   Future<bool> bookRide() async {
     try {
       // Validate all required fields
@@ -409,7 +407,8 @@ var isInstantBooking = false.obs;
 
             if (walletBalance < payableAmount) {
               ShowToastDialog.showToast(
-                  "Insufficient balance. Please top up your wallet or choose another payment method.");
+                "Insufficient balance. Please top up your wallet or choose another payment method.",
+              );
               return false;
             }
           }
@@ -434,7 +433,8 @@ var isInstantBooking = false.obs;
 
       if (distance.value.isEmpty || double.parse(distance.value) <= 0.5) {
         ShowToastDialog.showToast(
-            "Please select more than two ${Constant.distanceType} location".tr);
+          "Please select more than two ${Constant.distanceType} location".tr,
+        );
         return false;
       }
 
@@ -448,7 +448,8 @@ var isInstantBooking = false.obs;
       bool isPaymentNotCompleted = await FireStoreUtils.paymentStatusCheck();
       if (isPaymentNotCompleted) {
         ShowToastDialog.showToast(
-            "Please complete payment for your previous ride before booking a new one");
+          "Please complete payment for your previous ride before booking a new one",
+        );
         return false;
       }
 
@@ -481,16 +482,14 @@ var isInstantBooking = false.obs;
             "✅ Added admin commission to order: ${Constant.adminCommission!.toJson()}");
       } else {
         print("⚠️  No global admin commission available");
-        // Create a default commission to avoid null errors
         orderModel.adminCommission = AdminCommission(
-            isEnabled: false,
-            type: "percentage",
-            amount: "0",
-            flatRatePromotion:
-                FlatRatePromotion(isEnabled: false, amount: 0.0));
+          isEnabled: false,
+          type: "percentage",
+          amount: "0",
+          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+        );
       }
 
-      // Debug: Log what commission was set
       if (orderModel.adminCommission != null) {
         print("🧾 Order commission details:");
         print("   Enabled: ${orderModel.adminCommission!.isEnabled}");
@@ -510,25 +509,36 @@ var isInstantBooking = false.obs;
       orderModel.otp = Constant.getReferralCode();
       orderModel.taxList = Constant.taxList;
 
-      // Handle Stripe pre-authorization for ride booking
+      // ✅ STRIPE PRE-AUTHORIZATION BLOCK (ENHANCED)
       if (selectedPaymentMethod.value.toLowerCase() == "stripe" ||
           selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
-        // Check if we already have a payment intent ID from the payment selection
-        if (stripePaymentIntentId.value.isEmpty) {
-          ShowToastDialog.showToast(
-              "Please select Stripe payment method again to authorize payment");
+        
+        print("🎯 [STRIPE DEBUG] Stripe payment section EXECUTING");
+        print("   stripePaymentIntentId: ${stripePaymentIntentId.value}");
+        print("   stripePreAuthAmount: ${stripePreAuthAmount.value}");
+
+        if (stripePaymentIntentId.value.isNotEmpty && stripePreAuthAmount.value.isNotEmpty) {
+          orderModel.paymentIntentId = stripePaymentIntentId.value;
+          orderModel.preAuthAmount = stripePreAuthAmount.value;
+          orderModel.paymentIntentStatus = 'requires_capture';
+          orderModel.preAuthCreatedAt = Timestamp.now();
+
+          print("✅ [STRIPE DEBUG] Payment data set on OrderModel:");
+          print("   paymentIntentId: ${orderModel.paymentIntentId}");
+          print("   preAuthAmount: ${orderModel.preAuthAmount}");
+          print("   paymentIntentStatus: ${orderModel.paymentIntentStatus}");
+          print("   preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
+
+          // 🔥 CRITICAL: Create wallet transaction for recovery
+          await _createStripePreAuthTransaction(orderModel);
+        } else {
+          print("❌ [STRIPE DEBUG] stripePaymentIntentId or stripePreAuthAmount is EMPTY!");
+          ShowToastDialog.showToast("Payment authorization missing. Please select Stripe payment again.");
           return false;
         }
-
-        // Use the stored payment intent details
-        orderModel.paymentIntentId = stripePaymentIntentId.value;
-        orderModel.preAuthAmount = stripePreAuthAmount.value;
-        orderModel.paymentIntentStatus = 'requires_capture';
-        orderModel.preAuthCreatedAt = Timestamp.now();
-
-        print("✅ Using pre-authorized payment: ${stripePaymentIntentId.value}");
       }
 
+      // Handle booking for someone else
       if (selectedTakingRide.value.fullName != "Myself") {
         orderModel.someOneElse = selectedTakingRide.value;
       }
@@ -540,13 +550,14 @@ var isInstantBooking = false.obs;
       orderModel.position =
           Positions(geoPoint: position.geoPoint, geohash: position.hash);
 
-      // Find appropriate zone
+      // Zone check
       bool zoneFound = false;
       for (int i = 0; i < zoneList.length; i++) {
         if (Constant.isPointInPolygon(
-            LatLng(sourceLocationLAtLng.value.latitude!,
-                sourceLocationLAtLng.value.longitude!),
-            zoneList[i].area!)) {
+          LatLng(sourceLocationLAtLng.value.latitude!,
+              sourceLocationLAtLng.value.longitude!),
+          zoneList[i].area!,
+        )) {
           selectedZone.value = zoneList[i];
           orderModel.zoneId = selectedZone.value.id;
           orderModel.zone = selectedZone.value;
@@ -562,27 +573,33 @@ var isInstantBooking = false.obs;
         return false;
       }
 
-      // Place the ride request
-      bool success = await FireStoreUtils.placeRideRequest(orderModel);
+      // Final debug before saving
+      print("🔍 [BOOK RIDE DEBUG] Payment data before Firestore save:");
+      print("   stripePaymentIntentId: ${stripePaymentIntentId.value}");
+      print("   stripePreAuthAmount: ${stripePreAuthAmount.value}");
+      print("   orderModel.paymentIntentId: ${orderModel.paymentIntentId}");
+      print("   orderModel.preAuthAmount: ${orderModel.preAuthAmount}");
+      print(
+          "   orderModel.paymentIntentStatus: ${orderModel.paymentIntentStatus}");
+      print("   orderModel.preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
+
+      if (selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
+        print(
+            "✅ [BOOK RIDE DEBUG] Stripe payment section SHOULD have executed");
+      } else {
+        print(
+            "❌ [BOOK RIDE DEBUG] Stripe payment section DID NOT execute - using: ${selectedPaymentMethod.value}");
+      }
+
+      // 🔥 CRITICAL: Enhanced order saving with verification
+      bool success = await _saveOrderWithVerification(orderModel);
 
       if (success) {
-        // Verify the commission was saved to Firestore
         print("🔍 Verifying commission data was saved to Firestore...");
         await FireStoreUtils.verifyOrderCommission(orderModel.id!);
 
         // Clear form data
-        sourceLocationController.value.clear();
-        destinationLocationController.value.clear();
-        offerYourRateController.value.clear();
-        sourceLocationLAtLng.value = LocationLatLng();
-        destinationLocationLAtLng.value = LocationLatLng();
-        distance.value = "";
-        duration.value = "";
-        amount.value = "";
-        selectedPaymentMethod.value = "";
-        stripePaymentIntentId.value = "";
-        stripePreAuthAmount.value = "";
-
+        resetPaymentState();
         return true;
       }
 
@@ -594,54 +611,86 @@ var isInstantBooking = false.obs;
     }
   }
 
-  // Helper method to create Stripe pre-authorization
-  Future<Map<String, dynamic>?> _createStripePreAuth(String amount) async {
+  /// Create Stripe pre-auth transaction for recovery purposes
+  Future<void> _createStripePreAuthTransaction(OrderModel order) async {
     try {
-      Map<String, dynamic> body = {
-        'amount': ((double.parse(amount) * 100).round()).toString(),
-        'currency': "CAD",
-        'payment_method_types[]': 'card',
-        'capture_method': 'manual', // This creates a pre-authorization
-        "description": "BuzRyde Ride Pre-authorization",
-        "shipping[name]": userModel.value.fullName,
-        "shipping[address][line1]": "123 Main St",
-        "shipping[address][postal_code]": "K1A 0A6",
-        "shipping[address][city]": "Ottawa",
-        "shipping[address][state]": "ON",
-        "shipping[address][country]": "CA",
-      };
+      WalletTransactionModel preAuthTransaction = WalletTransactionModel(
+        id: Constant.getUuid(),
+        amount: "-${order.preAuthAmount}", // Negative amount for pre-auth
+        createdDate: Timestamp.now(),
+        paymentType: "Stripe",
+        transactionId: order.id,
+        userId: FireStoreUtils.getCurrentUid(),
+        orderType: "city", 
+        userType: "customer",
+        note: "Stripe pre-authorization for ride ${order.id} - Payment Intent: ${order.paymentIntentId}",
+      );
 
-      // You'll need to get the stripe secret from payment model
-      final paymentData = await FireStoreUtils().getPayment();
-      if (paymentData?.strip?.stripeSecret == null) {
-        throw Exception("Stripe not configured");
-      }
-
-      var response = await http.post(
-          Uri.parse('https://api.stripe.com/v1/payment_intents'),
-          body: body,
-          headers: {
-            'Authorization': 'Bearer ${paymentData!.strip!.stripeSecret}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-          });
-      return jsonDecode(response.body);
+      await FireStoreUtils.setWalletTransaction(preAuthTransaction);
+      print("💾 [STRIPE PRE-AUTH] Created recovery transaction: ${preAuthTransaction.id}");
+      print("   Note: ${preAuthTransaction.note}");
     } catch (e) {
-      print("Error creating Stripe pre-auth: $e");
-      return null;
+      print("❌ [STRIPE PRE-AUTH] Failed to create transaction: $e");
+    }
+  }
+
+  /// Enhanced order saving with immediate verification
+  Future<bool> _saveOrderWithVerification(OrderModel orderModel) async {
+    try {
+      print("💾 [ORDER SAVE] Saving order with enhanced verification...");
+      
+      // Save the order
+      bool saveSuccess = await FireStoreUtils.setOrder(orderModel) ?? false;
+      
+      if (saveSuccess) {
+        print("✅ [ORDER SAVE] Order saved successfully, verifying...");
+        
+        // 🔥 CRITICAL: Immediate verification - read back from Firestore
+        await Future.delayed(Duration(seconds: 2)); // Small delay for Firestore propagation
+        
+        final verifiedOrder = await FireStoreUtils.getOrder(orderModel.id!);
+        if (verifiedOrder != null) {
+          print("🔍 [ORDER VERIFICATION] Firestore verification:");
+          print("   paymentIntentId: ${verifiedOrder.paymentIntentId}");
+          print("   preAuthAmount: ${verifiedOrder.preAuthAmount}");
+          print("   paymentIntentStatus: ${verifiedOrder.paymentIntentStatus}");
+          print("   preAuthCreatedAt: ${verifiedOrder.preAuthCreatedAt}");
+          
+          if (verifiedOrder.paymentIntentId != null && verifiedOrder.paymentIntentId!.isNotEmpty) {
+            print("✅ [ORDER VERIFICATION] Payment data verified in Firestore");
+            return true;
+          } else {
+            print("❌ [ORDER VERIFICATION] Payment data LOST during save!");
+            return false;
+          }
+        } else {
+          print("❌ [ORDER VERIFICATION] Could not retrieve order after save");
+          return false;
+        }
+      } else {
+        print("❌ [ORDER SAVE] Failed to save order");
+        return false;
+      }
+    } catch (e) {
+      print("❌ [ORDER SAVE] Error: $e");
+      return false;
     }
   }
 
   /// Reset all payment-related state
-void resetPaymentState() {
-  selectedPaymentMethod.value = "";
-  stripePaymentIntentId.value = "";
-  stripePreAuthAmount.value = "";
-  
-  // Also clear any payment-related form fields if needed
-  if (offerYourRateController.value.text.isNotEmpty) {
+  void resetPaymentState() {
+    sourceLocationController.value.clear();
+    destinationLocationController.value.clear();
     offerYourRateController.value.clear();
+    sourceLocationLAtLng.value = LocationLatLng();
+    destinationLocationLAtLng.value = LocationLatLng();
+    distance.value = "";
+    duration.value = "";
+    amount.value = "";
+    selectedPaymentMethod.value = "";
+    stripePaymentIntentId.value = "";
+    stripePreAuthAmount.value = "";
+
+    print("🔄 Payment state reset");
   }
-  
-  print("🔄 Payment state reset");
-}
 }

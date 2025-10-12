@@ -30,7 +30,7 @@ class CompleteOrderScreen extends StatelessWidget {
           return Scaffold(
               appBar: AppBar(
                 backgroundColor: AppColors.primary,
-                title:  Text("Ride Details".tr),
+                title: Text("Ride Details".tr),
                 leading: InkWell(
                     onTap: () {
                       Get.back();
@@ -52,8 +52,11 @@ class CompleteOrderScreen extends StatelessWidget {
                       child: controller.isLoading.value
                           ? Constant.loader()
                           : Container(
-                              decoration:
-                                  BoxDecoration(color: Theme.of(context).colorScheme.background, borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
+                              decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.background,
+                                  borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(25),
+                                      topRight: Radius.circular(25))),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 child: Padding(
@@ -66,9 +69,15 @@ class CompleteOrderScreen extends StatelessWidget {
                                         children: [
                                           Container(
                                             decoration: BoxDecoration(
-                                              color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                                              color: themeChange.getThem()
+                                                  ? AppColors.darkContainerBackground
+                                                  : AppColors.containerBackground,
                                               borderRadius: const BorderRadius.all(Radius.circular(10)),
-                                              border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
+                                              border: Border.all(
+                                                  color: themeChange.getThem()
+                                                      ? AppColors.darkContainerBorder
+                                                      : AppColors.containerBorder,
+                                                  width: 0.5),
                                               boxShadow: themeChange.getThem()
                                                   ? null
                                                   : [
@@ -132,107 +141,14 @@ class CompleteOrderScreen extends StatelessWidget {
                                           const SizedBox(
                                             height: 10,
                                           ),
-                                          DriverView(driverId: controller.orderModel.value.driverId.toString(), amount: controller.orderModel.value.finalRate.toString()),
+                                          // 🔥 FIX: Only show DriverView if we have a valid driverId
+                                          _buildDriverSection(controller, themeChange),
                                           const Padding(
                                             padding: EdgeInsets.symmetric(vertical: 5),
                                             child: Divider(thickness: 1),
                                           ),
-                                          Text(
-                                            "Vehicle Details",
-                                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                          ),
-                                          const SizedBox(
-                                            height: 10,
-                                          ),
-                                          FutureBuilder<DriverUserModel?>(
-                                              future: FireStoreUtils.getDriver(controller.orderModel.value.driverId.toString()),
-                                              builder: (context, snapshot) {
-                                                switch (snapshot.connectionState) {
-                                                  case ConnectionState.waiting:
-                                                    return Constant.loader();
-                                                  case ConnectionState.done:
-                                                    if (snapshot.hasError) {
-                                                      return Text(snapshot.error.toString());
-                                                    } else {
-                                                      DriverUserModel driverModel = snapshot.data!;
-                                                      return Container(
-                                                        decoration: BoxDecoration(
-                                                          color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
-                                                          borderRadius: const BorderRadius.all(Radius.circular(10)),
-                                                          border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
-                                                          boxShadow: themeChange.getThem()
-                                                              ? null
-                                                              : [
-                                                                  BoxShadow(
-                                                                    color: Colors.black.withOpacity(0.10),
-                                                                    blurRadius: 5,
-                                                                    offset: const Offset(0, 4), // changes position of shadow
-                                                                  ),
-                                                                ],
-                                                        ),
-                                                        child: Padding(
-                                                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-                                                          child: Row(
-                                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                            crossAxisAlignment: CrossAxisAlignment.center,
-                                                            children: [
-                                                              Row(
-                                                                children: [
-                                                                  SvgPicture.asset(
-                                                                    'assets/icons/ic_car.svg',
-                                                                    width: 18,
-                                                                    color: themeChange.getThem() ? Colors.white : Colors.black,
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 10,
-                                                                  ),
-                                                                  Text(
-                                                                    driverModel.vehicleInformation!.vehicleType.toString(),
-                                                                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                                                  )
-                                                                ],
-                                                              ),
-                                                              Row(
-                                                                children: [
-                                                                  SvgPicture.asset(
-                                                                    'assets/icons/ic_color.svg',
-                                                                    width: 18,
-                                                                    color: themeChange.getThem() ? Colors.white : Colors.black,
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 10,
-                                                                  ),
-                                                                  Text(
-                                                                    driverModel.vehicleInformation!.vehicleColor.toString(),
-                                                                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                                                  )
-                                                                ],
-                                                              ),
-                                                              Row(
-                                                                children: [
-                                                                  Image.asset(
-                                                                    'assets/icons/ic_number.png',
-                                                                    width: 18,
-                                                                    color: themeChange.getThem() ? Colors.white : Colors.black,
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 10,
-                                                                  ),
-                                                                  Text(
-                                                                    driverModel.vehicleInformation!.vehicleNumber.toString(),
-                                                                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                                                  )
-                                                                ],
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  default:
-                                                    return  Text('Error'.tr);
-                                                }
-                                              }),
+                                          // 🔥 FIX: Only show Vehicle Details if we have a driver
+                                          _buildVehicleSection(controller, themeChange),
                                           const SizedBox(
                                             height: 20,
                                           ),
@@ -245,9 +161,15 @@ class CompleteOrderScreen extends StatelessWidget {
                                           ),
                                           Container(
                                             decoration: BoxDecoration(
-                                              color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                                              color: themeChange.getThem()
+                                                  ? AppColors.darkContainerBackground
+                                                  : AppColors.containerBackground,
                                               borderRadius: const BorderRadius.all(Radius.circular(10)),
-                                              border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
+                                              border: Border.all(
+                                                  color: themeChange.getThem()
+                                                      ? AppColors.darkContainerBorder
+                                                      : AppColors.containerBorder,
+                                                  width: 0.5),
                                               boxShadow: themeChange.getThem()
                                                   ? null
                                                   : [
@@ -269,14 +191,19 @@ class CompleteOrderScreen extends StatelessWidget {
                                           Padding(
                                             padding: const EdgeInsets.symmetric(vertical: 20),
                                             child: Container(
-                                              decoration: BoxDecoration(color: themeChange.getThem() ? AppColors.darkGray : AppColors.gray, borderRadius: const BorderRadius.all(Radius.circular(10))),
+                                              decoration: BoxDecoration(
+                                                  color: themeChange.getThem() ? AppColors.darkGray : AppColors.gray,
+                                                  borderRadius: const BorderRadius.all(Radius.circular(10))),
                                               child: Padding(
                                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                                                   child: Center(
                                                     child: Row(
                                                       children: [
-                                                        Expanded(child: Text(controller.orderModel.value.status.toString(), style: GoogleFonts.poppins(fontWeight: FontWeight.w500))),
-                                                        Text(Constant().formatTimestamp(controller.orderModel.value.createdDate), style: GoogleFonts.poppins()),
+                                                        Expanded(
+                                                            child: Text(controller.orderModel.value.status.toString(),
+                                                                style: GoogleFonts.poppins(fontWeight: FontWeight.w500))),
+                                                        Text(Constant().formatTimestamp(controller.orderModel.value.createdDate),
+                                                            style: GoogleFonts.poppins()),
                                                       ],
                                                     ),
                                                   )),
@@ -284,9 +211,15 @@ class CompleteOrderScreen extends StatelessWidget {
                                           ),
                                           Container(
                                             decoration: BoxDecoration(
-                                              color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                                              color: themeChange.getThem()
+                                                  ? AppColors.darkContainerBackground
+                                                  : AppColors.containerBackground,
                                               borderRadius: const BorderRadius.all(Radius.circular(10)),
-                                              border: Border.all(color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder, width: 0.5),
+                                              border: Border.all(
+                                                  color: themeChange.getThem()
+                                                      ? AppColors.darkContainerBorder
+                                                      : AppColors.containerBorder,
+                                                  width: 0.5),
                                               boxShadow: themeChange.getThem()
                                                   ? null
                                                   : [
@@ -311,8 +244,9 @@ class CompleteOrderScreen extends StatelessWidget {
                                                         ),
                                                       ),
                                                       Container(
-                                                        decoration:
-                                                            BoxDecoration(color: themeChange.getThem() ? AppColors.darkGray : AppColors.gray, borderRadius: const BorderRadius.all(Radius.circular(5))),
+                                                        decoration: BoxDecoration(
+                                                            color: themeChange.getThem() ? AppColors.darkGray : AppColors.gray,
+                                                            borderRadius: const BorderRadius.all(Radius.circular(5))),
                                                         child: Padding(
                                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                                                           child: Text(
@@ -432,5 +366,230 @@ class CompleteOrderScreen extends StatelessWidget {
                 ],
               ));
         });
+  }
+
+  // 🔥 NEW: Build driver section with proper null checking
+  Widget _buildDriverSection(CompleteOrderController controller, DarkThemeProvider themeChange) {
+    // Check if we have a valid driver ID
+    final hasDriver = controller.orderModel.value.driverId != null &&
+        controller.orderModel.value.driverId!.isNotEmpty;
+
+    if (!hasDriver) {
+      return _buildNoDriverState();
+    }
+
+    return DriverView(
+      driverId: controller.orderModel.value.driverId!,
+      amount: controller.orderModel.value.finalRate.toString(),
+    );
+  }
+
+  // 🔥 NEW: Build vehicle section with proper null checking
+  Widget _buildVehicleSection(CompleteOrderController controller, DarkThemeProvider themeChange) {
+    // Check if we have a valid driver ID before showing vehicle section
+    final hasDriver = controller.orderModel.value.driverId != null &&
+        controller.orderModel.value.driverId!.isNotEmpty;
+
+    if (!hasDriver) {
+      return const SizedBox(); // Don't show vehicle section if no driver
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Vehicle Details",
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(
+          height: 10,
+        ),
+        FutureBuilder<DriverUserModel?>(
+          future: FireStoreUtils.getDriver(controller.orderModel.value.driverId!),
+          builder: (context, snapshot) {
+            // 🔥 FIX: Enhanced null checking and error handling
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildVehicleLoadingState();
+            }
+
+            if (snapshot.hasError) {
+              return _buildVehicleErrorState("Error loading vehicle details");
+            }
+
+            if (!snapshot.hasData || snapshot.data == null) {
+              return _buildVehicleErrorState("Vehicle information not available");
+            }
+
+            final driverModel = snapshot.data!;
+            final vehicle = driverModel.vehicleInformation;
+
+            if (vehicle == null) {
+              return _buildVehicleErrorState("Vehicle details not found");
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: themeChange.getThem() ? AppColors.darkContainerBackground : AppColors.containerBackground,
+                borderRadius: const BorderRadius.all(Radius.circular(10)),
+                border: Border.all(
+                    color: themeChange.getThem() ? AppColors.darkContainerBorder : AppColors.containerBorder,
+                    width: 0.5),
+                boxShadow: themeChange.getThem()
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 5,
+                          offset: const Offset(0, 4), // changes position of shadow
+                        ),
+                      ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/ic_car.svg',
+                          width: 18,
+                          color: themeChange.getThem() ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          vehicle.vehicleType?.toString() ?? "Unknown",
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        )
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/ic_color.svg',
+                          width: 18,
+                          color: themeChange.getThem() ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          vehicle.vehicleColor?.toString() ?? "Unknown",
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        )
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Image.asset(
+                          'assets/icons/ic_number.png',
+                          width: 18,
+                          color: themeChange.getThem() ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          vehicle.vehicleNumber?.toString() ?? "Unknown",
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        )
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // 🔥 NEW: Build loading state for vehicle section
+  Widget _buildVehicleLoadingState() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.containerBackground,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        border: Border.all(color: AppColors.containerBorder, width: 0.5),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔥 NEW: Build error state for vehicle section
+  Widget _buildVehicleErrorState(String message) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.containerBackground,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        border: Border.all(color: Colors.orange, width: 0.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w500,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🔥 NEW: Build state when no driver is assigned
+  Widget _buildNoDriverState() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.containerBackground,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        border: Border.all(color: Colors.grey, width: 0.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        child: Column(
+          children: [
+            Icon(Icons.person_off, color: Colors.grey, size: 40),
+            const SizedBox(height: 8),
+            Text(
+              "No Driver Assigned",
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "This ride does not have a driver assigned yet",
+              style: GoogleFonts.poppins(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

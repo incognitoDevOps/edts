@@ -41,6 +41,8 @@ class OrderModel {
   String? preAuthAmount;
   String? paymentIntentStatus;
   Timestamp? preAuthCreatedAt;
+  Timestamp? paymentCapturedAt;
+  Timestamp? paymentCanceledAt;
 
   OrderModel(
       {this.position,
@@ -72,17 +74,26 @@ class OrderModel {
       this.paymentIntentId,
       this.preAuthAmount,
       this.paymentIntentStatus,
-      this.preAuthCreatedAt});
+      this.preAuthCreatedAt,
+      this.paymentCapturedAt,
+      this.paymentCanceledAt});
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     serviceId = json['serviceId'];
     sourceLocationName = json['sourceLocationName'];
     paymentType = json['paymentType'];
     destinationLocationName = json['destinationLocationName'];
-    sourceLocationLAtLng = json['sourceLocationLAtLng'] != null ? LocationLatLng.fromJson(json['sourceLocationLAtLng']) : null;
-    destinationLocationLAtLng = json['destinationLocationLAtLng'] != null ? LocationLatLng.fromJson(json['destinationLocationLAtLng']) : null;
-    coupon = json['coupon'] != null ? CouponModel.fromJson(json['coupon']) : null;
-    someOneElse = json['someOneElse'] != null ? ContactModel.fromJson(json['someOneElse']) : null;
+    sourceLocationLAtLng = json['sourceLocationLAtLng'] != null
+        ? LocationLatLng.fromJson(json['sourceLocationLAtLng'])
+        : null;
+    destinationLocationLAtLng = json['destinationLocationLAtLng'] != null
+        ? LocationLatLng.fromJson(json['destinationLocationLAtLng'])
+        : null;
+    coupon =
+        json['coupon'] != null ? CouponModel.fromJson(json['coupon']) : null;
+    someOneElse = json['someOneElse'] != null
+        ? ContactModel.fromJson(json['someOneElse'])
+        : null;
     id = json['id'];
     userId = json['userId'];
     offerRate = json['offerRate'];
@@ -97,15 +108,44 @@ class OrderModel {
     acceptedDriverId = json['acceptedDriverId'];
     rejectedDriverId = json['rejectedDriverId'];
     paymentStatus = json['paymentStatus'];
-    position = json['position'] != null ? Positions.fromJson(json['position']) : null;
-    service = json['service'] != null ? ServiceModel.fromJson(json['service']) : null;
-    adminCommission = json['adminCommission'] != null ? AdminCommission.fromJson(json['adminCommission']) : null;
+    position =
+        json['position'] != null ? Positions.fromJson(json['position']) : null;
+    service =
+        json['service'] != null ? ServiceModel.fromJson(json['service']) : null;
+    adminCommission = json['adminCommission'] != null
+        ? AdminCommission.fromJson(json['adminCommission'])
+        : null;
     zone = json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null;
     zoneId = json['zoneId'];
+
+    // 🔥 CRITICAL FIX: Ensure ALL payment fields are properly loaded with null checks
     paymentIntentId = json['paymentIntentId'];
     preAuthAmount = json['preAuthAmount'];
     paymentIntentStatus = json['paymentIntentStatus'];
     preAuthCreatedAt = json['preAuthCreatedAt'];
+    paymentCapturedAt = json['paymentCapturedAt'];
+    paymentCanceledAt = json['paymentCanceledAt'];
+
+    // 🔍 ENHANCED DEBUGGING: Log what's actually being loaded
+    print("💾 [ORDER FROMJSON] Payment fields loaded from JSON:");
+    print("   paymentIntentId: $paymentIntentId");
+    print("   preAuthAmount: $preAuthAmount");
+    print("   paymentIntentStatus: $paymentIntentStatus");
+    print("   paymentType: $paymentType");
+    print("   preAuthCreatedAt: $preAuthCreatedAt");
+
+    // Debug the raw JSON to see what's actually there
+    print("🔍 [ORDER FROMJSON] Raw JSON payment fields:");
+    print("   json['paymentIntentId']: ${json['paymentIntentId']}");
+    print("   json['preAuthAmount']: ${json['preAuthAmount']}");
+    print("   json['paymentIntentStatus']: ${json['paymentIntentStatus']}");
+
+    // 🔥 CRITICAL: If payment type is Stripe but payment data is missing, log warning
+  if ((paymentType?.toLowerCase().contains("stripe") == true) && 
+      (paymentIntentId == null || paymentIntentId!.isEmpty)) {
+    print("🚨 [ORDER FROMJSON] WARNING: Stripe payment but missing paymentIntentId!");
+  }
+
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
       json['taxList'].forEach((v) {
@@ -141,10 +181,15 @@ class OrderModel {
       data['zone'] = zone!.toJson();
     }
     data['zoneId'] = zoneId;
+
+    // 🔥 CRITICAL FIX: Ensure ALL payment fields are saved
     data['paymentIntentId'] = paymentIntentId;
     data['preAuthAmount'] = preAuthAmount;
     data['paymentIntentStatus'] = paymentIntentStatus;
     data['preAuthCreatedAt'] = preAuthCreatedAt;
+    data['paymentCapturedAt'] = paymentCapturedAt;
+    data['paymentCanceledAt'] = paymentCanceledAt;
+
     data['id'] = id;
     data['userId'] = userId;
     data['paymentType'] = paymentType;
@@ -166,6 +211,15 @@ class OrderModel {
     if (position != null) {
       data['position'] = position!.toJson();
     }
+
+    // 🔍 ENHANCED DEBUGGING: Log what's being saved
+    print("💾 [ORDER TOJSON] Payment fields being saved:");
+    print("   paymentIntentId: $paymentIntentId");
+    print("   preAuthAmount: $preAuthAmount");
+    print("   paymentIntentStatus: $paymentIntentStatus");
+    print("   paymentType: $paymentType");
+    print("   preAuthCreatedAt: $preAuthCreatedAt");
+
     return data;
   }
 }

@@ -723,7 +723,7 @@ class BookingDetailsScreen extends StatelessWidget {
       ShowToastDialog.showToast("Please select source location".tr);
     } else if (controller.destinationLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select destination location".tr);
-    } else if (double.parse(controller.distance.value) <=0.5) {
+    } else if (double.parse(controller.distance.value) <= 0.5) {
       ShowToastDialog.showToast(
           "Please select more than one ${Constant.distanceType} location".tr);
     } else if (controller.selectedType.value.offerRate == true &&
@@ -1283,6 +1283,12 @@ class BookingDetailsScreen extends StatelessWidget {
           controller.stripePreAuthAmount.value = totalAmount.toStringAsFixed(2);
           controller.selectedPaymentMethod.value = method;
 
+          print("✅ [STRIPE SELECTION] Payment authorized:");
+          print(
+              "   stripePaymentIntentId: ${preAuthResult['paymentIntentId']}");
+          print("   stripePreAuthAmount: ${totalAmount.toStringAsFixed(2)}");
+          print("   selectedPaymentMethod: $method");
+
           // IMPORTANT: Log the authorization in transaction history
           try {
             WalletTransactionModel authTransaction = WalletTransactionModel(
@@ -1294,7 +1300,8 @@ class BookingDetailsScreen extends StatelessWidget {
               userId: FireStoreUtils.getCurrentUid(),
               orderType: "city",
               userType: "customer",
-              note: "Stripe pre-authorization hold: ${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} - Payment Intent: ${preAuthResult['paymentIntentId']}",
+              note:
+                  "Stripe pre-authorization hold: ${Constant.amountShow(amount: totalAmount.toStringAsFixed(2))} - Payment Intent: ${preAuthResult['paymentIntentId']}",
             );
 
             await FireStoreUtils.setWalletTransaction(authTransaction);

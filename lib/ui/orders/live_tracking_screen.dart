@@ -7,6 +7,7 @@ import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+
 class LiveTrackingScreen extends StatelessWidget {
   const LiveTrackingScreen({super.key});
 

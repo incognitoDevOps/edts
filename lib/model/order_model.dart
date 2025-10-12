@@ -125,7 +125,6 @@ class OrderModel {
     preAuthCreatedAt = json['preAuthCreatedAt'];
     paymentCapturedAt = json['paymentCapturedAt'];
     paymentCanceledAt = json['paymentCanceledAt'];
-<<<<<<< HEAD
 
     // 🔍 ENHANCED DEBUGGING: Log what's actually being loaded
     print("💾 [ORDER FROMJSON] Payment fields loaded from JSON:");
@@ -147,8 +146,6 @@ class OrderModel {
     print("🚨 [ORDER FROMJSON] WARNING: Stripe payment but missing paymentIntentId!");
   }
 
-=======
->>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
       json['taxList'].forEach((v) {
@@ -192,10 +189,7 @@ class OrderModel {
     data['preAuthCreatedAt'] = preAuthCreatedAt;
     data['paymentCapturedAt'] = paymentCapturedAt;
     data['paymentCanceledAt'] = paymentCanceledAt;
-<<<<<<< HEAD
 
-=======
->>>>>>> c6685a3a6509a3a5ff5f9f2f2b56402e116d9616
     data['id'] = id;
     data['userId'] = userId;
     data['paymentType'] = paymentType;

@@ -523,7 +523,7 @@ class FireStoreUtils {
   /// Enhanced method to get driver with retry mechanism
   /// Enhanced method to get driver with retry mechanism and null safety
   static Future<DriverUserModel?> getDriverWithRetry(String? uuid,
-      {int maxRetries = 3}) async {
+      {int maxRetries = 3, required Duration retryDelay}) async {
     // 🔥 CRITICAL: Check for null or empty UUID
     if (uuid == null || uuid.isEmpty) {
       print("❌ [DRIVER RETRY] Invalid driver UUID: $uuid");
@@ -2510,7 +2510,7 @@ class FireStoreUtils {
       await fireStore
           .collection(CollectionName.orders)
           .doc(orderModel.id)
-          .set(orderModel.toJson())
+          .set(orderModel.toJson(), SetOptions(merge: true))
           .then((value) {
         isAdded = true;
         print("✅ [SET ORDER] Successfully saved order ${orderModel.id}");
@@ -2523,5 +2523,62 @@ class FireStoreUtils {
       isAdded = false;
     }
     return isAdded;
+  }
+
+  static Future<bool> setOrderWithVerification(OrderModel orderModel) async {
+    try {
+      print("💾 [SET ORDER WITH VERIFICATION] Saving order ${orderModel.id}");
+      print("   driverId: ${orderModel.driverId}");
+      print("   paymentIntentId: ${orderModel.paymentIntentId}");
+      print("   status: ${orderModel.status}");
+
+      // Ensure commission data is always included
+      if (orderModel.adminCommission == null) {
+        print("💡 Adding missing admin commission to order before saving");
+        if (Constant.adminCommission != null) {
+          orderModel.adminCommission = Constant.adminCommission;
+        } else {
+          orderModel.adminCommission = AdminCommission(
+            isEnabled: false,
+            type: "percentage",
+            amount: "0",
+            flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+          );
+        }
+      }
+
+      // Save the order
+      await fireStore
+          .collection(CollectionName.orders)
+          .doc(orderModel.id)
+          .set(orderModel.toJson(), SetOptions(merge: true));
+
+      print(
+          "✅ [SET ORDER WITH VERIFICATION] Successfully saved order ${orderModel.id}");
+
+      // 🔥 CRITICAL: Immediate verification
+      await Future.delayed(Duration(seconds: 1));
+      final verifiedOrder = await getOrder(orderModel.id!);
+
+      if (verifiedOrder != null) {
+        bool driverMatch = verifiedOrder.driverId == orderModel.driverId;
+        bool paymentMatch =
+            verifiedOrder.paymentIntentId == orderModel.paymentIntentId;
+
+        print("🔍 [SET ORDER VERIFICATION] Results:");
+        print(
+            "   driverId match: $driverMatch (expected: ${orderModel.driverId}, got: ${verifiedOrder.driverId})");
+        print("   paymentIntentId match: $paymentMatch");
+
+        return driverMatch && paymentMatch;
+      } else {
+        print("❌ [SET ORDER VERIFICATION] Could not retrieve order after save");
+        return false;
+      }
+    } catch (error) {
+      print(
+          "❌ [SET ORDER WITH VERIFICATION] Failed to save order ${orderModel.id}: $error");
+      return false;
+    }
   }
 }

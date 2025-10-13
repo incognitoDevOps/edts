@@ -1519,7 +1519,7 @@ class _AcceptRejectDriverModal extends StatelessWidget {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
 
-      // 🔥 CRITICAL: Preserve ALL payment data when updating order
+      // 🔥 CRITICAL: Preserve ALL payment data AND driver data when updating order
       final String? preservedPaymentIntentId = order.paymentIntentId;
       final String? preservedPreAuthAmount = order.preAuthAmount;
       final String? preservedPaymentIntentStatus = order.paymentIntentStatus;
@@ -1527,89 +1527,143 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       final Timestamp? preservedPaymentCapturedAt = order.paymentCapturedAt;
       final Timestamp? preservedPaymentCanceledAt = order.paymentCanceledAt;
 
-      order.acceptedDriverId = [];
-      order.driverId = driver.id.toString();
-      order.status = Constant.rideActive;
+      // 🔥 CRITICAL: Create a NEW OrderModel instance to avoid reference issues
+      OrderModel updatedOrder =
+          OrderModel.fromJson(order.toJson()); // Clone the order
+
+      updatedOrder.acceptedDriverId = [];
+      updatedOrder.driverId = driver.id; // 🔥 Make sure this is set correctly
+      updatedOrder.status = Constant.rideActive;
+      updatedOrder.updateDate = Timestamp.now();
 
       // Restore ALL preserved payment data
-      order.paymentIntentId = preservedPaymentIntentId;
-      order.preAuthAmount = preservedPreAuthAmount;
-      order.paymentIntentStatus = preservedPaymentIntentStatus;
-      order.preAuthCreatedAt = preservedPreAuthCreatedAt;
-      order.paymentCapturedAt = preservedPaymentCapturedAt;
-      order.paymentCanceledAt = preservedPaymentCanceledAt;
+      updatedOrder.paymentIntentId = preservedPaymentIntentId;
+      updatedOrder.preAuthAmount = preservedPreAuthAmount;
+      updatedOrder.paymentIntentStatus = preservedPaymentIntentStatus;
+      updatedOrder.preAuthCreatedAt = preservedPreAuthCreatedAt;
+      updatedOrder.paymentCapturedAt = preservedPaymentCapturedAt;
+      updatedOrder.paymentCanceledAt = preservedPaymentCanceledAt;
 
-      print("💾 [ACCEPT DRIVER] Preserving ALL payment data:");
+      print("💾 [ACCEPT DRIVER] Preserving ALL payment and driver data:");
+      print("   driverId: ${updatedOrder.driverId}");
       print("   paymentIntentId: $preservedPaymentIntentId");
       print("   preAuthAmount: $preservedPreAuthAmount");
       print("   preAuthCreatedAt: $preservedPreAuthCreatedAt");
 
-      await FireStoreUtils.setOrder(order);
+      // 🔥 CRITICAL: Use enhanced setOrder with verification
+      bool success =
+          await FireStoreUtils.setOrderWithVerification(updatedOrder);
 
-      // Send notification to driver
-      if (driver.fcmToken != null) {
-        await SendNotification.sendOneNotification(
-          token: driver.fcmToken!,
-          title: 'Ride Confirmed'.tr,
-          body:
-              'Your ride request has been accepted by the passenger. Please proceed to the pickup location.'
-                  .tr,
-          payload: {"type": "ride_accepted", "orderId": order.id},
-        );
+      if (success) {
+        // Update local state
+        order.driverId = driver.id;
+        order.status = Constant.rideActive;
+        order.updateDate = Timestamp.now();
+
+        // Send notification to driver
+        if (driver.fcmToken != null) {
+          await SendNotification.sendOneNotification(
+            token: driver.fcmToken!,
+            title: 'Ride Confirmed'.tr,
+            body:
+                'Your ride request has been accepted by the passenger. Please proceed to the pickup location.'
+                    .tr,
+            payload: {"type": "ride_accepted", "orderId": order.id},
+          );
+        }
+
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Driver accepted! They are on their way.");
+
+        // 🔥 CRITICAL: Verify the update was successful
+        await _verifyDriverAssignment(order.id!, driver.id!);
+      } else {
+        throw Exception("Failed to save order with driver assignment");
       }
-
-      ShowToastDialog.closeLoader();
-      ShowToastDialog.showToast("Driver accepted! They are on their way.");
     } catch (e) {
       ShowToastDialog.closeLoader();
       ShowToastDialog.showToast("Failed to accept driver: ${e.toString()}");
+      print("❌ [ACCEPT DRIVER] Error: $e");
+    }
+  }
+
+// 🔥 CRITICAL: Add verification for driver assignment
+  Future<void> _verifyDriverAssignment(String orderId, String driverId) async {
+    try {
+      await Future.delayed(Duration(seconds: 2));
+      final verifiedOrder = await FireStoreUtils.getOrder(orderId);
+      if (verifiedOrder != null) {
+        print("🔍 [DRIVER VERIFICATION] Firestore verification:");
+        print("   driverId: ${verifiedOrder.driverId}");
+        print("   expected: $driverId");
+
+        if (verifiedOrder.driverId == driverId) {
+          print("✅ [DRIVER VERIFICATION] Driver assignment confirmed");
+        } else {
+          print(
+              "❌ [DRIVER VERIFICATION] Driver assignment FAILED - driverId mismatch!");
+        }
+      } else {
+        print(
+            "❌ [DRIVER VERIFICATION] Could not retrieve order for verification");
+      }
+    } catch (e) {
+      print("❌ [DRIVER VERIFICATION] Error: $e");
     }
   }
 
   Future<void> _rejectDriver(OrderModel order, DriverUserModel driver) async {
     try {
-      // 🔥 CRITICAL: Preserve ALL payment data when updating order
-      final String? preservedPaymentIntentId = order.paymentIntentId;
-      final String? preservedPreAuthAmount = order.preAuthAmount;
-      final String? preservedPaymentIntentStatus = order.paymentIntentStatus;
-      final Timestamp? preservedPreAuthCreatedAt = order.preAuthCreatedAt;
-      final Timestamp? preservedPaymentCapturedAt = order.paymentCapturedAt;
-      final Timestamp? preservedPaymentCanceledAt = order.paymentCanceledAt;
+      // 🔥 CRITICAL: Create a NEW OrderModel instance to avoid reference issues
+      OrderModel updatedOrder =
+          OrderModel.fromJson(order.toJson()); // Clone the order
 
-      List<dynamic> rejectDriverId = order.rejectedDriverId ?? [];
+      List<dynamic> rejectDriverId = updatedOrder.rejectedDriverId ?? [];
       rejectDriverId.add(driver.id);
-      List<dynamic> acceptDriverId = order.acceptedDriverId ?? [];
+      List<dynamic> acceptDriverId = updatedOrder.acceptedDriverId ?? [];
       acceptDriverId.remove(driver.id);
 
-      order.rejectedDriverId = rejectDriverId;
-      order.acceptedDriverId = acceptDriverId;
+      updatedOrder.rejectedDriverId = rejectDriverId;
+      updatedOrder.acceptedDriverId = acceptDriverId;
+      updatedOrder.updateDate = Timestamp.now();
 
-      // Restore ALL preserved payment data
-      order.paymentIntentId = preservedPaymentIntentId;
-      order.preAuthAmount = preservedPreAuthAmount;
-      order.paymentIntentStatus = preservedPaymentIntentStatus;
-      order.preAuthCreatedAt = preservedPreAuthCreatedAt;
-      order.paymentCapturedAt = preservedPaymentCapturedAt;
-      order.paymentCanceledAt = preservedPaymentCanceledAt;
+      // 🔥 CRITICAL: Preserve the existing driverId (don't set it to null!)
+      // Only update the accepted/rejected lists, keep driverId unchanged
 
-      await FireStoreUtils.setOrder(order);
+      print("💾 [REJECT DRIVER] Updating driver lists:");
+      print("   current driverId: ${updatedOrder.driverId}");
+      print("   rejected drivers: ${rejectDriverId.length}");
+      print("   accepted drivers: ${acceptDriverId.length}");
 
-      // Send notification to driver
-      if (driver.fcmToken != null) {
-        await SendNotification.sendOneNotification(
-          token: driver.fcmToken!,
-          title: 'Ride Canceled'.tr,
-          body:
-              'The passenger has canceled the ride. No action is required from your end.'
-                  .tr,
-          payload: {"type": "ride_rejected", "orderId": order.id},
-        );
+      bool success =
+          await FireStoreUtils.setOrderWithVerification(updatedOrder);
+
+      if (success) {
+        // Update local state
+        order.rejectedDriverId = rejectDriverId;
+        order.acceptedDriverId = acceptDriverId;
+        order.updateDate = Timestamp.now();
+
+        // Send notification to driver
+        if (driver.fcmToken != null) {
+          await SendNotification.sendOneNotification(
+            token: driver.fcmToken!,
+            title: 'Ride Canceled'.tr,
+            body:
+                'The passenger has canceled the ride. No action is required from your end.'
+                    .tr,
+            payload: {"type": "ride_rejected", "orderId": order.id},
+          );
+        }
+
+        ShowToastDialog.showToast(
+            "Driver rejected. Looking for other drivers...");
+      } else {
+        throw Exception("Failed to save order with driver rejection");
       }
-
-      ShowToastDialog.showToast(
-          "Driver rejected. Looking for other drivers...");
     } catch (e) {
       ShowToastDialog.showToast("Failed to reject driver: ${e.toString()}");
+      print("❌ [REJECT DRIVER] Error: $e");
     }
   }
 }

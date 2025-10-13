@@ -124,7 +124,7 @@ class PaymentOrderControllerEnhanced extends GetxController {
       if (orderModel.value.driverId != null && orderModel.value.driverId!.isNotEmpty) {
         final driver = await FireStoreUtils.getDriverWithRetry(
           orderModel.value.driverId!,
-          maxRetries: 3,
+          maxRetries: 3, retryDelay: Duration(seconds: 2),
         );
 
         if (driver != null) {

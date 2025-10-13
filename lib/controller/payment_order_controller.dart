@@ -25,7 +25,6 @@ import 'package:customer/themes/app_colors.dart';
 import 'package:customer/utils/fire_store_utils.dart';
 import 'package:customer/services/stripe_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:get/get.dart';
@@ -45,48 +44,76 @@ class PaymentOrderController extends GetxController {
 
   Rx<OrderModel> orderModel = OrderModel().obs;
 
-  getArgument() async {
-  dynamic argumentData = Get.arguments;
-  if (argumentData != null) {
-    OrderModel passedOrder = argumentData['orderModel'];
-
-    print("🔄 [PAYMENT LOAD] Loading order with payment recovery...");
-    print("   Order ID: ${passedOrder.id}");
-    print("   Passed paymentIntentId: ${passedOrder.paymentIntentId}");
-
-    print("   Passed Driver ID: ${passedOrder.driverId}");
-
+   getArgument() async {
     try {
-      // Use the enhanced payment recovery method
-      final freshOrder = await FireStoreUtils.getOrderWithPaymentRecovery(passedOrder.id!);
+      print("🔄 [PAYMENT LOAD] Starting payment controller initialization...");
+      
+      dynamic argumentData = Get.arguments;
+      if (argumentData == null) {
+        print("❌ [PAYMENT LOAD] No arguments passed to payment screen");
+        isLoading.value = false;
+        update();
+        return;
+      }
 
+      OrderModel passedOrder = argumentData['orderModel'];
+      if (passedOrder.id == null || passedOrder.id!.isEmpty) {
+        print("❌ [PAYMENT LOAD] Invalid order data in arguments");
+        isLoading.value = false;
+        update();
+        return;
+      }
+
+      print("📦 [PAYMENT LOAD] Processing order: ${passedOrder.id}");
+      print("   Passed Driver ID: ${passedOrder.driverId}");
+      print("   Passed Payment Intent: ${passedOrder.paymentIntentId}");
+      print("   Passed Payment Type: ${passedOrder.paymentType}");
+
+      // Set the passed order immediately for UI
+      orderModel.value = passedOrder;
+      selectedPaymentMethod.value = passedOrder.paymentType ?? '';
+
+      // 🔥 CRITICAL: Load fresh data from Firestore with recovery
+      await _loadOrderWithRecovery(passedOrder.id!);
+      
+    } catch (e, stack) {
+      print("❌ [PAYMENT LOAD] Error in getArgument: $e");
+      print("📋 Stack trace: $stack");
+      isLoading.value = false;
+      update();
+      ShowToastDialog.showToast("Error loading order data");
+    }
+  }
+
+  // 🔥 NEW: Enhanced order loading with recovery
+  Future<void> _loadOrderWithRecovery(String orderId) async {
+    try {
+      print("🔄 [ORDER RECOVERY] Loading fresh order data from Firestore...");
+      
+      // Load fresh order data
+      final freshOrder = await FireStoreUtils.getOrderWithPaymentRecovery(orderId);
+      
       if (freshOrder != null) {
-        // 🔥 CRITICAL: Use the recovered order directly
         orderModel.value = freshOrder;
-        print("✅ [PAYMENT LOAD] Order loaded with recovered payment data");
-        print("   Payment Intent ID: ${freshOrder.paymentIntentId}");
-        print("   Pre-auth Amount: ${freshOrder.preAuthAmount}");
-        print("   Status: ${freshOrder.paymentIntentStatus}");
-        print("   Created: ${freshOrder.preAuthCreatedAt}");
+        print("✅ [ORDER RECOVERY] Order loaded successfully");
+        print("   Driver ID: ${freshOrder.driverId}");
+        print("   Payment Intent: ${freshOrder.paymentIntentId}");
+        print("   Status: ${freshOrder.status}");
         
-        // 🔥 IMPORTANT: Call getPaymentData AFTER setting the order
+        // Now load payment configuration and other data
         await getPaymentData();
       } else {
-        print("⚠️  [PAYMENT LOAD] Failed to reload, using passed order");
-        orderModel.value = passedOrder;
+        print("⚠️ [ORDER RECOVERY] Failed to load fresh order, using passed data");
+        // Continue with existing orderModel value
         await getPaymentData();
       }
     } catch (e) {
-      print("❌ [PAYMENT LOAD] Error: $e");
-      orderModel.value = passedOrder;
+      print("❌ [ORDER RECOVERY] Error loading order: $e");
+      // Continue with payment data loading even if order recovery fails
       await getPaymentData();
     }
-  } else {
-    print("❌ [PAYMENT LOAD] No arguments passed to payment screen");
-    isLoading.value = false;
-    update();
   }
-}
+  
   Rx<PaymentModel> paymentModel = PaymentModel().obs;
   Rx<UserModel> userModel = UserModel().obs;
   Rx<DriverUserModel> driverUserModel = DriverUserModel().obs;
@@ -96,92 +123,147 @@ class PaymentOrderController extends GetxController {
   RxString selectedPaymentMethod = "".obs;
   RxBool isPaymentProcessing = false.obs;
 
+  // 🔥 ENHANCED: Payment data loading
   getPaymentData() async {
-  print("💰 [PAYMENT DATA] Starting payment data loading...");
-  
-  // 🔥 CRITICAL: Check if order is properly loaded
-  if (orderModel.value.id == null || orderModel.value.id!.isEmpty) {
-    print("❌ [PAYMENT DATA] Order ID is null or empty, cannot proceed");
-    isLoading.value = false;
-    update();
-    return;
+    print("💰 [PAYMENT DATA] Starting payment data loading...");
+    
+    try {
+      // Load payment configuration
+      await FireStoreUtils().getPayment().then((value) {
+        if (value != null) {
+          paymentModel.value = value;
+          print("✅ [PAYMENT DATA] Payment configuration loaded");
+
+          // Configure Stripe if available
+          if (paymentModel.value.strip?.clientpublishableKey != null) {
+            Stripe.publishableKey = paymentModel.value.strip!.clientpublishableKey.toString();
+            Stripe.merchantIdentifier = 'BuzRyde';
+            Stripe.instance.applySettings();
+            print("✅ [PAYMENT DATA] Stripe configured");
+          }
+          
+          setRef();
+          print("✅ [PAYMENT DATA] Payment method: ${selectedPaymentMethod.value}");
+
+          // Initialize RazorPay if needed
+          if (paymentModel.value.razorpay != null) {
+            razorPay.on(Razorpay.EVENT_PAYMENT_SUCCESS, handlePaymentSuccess);
+            razorPay.on(Razorpay.EVENT_EXTERNAL_WALLET, handleExternalWaller);
+            razorPay.on(Razorpay.EVENT_PAYMENT_ERROR, handlePaymentError);
+            print("✅ [PAYMENT DATA] RazorPay initialized");
+          }
+        } else {
+          print("⚠️ [PAYMENT DATA] No payment configuration found");
+        }
+      });
+
+      // Load user profile
+      print("👤 [PAYMENT DATA] Loading user profile...");
+      await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid()).then((value) {
+        if (value != null) {
+          userModel.value = value;
+          print("✅ [PAYMENT DATA] User profile loaded - wallet: ${userModel.value.walletAmount}");
+        } else {
+          print("⚠️ [PAYMENT DATA] User profile not found");
+        }
+      });
+
+      // 🔥 CRITICAL: Load driver information with enhanced recovery
+      await _loadDriverInformationWithRecovery();
+
+      print("✅ [PAYMENT DATA] All payment data loaded successfully");
+
+    } catch (e, stack) {
+      print("❌ [PAYMENT DATA] Error loading payment data: $e");
+      print("📋 Stack trace: $stack");
+      ShowToastDialog.showToast("Error loading payment information");
+    } finally {
+      isLoading.value = false;
+      update();
+      print("🏁 [PAYMENT DATA] Loading completed");
+    }
   }
 
-  try {
-    print("🔍 [PAYMENT DATA] Loading payment configuration for order: ${orderModel.value.id}");
+  // 🔥 ENHANCED: Driver loading with recovery mechanisms
+  Future<void> _loadDriverInformationWithRecovery() async {
+    isDriverLoading.value = true;
+    driverError.value = "";
 
-    // Load payment configuration FIRST
-    await FireStoreUtils().getPayment().then((value) {
-      if (value != null) {
-        paymentModel.value = value;
-        print("✅ [PAYMENT DATA] Payment configuration loaded");
-
-        if (paymentModel.value.strip?.clientpublishableKey != null) {
-          Stripe.publishableKey = paymentModel.value.strip!.clientpublishableKey.toString();
-          Stripe.merchantIdentifier = 'BuzRyde';
-          Stripe.instance.applySettings();
-          print("✅ [PAYMENT DATA] Stripe configured");
-        }
+    try {
+      // Check if driver ID exists
+      if (orderModel.value.driverId == null || orderModel.value.driverId!.isEmpty) {
+        print("⚠️ [DRIVER LOAD] No driver assigned to order ${orderModel.value.id}");
         
-        setRef();
-        selectedPaymentMethod.value = orderModel.value.paymentType.toString();
-        print("✅ [PAYMENT DATA] Payment method set: ${selectedPaymentMethod.value}");
-
-        // Initialize RazorPay only if needed
-        if (paymentModel.value.razorpay != null) {
-          razorPay.on(Razorpay.EVENT_PAYMENT_SUCCESS, handlePaymentSuccess);
-          razorPay.on(Razorpay.EVENT_EXTERNAL_WALLET, handleExternalWaller);
-          razorPay.on(Razorpay.EVENT_PAYMENT_ERROR, handlePaymentError);
-          print("✅ [PAYMENT DATA] RazorPay initialized");
+        // 🔥 CRITICAL: Attempt to recover driver ID from acceptedDriverId
+        if (orderModel.value.acceptedDriverId != null && orderModel.value.acceptedDriverId!.isNotEmpty) {
+          final recoveredDriverId = orderModel.value.acceptedDriverId!.first.toString();
+          print("💡 [DRIVER RECOVERY] Found driver in acceptedDriverId: $recoveredDriverId");
+          
+          // Update the order with recovered driver ID
+          orderModel.value.driverId = recoveredDriverId;
+          await FireStoreUtils.setOrder(orderModel.value);
+          print("✅ [DRIVER RECOVERY] Updated order with recovered driver ID");
+        } else {
+          driverError.value = "No driver assigned to this ride";
+          isDriverLoading.value = false;
+          update();
+          return;
         }
-      } else {
-        print("⚠️ [PAYMENT DATA] No payment configuration found");
       }
-    });
 
-    // Load user profile
-    print("👤 [PAYMENT DATA] Loading user profile...");
-    await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid()).then((value) {
-      if (value != null) {
-        userModel.value = value;
-        print("✅ [PAYMENT DATA] User profile loaded - wallet: ${userModel.value.walletAmount}");
+      print("🔍 [DRIVER LOAD] Loading driver: ${orderModel.value.driverId}");
+
+      // Try to load driver with retry mechanism
+      final driver = await FireStoreUtils.getDriverWithRetry(
+        orderModel.value.driverId!,
+        maxRetries: 3,
+        retryDelay: Duration(seconds: 2)
+      );
+
+      if (driver != null) {
+        driverUserModel.value = driver;
+        driverError.value = "";
+        print("✅ [DRIVER LOAD] Driver loaded successfully: ${driver.fullName}");
+        
+        // Debug driver payment settings
+        _debugDriverPaymentSettings(driver);
       } else {
-        print("⚠️ [PAYMENT DATA] User profile not found");
+        driverError.value = "Driver information not available";
+        print("❌ [DRIVER LOAD] Failed to load driver after retries");
+        
+        // 🔥 CRITICAL: Create emergency driver record to prevent crashes
+        driverUserModel.value = DriverUserModel(
+          id: orderModel.value.driverId!,
+          fullName: "Driver (Unavailable)",
+          email: "unknown@driver.com",
+          phoneNumber: "000-000-0000",
+          flatRateActive: false,
+          paymentMethod: "percentage"
+        );
+        print("⚠️ [DRIVER LOAD] Created emergency driver record");
       }
-    });
-
-    // 🔥 ENHANCED: Load driver information with better error handling
-    await _loadDriverInformationWithFallback();
-
-    print("✅ [PAYMENT DATA] All payment data loaded successfully");
-
-  } catch (e, stack) {
-    print("❌ [PAYMENT DATA] Error loading payment data: $e");
-    print("📋 Stack trace: $stack");
-    ShowToastDialog.showToast("Error loading payment information");
-  } finally {
-    // 🔥 CRITICAL: Always stop loading when done
-    isLoading.value = false;
-    update();
-    print("🏁 [PAYMENT DATA] Loading completed");
+    } catch (error, stack) {
+      print("❌ [DRIVER LOAD] Error loading driver: $error");
+      print("📋 Stack trace: $stack");
+      
+      driverError.value = "Error loading driver information";
+      
+      // 🔥 CRITICAL: Create emergency driver record
+      driverUserModel.value = DriverUserModel(
+        id: orderModel.value.driverId ?? "unknown",
+        fullName: "Driver (Error)",
+        email: "error@driver.com", 
+        phoneNumber: "000-000-0000",
+        flatRateActive: false,
+        paymentMethod: "percentage"
+      );
+    } finally {
+      isDriverLoading.value = false;
+      update();
+      print("🏁 [DRIVER LOAD] Driver loading completed");
+    }
   }
-}
-
-/// Enhanced driver loading with fallback
-Future<void> _loadDriverInformationWithFallback() async {
-  // Check if driver ID exists and is valid
-  if (orderModel.value.driverId == null || orderModel.value.driverId!.isEmpty) {
-    print("ℹ️ [DRIVER LOAD] No driver assigned to this order");
-    driverError.value = "No driver assigned";
-    isDriverLoading.value = false;
-    return;
-  }
-
-  print("🚗 [DRIVER LOAD] Loading driver information for: ${orderModel.value.driverId}");
-  await _loadDriverInformation();
-}
-  // Stripe pre-authorization methods - DEPRECATED
-  // These methods are kept for backward compatibility but should not be used
+  
   // The payment intent should be created during booking, not at payment screen
   Future<void> createPreAuthorization({required String amount}) async {
     print("⚠️  createPreAuthorization called - This should not happen!");
@@ -545,48 +627,35 @@ Future<void> _loadDriverInformationWithFallback() async {
     }
   }
 
+   // 🔥 ENHANCED: Complete order with comprehensive validation
   completeOrder() async {
-    print("💰 [PAYMENT DEBUG] Starting completeOrder process...");
+    print("💰 [COMPLETE ORDER] Starting complete order process...");
+
+    // Prevent multiple simultaneous payments
+    if (isPaymentProcessing.value) {
+      print("⚠️ [COMPLETE ORDER] Payment already in progress");
+      return;
+    }
+
+    isPaymentProcessing.value = true;
 
     try {
-      // Reset payment processing flag at the end
-      isPaymentProcessing.value = false;
-
-      // Handle Stripe pre-authorization capture
-      if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
-              selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
-          orderModel.value.paymentIntentId != null) {
-        await _captureStripePreAuthorization();
-      }
-
       // DEBUG: Check order state before starting
-      print("📋 Order ID: ${orderModel.value.id}");
-      print("🚗 Driver ID: ${orderModel.value.driverId}");
-      print("💳 Payment Type: ${orderModel.value.paymentType}");
-      print("📊 Current Status: ${orderModel.value.status}");
-      print("💰 Payment Intent: ${orderModel.value.paymentIntentId}");
+      print("📋 [COMPLETE ORDER] Order validation:");
+      print("   Order ID: ${orderModel.value.id}");
+      print("   Driver ID: ${orderModel.value.driverId}");
+      print("   Payment Type: ${orderModel.value.paymentType}");
+      print("   Status: ${orderModel.value.status}");
+      print("   Payment Intent: ${orderModel.value.paymentIntentId}");
 
-      // Validate critical data
-      if (orderModel.value.driverId == null ||
-          orderModel.value.driverId!.isEmpty) {
-        print("❌ CRITICAL: No driver ID found!");
-        ShowToastDialog.showToast("Cannot complete: No driver assigned");
-        ShowToastDialog.closeLoader();
-        isPaymentProcessing.value = false;
-        return;
-      }
-
-      if (orderModel.value.finalRate == null ||
-          orderModel.value.finalRate!.isEmpty) {
-        print("❌ CRITICAL: No final rate found!");
-        ShowToastDialog.showToast("Cannot complete: Invalid fare amount");
-        ShowToastDialog.closeLoader();
+      // 🔥 CRITICAL: Validate essential data
+      if (!_validateOrderCompletion()) {
         isPaymentProcessing.value = false;
         return;
       }
 
       ShowToastDialog.showLoader("Processing payment...");
-      print("🔄 Step 1: Updating order status...");
+      print("🔄 [COMPLETE ORDER] Step 1: Updating order status...");
 
       // Update order status
       orderModel.value.paymentStatus = true;
@@ -595,14 +664,21 @@ Future<void> _loadDriverInformationWithFallback() async {
       orderModel.value.coupon = selectedCouponModel.value;
       orderModel.value.updateDate = Timestamp.now();
 
-      print("✅ Step 1 Complete: Order status updated");
+      print("✅ [COMPLETE ORDER] Step 1 Complete: Order status updated");
+
+      // Handle Stripe pre-authorization capture if needed
+      if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
+              selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
+          orderModel.value.paymentIntentId != null) {
+        await _captureStripePreAuthorization();
+      }
 
       // Calculate amount with debug
       final amount = calculateAmount();
-      print("🧮 Calculated amount: $amount");
+      print("🧮 [COMPLETE ORDER] Calculated amount: $amount");
 
-      // Create wallet transaction
-      print("🔄 Step 2: Creating wallet transaction...");
+      // Create wallet transaction for driver
+      print("🔄 [COMPLETE ORDER] Step 2: Creating wallet transaction...");
       WalletTransactionModel transactionModel = WalletTransactionModel(
           id: Constant.getUuid(),
           amount: amount.toString(),
@@ -615,137 +691,52 @@ Future<void> _loadDriverInformationWithFallback() async {
           note: "Ride amount credited");
 
       await FireStoreUtils.setWalletTransaction(transactionModel);
-      print("✅ Step 2 Complete: Wallet transaction created");
+      print("✅ [COMPLETE ORDER] Step 2 Complete: Wallet transaction created");
 
       // Update driver wallet
-      print("🔄 Step 3: Updating driver wallet...");
+      print("🔄 [COMPLETE ORDER] Step 3: Updating driver wallet...");
       await FireStoreUtils.updateDriverWallet(
           amount: amount.toString(),
           driverId: orderModel.value.driverId.toString());
-      print("✅ Step 3 Complete: Driver wallet updated");
+      print("✅ [COMPLETE ORDER] Step 3 Complete: Driver wallet updated");
 
-      // Handle admin commission with debug
-      print("🔄 Step 4: Processing admin commission...");
-      if (orderModel.value.adminCommission != null &&
-          orderModel.value.adminCommission!.isEnabled == true) {
-        double baseAmount;
-        try {
-          baseAmount = double.parse(orderModel.value.finalRate.toString()) -
-              double.parse(couponAmount.value.toString());
-        } catch (e) {
-          print("❌ Error calculating base amount, using finalRate only");
-          baseAmount =
-              double.tryParse(orderModel.value.finalRate.toString()) ?? 0.0;
-        }
+      // Handle admin commission
+      print("🔄 [COMPLETE ORDER] Step 4: Processing admin commission...");
+      await _processAdminCommission(amount);
 
-        // Safety check: Ensure commission data is available
-        if (orderModel.value.adminCommission == null) {
-          print("⚠️  Order missing commission data, using global commission");
-          if (Constant.adminCommission != null) {
-            orderModel.value.adminCommission = Constant.adminCommission;
-            // Update the order in Firestore with the commission data
-            await FirebaseFirestore.instance
-                .collection(CollectionName.orders)
-                .doc(orderModel.value.id)
-                .update(
-                    {'adminCommission': Constant.adminCommission!.toJson()});
-            print("✅ Added missing commission data to order");
-          } else {
-            print("❌ No commission data available anywhere");
-            // Create emergency default commission
-            orderModel.value.adminCommission = AdminCommission(
-                isEnabled: false,
-                type: "percentage",
-                amount: "0",
-                flatRatePromotion:
-                    FlatRatePromotion(isEnabled: false, amount: 0.0));
-          }
-        }
+      // Send notification to driver
+      print("🔄 [COMPLETE ORDER] Step 5: Sending notification...");
+      await _sendCompletionNotification(amount);
 
-        // Use the new helper method to calculate commission based on driver's payment method
-        double commissionAmount = _calculateDriverCommission(baseAmount,
-            orderModel.value.adminCommission!, driverUserModel.value);
+      // Handle referral
+      print("🔄 [COMPLETE ORDER] Step 6: Processing referral...");
+      await _processReferral();
 
-        print("📊 Final commission amount: $commissionAmount");
+      // Final order save
+      print("🔄 [COMPLETE ORDER] Step 7: Saving final order...");
+      final success = await FireStoreUtils.setOrder(orderModel.value);
+      
+      if (success == true) {
+        ShowToastDialog.closeLoader();
+        print("🎉 [COMPLETE ORDER] PAYMENT COMPLETE SUCCESSFULLY!");
+        ShowToastDialog.showToast("Ride Complete successfully");
 
-        // Only deduct commission if it's greater than 0
-        if (commissionAmount > 0) {
-          WalletTransactionModel adminCommissionWallet = WalletTransactionModel(
-              id: Constant.getUuid(),
-              amount: "-$commissionAmount",
-              createdDate: Timestamp.now(),
-              paymentType: selectedPaymentMethod.value,
-              transactionId: orderModel.value.id,
-              orderType: "city",
-              userType: "driver",
-              userId: orderModel.value.driverId.toString(),
-              note: "Admin commission debited");
-
-          await FireStoreUtils.setWalletTransaction(adminCommissionWallet);
-          await FireStoreUtils.updateDriverWallet(
-              amount: "-$commissionAmount",
-              driverId: orderModel.value.driverId.toString());
-          print("✅ Step 4 Complete: Admin commission processed");
-        } else {
-          print("ℹ️  No commission to deduct (amount is 0)");
-        }
+        // Navigate away
+        Get.back();
       } else {
-        print("ℹ️  No admin commission to process");
+        print("❌ [COMPLETE ORDER] Failed to save order");
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Failed to complete ride");
       }
 
-      // Send notification with debug
-      print("🔄 Step 5: Sending notification...");
-      if (driverUserModel.value.fcmToken != null) {
-        Map<String, dynamic> playLoad = <String, dynamic>{
-          "type": "city_order_payment_complete",
-          "orderId": orderModel.value.id
-        };
-
-        await SendNotification.sendOneNotification(
-            token: driverUserModel.value.fcmToken.toString(),
-            title: 'Payment Received',
-            body:
-                '${userModel.value.fullName} has paid ${Constant.amountShow(amount: amount.toString())} for the completed ride.',
-            payload: playLoad);
-        print("✅ Step 5 Complete: Notification sent");
-      } else {
-        print("ℹ️  No FCM token for driver");
-      }
-
-      // Handle referral with debug
-      print("🔄 Step 6: Processing referral...");
-      await FireStoreUtils.getFirestOrderOrNOt(orderModel.value)
-          .then((value) async {
-        if (value == true) {
-          await FireStoreUtils.updateReferralAmount(orderModel.value);
-          print("✅ Referral processed");
-        } else {
-          print("ℹ️  Not first order, no referral");
-        }
-      });
-
-      // Final order save with debug
-      print("🔄 Step 7: Saving final order...");
-      await FireStoreUtils.setOrder(orderModel.value).then((value) {
-        if (value == true) {
-          ShowToastDialog.closeLoader();
-          print("🎉 PAYMENT COMPLETE SUCCESSFULLY!");
-          ShowToastDialog.showToast("Ride Complete successfully");
-
-          // Navigate away or reset state
-          Get.back(); // Or whatever navigation you need
-        } else {
-          print("❌ Failed to save order");
-          ShowToastDialog.closeLoader();
-          ShowToastDialog.showToast("Failed to complete ride");
-        }
-      });
     } catch (e, stack) {
       ShowToastDialog.closeLoader();
       isPaymentProcessing.value = false;
-      print("❌ ERROR in completeOrder: $e");
+      print("❌ [COMPLETE ORDER] ERROR: $e");
       print("📋 Stack trace: $stack");
       ShowToastDialog.showToast("Error completing order: ${e.toString()}");
+    } finally {
+      isPaymentProcessing.value = false;
     }
   }
 
@@ -768,6 +759,161 @@ Future<void> _loadDriverInformationWithFallback() async {
     });
   }
 
+   // 🔥 NEW: Comprehensive order validation
+  bool _validateOrderCompletion() {
+    // Check driver assignment
+    if (orderModel.value.driverId == null || orderModel.value.driverId!.isEmpty) {
+      print("❌ [VALIDATION] CRITICAL: No driver ID found!");
+      
+      // Attempt last-minute recovery
+      if (orderModel.value.acceptedDriverId != null && orderModel.value.acceptedDriverId!.isNotEmpty) {
+        final recoveredDriverId = orderModel.value.acceptedDriverId!.first.toString();
+        print("💡 [VALIDATION] Recovering driver ID from acceptedDriverId: $recoveredDriverId");
+        orderModel.value.driverId = recoveredDriverId;
+      } else {
+        ShowToastDialog.showToast("Cannot complete: No driver assigned to this ride");
+        return false;
+      }
+    }
+
+    // Check fare amount
+    if (orderModel.value.finalRate == null || orderModel.value.finalRate!.isEmpty) {
+      print("❌ [VALIDATION] CRITICAL: No final rate found!");
+      ShowToastDialog.showToast("Cannot complete: Invalid fare amount");
+      return false;
+    }
+
+    // Check payment method
+    if (selectedPaymentMethod.value.isEmpty) {
+      print("❌ [VALIDATION] CRITICAL: No payment method selected!");
+      ShowToastDialog.showToast("Please select a payment method");
+      return false;
+    }
+
+    // For Stripe payments, check if we have payment intent data
+    if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
+            selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
+        (orderModel.value.paymentIntentId == null || orderModel.value.paymentIntentId!.isEmpty)) {
+      print("⚠️ [VALIDATION] Stripe payment but no payment intent data");
+      // This might be okay if it's a new payment flow
+    }
+
+    print("✅ [VALIDATION] All checks passed");
+    return true;
+  }
+
+  // 🔥 NEW: Process admin commission with better error handling
+  Future<void> _processAdminCommission(double amount) async {
+    try {
+      if (orderModel.value.adminCommission != null &&
+          orderModel.value.adminCommission!.isEnabled == true) {
+        
+        double baseAmount;
+        try {
+          baseAmount = double.parse(orderModel.value.finalRate.toString()) -
+              double.parse(couponAmount.value.toString());
+        } catch (e) {
+          print("❌ [COMMISSION] Error calculating base amount, using finalRate only");
+          baseAmount = double.tryParse(orderModel.value.finalRate.toString()) ?? 0.0;
+        }
+
+        // Ensure commission data is available
+        if (orderModel.value.adminCommission == null) {
+          print("⚠️ [COMMISSION] Order missing commission data, using global commission");
+          if (Constant.adminCommission != null) {
+            orderModel.value.adminCommission = Constant.adminCommission;
+            await FirebaseFirestore.instance
+                .collection(CollectionName.orders)
+                .doc(orderModel.value.id)
+                .update({'adminCommission': Constant.adminCommission!.toJson()});
+            print("✅ [COMMISSION] Added missing commission data to order");
+          } else {
+            print("❌ [COMMISSION] No commission data available anywhere");
+            orderModel.value.adminCommission = AdminCommission(
+                isEnabled: false,
+                type: "percentage", 
+                amount: "0",
+                flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0));
+          }
+        }
+
+        // Calculate commission
+        double commissionAmount = _calculateDriverCommission(
+            baseAmount, orderModel.value.adminCommission!, driverUserModel.value);
+
+        print("📊 [COMMISSION] Final commission amount: $commissionAmount");
+
+        // Only deduct commission if it's greater than 0
+        if (commissionAmount > 0) {
+          WalletTransactionModel adminCommissionWallet = WalletTransactionModel(
+              id: Constant.getUuid(),
+              amount: "-$commissionAmount",
+              createdDate: Timestamp.now(),
+              paymentType: selectedPaymentMethod.value,
+              transactionId: orderModel.value.id,
+              orderType: "city",
+              userType: "driver",
+              userId: orderModel.value.driverId.toString(),
+              note: "Admin commission debited");
+
+          await FireStoreUtils.setWalletTransaction(adminCommissionWallet);
+          await FireStoreUtils.updateDriverWallet(
+              amount: "-$commissionAmount",
+              driverId: orderModel.value.driverId.toString());
+          print("✅ [COMMISSION] Admin commission processed");
+        } else {
+          print("ℹ️ [COMMISSION] No commission to deduct (amount is 0)");
+        }
+      } else {
+        print("ℹ️ [COMMISSION] No admin commission to process");
+      }
+    } catch (e) {
+      print("❌ [COMMISSION] Error processing commission: $e");
+      // Don't fail the entire payment if commission processing fails
+    }
+  }
+
+  // 🔥 NEW: Send completion notification
+  Future<void> _sendCompletionNotification(double amount) async {
+    try {
+      if (driverUserModel.value.fcmToken != null && driverUserModel.value.fcmToken!.isNotEmpty) {
+        Map<String, dynamic> playLoad = <String, dynamic>{
+          "type": "city_order_payment_complete",
+          "orderId": orderModel.value.id
+        };
+
+        await SendNotification.sendOneNotification(
+            token: driverUserModel.value.fcmToken.toString(),
+            title: 'Payment Received',
+            body: '${userModel.value.fullName} has paid ${Constant.amountShow(amount: amount.toString())} for the completed ride.',
+            payload: playLoad);
+        print("✅ [NOTIFICATION] Notification sent to driver");
+      } else {
+        print("ℹ️ [NOTIFICATION] No FCM token for driver, skipping notification");
+      }
+    } catch (e) {
+      print("❌ [NOTIFICATION] Error sending notification: $e");
+      // Don't fail payment if notification fails
+    }
+  }
+
+  // 🔥 NEW: Process referral
+  Future<void> _processReferral() async {
+    try {
+      await FireStoreUtils.getFirestOrderOrNOt(orderModel.value).then((value) async {
+        if (value == true) {
+          await FireStoreUtils.updateReferralAmount(orderModel.value);
+          print("✅ [REFERRAL] Referral processed");
+        } else {
+          print("ℹ️ [REFERRAL] Not first order, no referral");
+        }
+      });
+    } catch (e) {
+      print("❌ [REFERRAL] Error processing referral: $e");
+      // Don't fail payment if referral processing fails
+    }
+  }
+
   Rx<CouponModel> selectedCouponModel = CouponModel().obs;
   RxString couponAmount = "0.0".obs;
 
@@ -777,10 +923,9 @@ Future<void> _loadDriverInformationWithFallback() async {
       for (var element in orderModel.value.taxList!) {
         taxAmount.value = (double.parse(taxAmount.value) +
                 Constant().calculateTax(
-                    amount:
-                        (double.parse(orderModel.value.finalRate.toString()) -
-                                double.parse(couponAmount.value.toString()))
-                            .toString(),
+                    amount: (double.parse(orderModel.value.finalRate.toString()) -
+                            double.parse(couponAmount.value.toString()))
+                        .toString(),
                     taxModel: element))
             .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
       }
@@ -1384,7 +1529,7 @@ Future<void> _loadDriverInformationWithFallback() async {
   /// Calculate commission based on driver's payment method (flat rate or percentage)
   double _calculateDriverCommission(double baseAmount,
       AdminCommission? orderCommission, DriverUserModel driver) {
-    print("💰 Calculating driver commission...");
+    print("💰 [COMMISSION CALC] Calculating driver commission...");
     print("   Base amount: $baseAmount");
     print("   Driver flatRateActive: ${driver.flatRateActive}");
     print("   Driver paymentMethod: ${driver.paymentMethod}");
@@ -1393,19 +1538,18 @@ Future<void> _loadDriverInformationWithFallback() async {
 
     // If no commission from order, use global
     if (commissionToUse == null) {
-      print("⚠️  No commission data in order, using global commission");
+      print("⚠️ [COMMISSION CALC] No commission data in order, using global commission");
       commissionToUse = Constant.adminCommission;
     }
 
     if (commissionToUse == null) {
-      print("❌ No commission data available for calculation");
+      print("❌ [COMMISSION CALC] No commission data available for calculation");
       return 0.0;
     }
 
     // SPECIAL CASE: If driver has flat rate active, deduct ZERO commission
     if (driver.flatRateActive == true) {
-      print(
-          "🎯 Driver has flatRateActive: true - deducting ZERO commission (already paid upfront)");
+      print("🎯 [COMMISSION CALC] Driver has flatRateActive: true - deducting ZERO commission (already paid upfront)");
       return 0.0;
     }
 
@@ -1420,77 +1564,37 @@ Future<void> _loadDriverInformationWithFallback() async {
 
   /// Debug method to log driver's payment settings
   void _debugDriverPaymentSettings(DriverUserModel driver) {
-    print("👤 Driver Payment Settings Debug:");
+    print("👤 [DRIVER DEBUG] Driver Payment Settings:");
     print("   Driver: ${driver.fullName} (${driver.id})");
     print("   flatRateActive: ${driver.flatRateActive}");
     print("   paymentMethod: ${driver.paymentMethod}");
     print("   flatRatePaidAt: ${driver.flatRatePaidAt}");
     print("   lastSwitched: ${driver.lastSwitched}");
 
-    // Special note about flat rate commission
     if (driver.flatRateActive == true) {
-      print(
-          "   💰 FLAT RATE ACTIVE: Will deduct ZERO commission (already paid upfront)");
+      print("   💰 FLAT RATE ACTIVE: Will deduct ZERO commission (already paid upfront)");
     }
 
-    // Check if flat rate should be active based on timing
     if (driver.flatRatePaidAt != null) {
       final paidAt = driver.flatRatePaidAt!.toDate();
       final now = DateTime.now();
       final difference = now.difference(paidAt);
-
       print("   Flat rate paid: ${difference.inDays} days ago");
 
-      // Typically flat rate is valid for 30 days
       if (difference.inDays > 30) {
         print("   ⚠️ Flat rate may have expired (more than 30 days)");
-        print("   💡 Consider updating flatRateActive to false");
       } else {
         print("   ✅ Flat rate is within validity period");
       }
     } else if (driver.flatRateActive == true) {
-      print("   ⚠️ flatRateActive is true but flatRatePaidAt is null");
-      print("   💡 This might indicate inconsistent data");
+      print("   ⚠️ flatRateActive is true but flatRatePaidAt is null - inconsistent data");
     }
   }
 
-  Future<void> _loadDriverInformation() async {
-  isDriverLoading.value = true;
-  driverError.value = "";
-
-  try {
-    // 🔥 CRITICAL: Enhanced null checking
-    if (orderModel.value.driverId == null || orderModel.value.driverId!.isEmpty) {
-      print("⚠️ [DRIVER LOAD] No driver assigned to order ${orderModel.value.id}");
-      driverError.value = "No driver assigned to this ride";
-      isDriverLoading.value = false;
-      update();
-      return;
-    }
-
-    print("🔍 [DRIVER LOAD] Loading driver: ${orderModel.value.driverId}");
-
-    // Try to load driver with retry mechanism
-    final driver = await FireStoreUtils.getDriverWithRetry(
-      orderModel.value.driverId!,
-      maxRetries: 2,
-    );
-
-    if (driver != null) {
-      driverUserModel.value = driver;
-      driverError.value = "";
-      print("✅ [DRIVER LOAD] Driver loaded successfully: ${driver.fullName}");
-    } else {
-      driverError.value = "Driver information not available";
-      print("❌ [DRIVER LOAD] Failed to load driver after retries");
-    }
-  } catch (error) {
-    driverError.value = "Error loading driver information";
-    print("❌ [DRIVER LOAD] Error loading driver: $error");
-  } finally {
-    isDriverLoading.value = false;
-    update();
-    print("🏁 [DRIVER LOAD] Driver loading completed");
+  @override
+  void onClose() {
+    // Clean up RazorPay listeners
+    razorPay.clear();
+    super.onClose();
   }
-}
 }

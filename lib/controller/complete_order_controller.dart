@@ -102,7 +102,7 @@ class CompleteOrderController extends GetxController {
       // Use retry mechanism to load driver
       final driver = await FireStoreUtils.getDriverWithRetry(
         orderModel.value.driverId,
-        maxRetries: 2,
+        maxRetries: 2, retryDelay: Duration(seconds: 2),
       );
 
       if (driver != null) {

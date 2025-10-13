@@ -32,7 +32,7 @@ class DriverView extends StatelessWidget {
     }
 
     return FutureBuilder<DriverUserModel?>(
-        future: FireStoreUtils.getDriverWithRetry(driverId.toString(), maxRetries: 2),
+        future: FireStoreUtils.getDriverWithRetry(driverId.toString(), maxRetries: 2, retryDelay: const Duration(seconds: 2)),
         builder: (context, snapshot) {
           switch (snapshot.connectionState) {
             case ConnectionState.waiting:

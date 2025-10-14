@@ -1192,7 +1192,7 @@ Future<void> _completeRide(OrderModel order) async {
   try {
     ShowToastDialog.showLoader('Completing ride...');
 
-    // 🔥 CRITICAL: Create a COMPLETE copy with ALL payment data preserved
+    // 🔥 CRITICAL: Clone the order
     OrderModel updatedOrder = order.clone();
 
     // Debug before update
@@ -1203,17 +1203,11 @@ Future<void> _completeRide(OrderModel order) async {
     updatedOrder.status = Constant.rideComplete;
     updatedOrder.updateDate = Timestamp.now();
 
-    // 🔥 VALIDATE payment data is still there
-    if (!updatedOrder.hasValidPaymentData() &&
-        updatedOrder.paymentType?.toLowerCase().contains("stripe") == true) {
-      throw Exception("CRITICAL: Payment data lost before completion!");
-    }
-
     print("🔍 [COMPLETE RIDE] After status update:");
     updatedOrder.debugPaymentData();
 
-    // Save to Firestore
-    bool success = await FireStoreUtils.setOrder(updatedOrder);
+    // 🔥 CRITICAL: Use safe update method that preserves payment data
+    bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
 
     ShowToastDialog.closeLoader();
 
@@ -1224,7 +1218,7 @@ Future<void> _completeRide(OrderModel order) async {
 
       // Navigate to complete screen WITH the order that has payment data
       Get.offAll(() => const CompleteOrderScreen(), arguments: {
-        "orderModel": updatedOrder // Pass the order WITH payment data
+        "orderModel": updatedOrder
       });
     } else {
       ShowToastDialog.showToast("Failed to complete ride");
@@ -1805,8 +1799,7 @@ class _AcceptRejectDriverModal extends StatelessWidget {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
 
-      // 🔥 CRITICAL: Use the ORIGINAL order that has valid payment data
-      // Don't fetch from Firestore again - the stream already corrupted the data
+      // 🔥 CRITICAL: Clone the order to avoid reference issues
       OrderModel updatedOrder = order.clone();
 
       // 🔥 DEBUG: Verify we have valid payment data
@@ -1841,16 +1834,9 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       print("   driverId: ${updatedOrder.driverId}");
       updatedOrder.debugPaymentData();
 
-      // 🔥 CRITICAL: Validate before save
-      if (!updatedOrder.validateForSave()) {
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast(
-            "Failed to assign driver - payment validation failed");
-        return;
-      }
-
-      // Use atomic save
-      bool success = await FireStoreUtils.setOrder(updatedOrder);
+      // 🔥 CRITICAL: Use the NEW safe update method that preserves payment data
+      // This method fetches current payment data from Firestore before saving
+      bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
 
       ShowToastDialog.closeLoader();
 
@@ -1877,9 +1863,8 @@ class _AcceptRejectDriverModal extends StatelessWidget {
 
   Future<void> _rejectDriver(OrderModel order, DriverUserModel driver) async {
     try {
-      // 🔥 CRITICAL: Create a NEW OrderModel instance to avoid reference issues
-      OrderModel updatedOrder =
-          OrderModel.fromJson(order.toJson()); // Clone the order
+      // 🔥 CRITICAL: Clone the order
+      OrderModel updatedOrder = order.clone();
 
       List<dynamic> rejectDriverId = updatedOrder.rejectedDriverId ?? [];
       rejectDriverId.add(driver.id);
@@ -1890,16 +1875,13 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       updatedOrder.acceptedDriverId = acceptDriverId;
       updatedOrder.updateDate = Timestamp.now();
 
-      // 🔥 CRITICAL: Preserve the existing driverId (don't set it to null!)
-      // Only update the accepted/rejected lists, keep driverId unchanged
-
       print("💾 [REJECT DRIVER] Updating driver lists:");
       print("   current driverId: ${updatedOrder.driverId}");
       print("   rejected drivers: ${rejectDriverId.length}");
       print("   accepted drivers: ${acceptDriverId.length}");
 
-      bool success =
-          await FireStoreUtils.setOrderWithVerification(updatedOrder);
+      // 🔥 CRITICAL: Use safe update method
+      bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
 
       if (success) {
         // Update local state

@@ -113,7 +113,7 @@ class OrderScreen extends StatelessWidget {
         if (orderModel.status == Constant.ridePlaced ||
             orderModel.status == Constant.rideActive ||
             orderModel.status == Constant.rideInProgress) {
-          Get.to(() => const LastActiveRideScreen());
+          Get.to(() => LastActiveRideScreen(initialOrder: orderModel));
         }
       },
       child: Container(

@@ -44,39 +44,40 @@ class OrderModel {
   Timestamp? paymentCapturedAt;
   Timestamp? paymentCanceledAt;
 
-  OrderModel(
-      {this.position,
-      this.serviceId,
-      this.paymentType,
-      this.sourceLocationName,
-      this.destinationLocationName,
-      this.sourceLocationLAtLng,
-      this.destinationLocationLAtLng,
-      this.id,
-      this.userId,
-      this.distance,
-      this.distanceType,
-      this.status,
-      this.driverId,
-      this.otp,
-      this.offerRate,
-      this.finalRate,
-      this.paymentStatus,
-      this.createdDate,
-      this.updateDate,
-      this.taxList,
-      this.coupon,
-      this.someOneElse,
-      this.service,
-      this.adminCommission,
-      this.zone,
-      this.zoneId,
-      this.paymentIntentId,
-      this.preAuthAmount,
-      this.paymentIntentStatus,
-      this.preAuthCreatedAt,
-      this.paymentCapturedAt,
-      this.paymentCanceledAt});
+  OrderModel({
+    this.position,
+    this.serviceId,
+    this.paymentType,
+    this.sourceLocationName,
+    this.destinationLocationName,
+    this.sourceLocationLAtLng,
+    this.destinationLocationLAtLng,
+    this.id,
+    this.userId,
+    this.distance,
+    this.distanceType,
+    this.status,
+    this.driverId,
+    this.otp,
+    this.offerRate,
+    this.finalRate,
+    this.paymentStatus,
+    this.createdDate,
+    this.updateDate,
+    this.taxList,
+    this.coupon,
+    this.someOneElse,
+    this.service,
+    this.adminCommission,
+    this.zone,
+    this.zoneId,
+    this.paymentIntentId,
+    this.preAuthAmount,
+    this.paymentIntentStatus,
+    this.preAuthCreatedAt,
+    this.paymentCapturedAt,
+    this.paymentCanceledAt,
+  });
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     serviceId = json['serviceId'];
@@ -103,8 +104,11 @@ class OrderModel {
     status = json['status'];
     driverId = json['driverId'];
     otp = json['otp'];
-    createdDate = json['createdDate'];
-    updateDate = json['updateDate'];
+
+    // 🔥 CRITICAL: Handle all timestamp fields with proper parsing
+    createdDate = _parseTimestamp(json['createdDate']);
+    updateDate = _parseTimestamp(json['updateDate']);
+
     acceptedDriverId = json['acceptedDriverId'];
     rejectedDriverId = json['rejectedDriverId'];
     paymentStatus = json['paymentStatus'];
@@ -118,12 +122,15 @@ class OrderModel {
     zone = json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null;
     zoneId = json['zoneId'];
 
+    // 🔥 CRITICAL: Properly handle payment fields with null checks
     paymentIntentId = json['paymentIntentId'];
     preAuthAmount = json['preAuthAmount'];
     paymentIntentStatus = json['paymentIntentStatus'];
-    preAuthCreatedAt = json['preAuthCreatedAt'];
-    paymentCapturedAt = json['paymentCapturedAt'];
-    paymentCanceledAt = json['paymentCanceledAt'];
+
+    // Handle payment timestamp fields properly
+    preAuthCreatedAt = _parseTimestamp(json['preAuthCreatedAt']);
+    paymentCapturedAt = _parseTimestamp(json['paymentCapturedAt']);
+    paymentCanceledAt = _parseTimestamp(json['paymentCanceledAt']);
 
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
@@ -133,11 +140,64 @@ class OrderModel {
     }
   }
 
+  // 🔥 CRITICAL: Helper method to parse timestamps safely from Firestore
+  Timestamp? _parseTimestamp(dynamic timestampData) {
+    if (timestampData == null) return null;
+
+    // If it's already a Timestamp, return it directly
+    if (timestampData is Timestamp) {
+      print("✅ [TIMESTAMP] Already a Timestamp: ${timestampData.seconds}");
+      return timestampData;
+    }
+
+    // If it's a Map (Firestore format), convert it to Timestamp
+    if (timestampData is Map<String, dynamic>) {
+      try {
+        final seconds =
+            timestampData['_seconds'] ?? timestampData['seconds'] ?? 0;
+        final nanoseconds =
+            timestampData['_nanoseconds'] ?? timestampData['nanoseconds'] ?? 0;
+
+        print(
+            "🔄 [TIMESTAMP] Converting from Map: seconds=$seconds, nanoseconds=$nanoseconds");
+
+        if (seconds > 0) {
+          final timestamp = Timestamp(seconds, nanoseconds);
+          print("✅ [TIMESTAMP] Successfully converted: ${timestamp.seconds}");
+          return timestamp;
+        } else {
+          print("⚠️  [TIMESTAMP] Invalid seconds value: $seconds");
+        }
+      } catch (e) {
+        print("❌ [TIMESTAMP PARSE] Error parsing timestamp Map: $e");
+        print("   Raw data: $timestampData");
+      }
+    }
+
+    // If it's a number (seconds since epoch), convert it
+    if (timestampData is int) {
+      print("🔄 [TIMESTAMP] Converting from int: $timestampData");
+      if (timestampData > 1000000000) {
+        // Likely milliseconds
+        return Timestamp.fromMillisecondsSinceEpoch(timestampData);
+      } else {
+        // Likely seconds
+        return Timestamp(timestampData, 0);
+      }
+    }
+
+    print(
+        "❌ [TIMESTAMP] Could not parse timestamp: $timestampData (type: ${timestampData.runtimeType})");
+    return null;
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['serviceId'] = serviceId;
     data['sourceLocationName'] = sourceLocationName;
     data['destinationLocationName'] = destinationLocationName;
+    data['paymentType'] = paymentType;
+
     if (sourceLocationLAtLng != null) {
       data['sourceLocationLAtLng'] = sourceLocationLAtLng!.toJson();
     }
@@ -161,6 +221,7 @@ class OrderModel {
     }
     data['zoneId'] = zoneId;
 
+    // Payment data
     data['paymentIntentId'] = paymentIntentId;
     data['preAuthAmount'] = preAuthAmount;
     data['paymentIntentStatus'] = paymentIntentStatus;
@@ -170,7 +231,6 @@ class OrderModel {
 
     data['id'] = id;
     data['userId'] = userId;
-    data['paymentType'] = paymentType;
     data['offerRate'] = offerRate;
     data['finalRate'] = finalRate;
     data['distance'] = distance;
@@ -183,6 +243,7 @@ class OrderModel {
     data['acceptedDriverId'] = acceptedDriverId;
     data['rejectedDriverId'] = rejectedDriverId;
     data['paymentStatus'] = paymentStatus;
+
     if (taxList != null) {
       data['taxList'] = taxList!.map((v) => v.toJson()).toList();
     }
@@ -208,29 +269,37 @@ class OrderModel {
     // For Stripe payments, payment intent is REQUIRED
     if (paymentType?.toLowerCase().contains("stripe") == true) {
       if (paymentIntentId == null || paymentIntentId!.isEmpty) {
-        print("❌ Order validation failed: Stripe payment missing paymentIntentId");
+        print(
+            "❌ Order validation failed: Stripe payment missing paymentIntentId");
+        print("   Current paymentIntentId: $paymentIntentId");
         return false;
       }
       if (preAuthAmount == null || preAuthAmount!.isEmpty) {
-        print("❌ Order validation failed: Stripe payment missing preAuthAmount");
+        print(
+            "❌ Order validation failed: Stripe payment missing preAuthAmount");
+        print("   Current preAuthAmount: $preAuthAmount");
         return false;
       }
       if (preAuthCreatedAt == null) {
-        print("❌ Order validation failed: Stripe payment missing preAuthCreatedAt timestamp");
+        print(
+            "❌ Order validation failed: Stripe payment missing preAuthCreatedAt timestamp");
+        print("   Current preAuthCreatedAt: $preAuthCreatedAt");
         return false;
       }
+
+      print("✅ Stripe payment validation passed:");
+      print("   paymentIntentId: $paymentIntentId");
+      print("   preAuthAmount: $preAuthAmount");
+      print("   preAuthCreatedAt: $preAuthCreatedAt");
+    } else {
+      print("✅ Non-Stripe payment - no payment validation required");
     }
 
     print("✅ Order validation passed for order: $id");
     return true;
   }
 
-  /// Creates a deep copy to prevent reference issues
-  OrderModel clone() {
-    return OrderModel.fromJson(this.toJson());
-  }
-
-  /// Debug helper to print order state
+  /// Enhanced debug helper to print complete order state
   void debugPrint() {
     print("📋 Order Debug Info:");
     print("   ID: $id");
@@ -242,6 +311,67 @@ class OrderModel {
     print("   Pre-auth Amount: $preAuthAmount");
     print("   Payment Intent Status: $paymentIntentStatus");
     print("   Pre-auth Created: $preAuthCreatedAt");
+    print("   Payment Captured: $paymentCapturedAt");
+    print("   Payment Canceled: $paymentCanceledAt");
     print("   Payment Status: $paymentStatus");
+    print("   Created Date: $createdDate");
+    print("   Update Date: $updateDate");
+  }
+
+  /// Debug method specifically for payment data
+  void debugPaymentData() {
+    print("🔍 [PAYMENT DEBUG] Order: $id");
+    print("   Payment Type: $paymentType");
+    print("   Payment Intent ID: $paymentIntentId");
+    print("   Pre-auth Amount: $preAuthAmount");
+    print("   Payment Intent Status: $paymentIntentStatus");
+    print("   Pre-auth Created: $preAuthCreatedAt");
+    print("   Pre-auth Created Type: ${preAuthCreatedAt?.runtimeType}");
+    print("   Payment Captured: $paymentCapturedAt");
+    print("   Payment Canceled: $paymentCanceledAt");
+    print("   Payment Status: $paymentStatus");
+  }
+
+  /// Creates a deep copy to prevent reference issues
+  OrderModel clone() {
+    return OrderModel.fromJson(this.toJson());
+  }
+
+  /// Check if payment data is intact for Stripe payments
+  bool hasValidPaymentData() {
+    if (paymentType?.toLowerCase().contains("stripe") != true) {
+      return true; // Non-Stripe payments don't need payment data
+    }
+
+    final hasPaymentData = paymentIntentId != null &&
+        paymentIntentId!.isNotEmpty &&
+        preAuthAmount != null &&
+        preAuthAmount!.isNotEmpty &&
+        preAuthCreatedAt != null;
+
+    if (!hasPaymentData) {
+      print("⚠️  [PAYMENT CHECK] Missing payment data for Stripe order:");
+      print("   paymentIntentId: $paymentIntentId");
+      print("   preAuthAmount: $preAuthAmount");
+      print("   preAuthCreatedAt: $preAuthCreatedAt");
+    }
+
+    return hasPaymentData;
+  }
+
+  /// Restore payment data from another order (for recovery)
+  void restorePaymentData(OrderModel sourceOrder) {
+    print("🔄 [PAYMENT RESTORE] Restoring payment data from source order");
+    paymentIntentId = sourceOrder.paymentIntentId;
+    preAuthAmount = sourceOrder.preAuthAmount;
+    paymentIntentStatus = sourceOrder.paymentIntentStatus;
+    preAuthCreatedAt = sourceOrder.preAuthCreatedAt;
+    paymentCapturedAt = sourceOrder.paymentCapturedAt;
+    paymentCanceledAt = sourceOrder.paymentCanceledAt;
+
+    print("✅ [PAYMENT RESTORE] Payment data restored:");
+    print("   paymentIntentId: $paymentIntentId");
+    print("   preAuthAmount: $preAuthAmount");
+    print("   preAuthCreatedAt: $preAuthCreatedAt");
   }
 }

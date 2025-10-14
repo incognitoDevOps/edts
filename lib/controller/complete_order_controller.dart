@@ -112,19 +112,6 @@ class CompleteOrderController extends GetxController {
     }
   }
 
-  // 🔥 NEW: Debug method to check order state
-  void _debugOrderState() {
-    print("🔍 [COMPLETE SCREEN DEBUG] Current Order State:");
-    print("   Order ID: ${orderModel.value.id}");
-    print("   Driver ID: ${orderModel.value.driverId}");
-    print("   Driver Loaded: ${driverUserModel.value != null}");
-    print("   Payment Intent: ${orderModel.value.paymentIntentId}");
-    print("   Pre-auth Amount: ${orderModel.value.preAuthAmount}");
-    print("   Payment Status: ${orderModel.value.paymentIntentStatus}");
-    print("   Pre-auth Created: ${orderModel.value.preAuthCreatedAt}");
-    print("   Order Status: ${orderModel.value.status}");
-  }
-
   // 🔥 UPDATED: Enhanced calculateAmount method with better error handling
   double calculateAmount() {
     try {

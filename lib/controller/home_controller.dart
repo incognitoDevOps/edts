@@ -14,7 +14,6 @@ import 'package:customer/model/order_model.dart';
 import 'package:customer/model/payment_model.dart';
 import 'package:customer/model/service_model.dart';
 import 'package:customer/model/user_model.dart';
-import 'package:customer/model/wallet_transaction_model.dart';
 import 'package:customer/model/zone_model.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/utils/Preferences.dart';
@@ -380,69 +379,66 @@ class HomeController extends GetxController {
   }
 
   /// Enhanced ride booking method with proper payment data preservation
-  /// Enhanced ride booking method with proper payment data preservation
-Future<bool> bookRide() async {
+Future<OrderModel?> bookRide() async {
   try {
     // Validate all required fields
     if (selectedPaymentMethod.value.isEmpty) {
       ShowToastDialog.showToast("Please select Payment Method".tr);
-      return false;
+      return null; // Return null instead of false
     }
 
     // Check wallet balance if wallet payment is selected
     if (selectedPaymentMethod.value.toLowerCase() == "wallet") {
-      await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid())
-          .then((user) {
-        if (user != null) {
-          userModel.value = user;
-          double walletBalance = double.parse(user.walletAmount ?? "0.0");
-          double payableAmount = double.parse(amount.value);
+      final user = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+      if (user != null) {
+        userModel.value = user;
+        double walletBalance = double.parse(user.walletAmount ?? "0.0");
+        double payableAmount = double.parse(amount.value);
 
-          // Add tax calculation to payable amount
-          if (Constant.taxList != null) {
-            for (var tax in Constant.taxList!) {
-              payableAmount += Constant()
-                  .calculateTax(amount: amount.value, taxModel: tax);
-            }
-          }
-
-          if (walletBalance < payableAmount) {
-            ShowToastDialog.showToast(
-              "Insufficient balance. Please top up your wallet or choose another payment method.",
-            );
-            return false;
+        // Add tax calculation to payable amount
+        if (Constant.taxList != null) {
+          for (var tax in Constant.taxList!) {
+            payableAmount += Constant().calculateTax(amount: amount.value, taxModel: tax);
           }
         }
-      });
+
+        if (walletBalance < payableAmount) {
+          ShowToastDialog.showToast(
+            "Insufficient balance. Please top up your wallet or choose another payment method.",
+          );
+          return null; // Return null instead of false
+        }
+      }
     }
 
+    // ... all your other validations return null instead of false
     if (sourceLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select source location".tr);
-      return false;
+      return null;
     }
 
     if (destinationLocationController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please select destination location".tr);
-      return false;
+      return null;
     }
 
     if (sourceLocationLAtLng.value.latitude == null ||
         destinationLocationLAtLng.value.latitude == null) {
       ShowToastDialog.showToast("Invalid location coordinates".tr);
-      return false;
+      return null;
     }
 
     if (distance.value.isEmpty || double.parse(distance.value) <= 0.5) {
       ShowToastDialog.showToast(
         "Please select more than two ${Constant.distanceType} location".tr,
       );
-      return false;
+      return null;
     }
 
     if (selectedType.value.offerRate == true &&
         offerYourRateController.value.text.isEmpty) {
       ShowToastDialog.showToast("Please Enter offer rate".tr);
-      return false;
+      return null;
     }
 
     // Check for pending payments
@@ -451,16 +447,15 @@ Future<bool> bookRide() async {
       ShowToastDialog.showToast(
         "Please complete payment for your previous ride before booking a new one",
       );
-      return false;
+      return null;
     }
 
-    // Create order model
+    // Create order model (your existing code)
     OrderModel orderModel = OrderModel();
     orderModel.id = Constant.getUuid();
     orderModel.userId = FireStoreUtils.getCurrentUid();
     orderModel.sourceLocationName = sourceLocationController.value.text;
-    orderModel.destinationLocationName =
-        destinationLocationController.value.text;
+    orderModel.destinationLocationName = destinationLocationController.value.text;
     orderModel.sourceLocationLAtLng = sourceLocationLAtLng.value;
     orderModel.destinationLocationLAtLng = destinationLocationLAtLng.value;
     orderModel.distance = distance.value;
@@ -476,11 +471,10 @@ Future<bool> bookRide() async {
     orderModel.paymentStatus = false;
     orderModel.service = selectedType.value;
 
-    // Set admin commission - always use the global commission settings
+    // Set admin commission
     if (Constant.adminCommission != null) {
       orderModel.adminCommission = Constant.adminCommission;
-      print(
-          "✅ Added admin commission to order: ${Constant.adminCommission!.toJson()}");
+      print("✅ Added admin commission to order: ${Constant.adminCommission!.toJson()}");
     } else {
       print("⚠️  No global admin commission available");
       orderModel.adminCommission = AdminCommission(
@@ -491,32 +485,18 @@ Future<bool> bookRide() async {
       );
     }
 
-    // Log commission details
-    if (orderModel.adminCommission != null) {
-      print("🧾 Order commission details:");
-      print("   Enabled: ${orderModel.adminCommission!.isEnabled}");
-      print("   Type: ${orderModel.adminCommission!.type}");
-      print("   Amount: ${orderModel.adminCommission!.amount}");
-      if (orderModel.adminCommission!.flatRatePromotion != null) {
-        print(
-            "   Flat Rate Enabled: ${orderModel.adminCommission!.flatRatePromotion!.isEnabled}");
-        print(
-            "   Flat Rate Amount: ${orderModel.adminCommission!.flatRatePromotion!.amount}");
-      }
-    }
-
     orderModel.otp = Constant.getReferralCode();
     orderModel.taxList = Constant.taxList;
 
-    // ✅ STRIPE PRE-AUTHORIZATION - Atomic payment data recording
+    // ✅ STRIPE PRE-AUTHORIZATION
     if (selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
       if (stripePaymentIntentId.value.isEmpty || stripePreAuthAmount.value.isEmpty) {
         print("❌ Stripe payment data missing");
         ShowToastDialog.showToast("Payment authorization error. Please try again.");
-        return false;
+        return null;
       }
 
-      // Set ALL payment fields atomically - this data is immutable
+      // Set ALL payment fields atomically
       orderModel.paymentIntentId = stripePaymentIntentId.value;
       orderModel.preAuthAmount = stripePreAuthAmount.value;
       orderModel.paymentIntentStatus = 'requires_capture';
@@ -546,8 +526,7 @@ Future<bool> bookRide() async {
     GeoFirePoint position = Geoflutterfire().point(
         latitude: sourceLocationLAtLng.value.latitude!,
         longitude: sourceLocationLAtLng.value.longitude!);
-    orderModel.position =
-        Positions(geoPoint: position.geoPoint, geohash: position.hash);
+    orderModel.position = Positions(geoPoint: position.geoPoint, geohash: position.hash);
 
     // Zone check
     bool zoneFound = false;
@@ -569,13 +548,13 @@ Future<bool> bookRide() async {
       ShowToastDialog.showToast(
         "Services are currently unavailable in the selected location. Please reach out to the administrator for assistance.",
       );
-      return false;
+      return null;
     }
 
     // 🔥 CRITICAL: Validate order before saving
     if (!orderModel.validateForSave()) {
       ShowToastDialog.showToast("Order validation failed. Please check your details.");
-      return false;
+      return null;
     }
 
     // Debug log before save
@@ -590,97 +569,17 @@ Future<bool> bookRide() async {
 
       // Clear form
       resetPaymentState();
-      return true;
+      return orderModel; // Return the order model
     }
 
     ShowToastDialog.showToast("Failed to place ride request");
-    return false;
+    return null;
   } catch (e) {
     print("❌ Error in bookRide: $e");
     ShowToastDialog.showToast("Failed to book ride: ${e.toString()}");
-    return false;
+    return null;
   }
 }
-
-/// Enhanced order saving with immediate verification
-Future<bool> _saveOrderWithVerification(OrderModel orderModel, bool isStripePayment) async {
-  try {
-    print("💾 [ORDER SAVE] Saving order with enhanced verification...");
-    
-    // Save the order
-    bool saveSuccess = await FireStoreUtils.setOrder(orderModel) ?? false;
-    
-    if (saveSuccess) {
-      print("✅ [ORDER SAVE] Order saved successfully, verifying...");
-      
-      // 🔥 CRITICAL: Immediate verification - read back from Firestore
-      await Future.delayed(Duration(seconds: 2)); // Small delay for Firestore propagation
-      
-      final verifiedOrder = await FireStoreUtils.getOrder(orderModel.id!);
-      if (verifiedOrder != null) {
-        print("🔍 [ORDER VERIFICATION] Firestore verification:");
-        print("   paymentIntentId: ${verifiedOrder.paymentIntentId}");
-        print("   preAuthAmount: ${verifiedOrder.preAuthAmount}");
-        print("   paymentIntentStatus: ${verifiedOrder.paymentIntentStatus}");
-        print("   preAuthCreatedAt: ${verifiedOrder.preAuthCreatedAt}");
-        print("   paymentType: ${verifiedOrder.paymentType}");
-        
-        // Different verification logic for Stripe vs Wallet
-        if (isStripePayment) {
-          // For Stripe: Check if payment intent data exists
-          if (verifiedOrder.paymentIntentId != null && verifiedOrder.paymentIntentId!.isNotEmpty) {
-            print("✅ [ORDER VERIFICATION] Stripe payment data verified in Firestore");
-            return true;
-          } else {
-            print("❌ [ORDER VERIFICATION] Stripe payment data LOST during save!");
-            return false;
-          }
-        } else {
-          // For Wallet: Payment intent data should be null (this is correct)
-          if (verifiedOrder.paymentIntentId == null || verifiedOrder.paymentIntentId!.isEmpty) {
-            print("✅ [ORDER VERIFICATION] Wallet payment data verified - no Stripe data expected");
-            return true;
-          } else {
-            print("⚠️ [ORDER VERIFICATION] Unexpected Stripe data found for Wallet payment");
-            return true; // Still return true as this isn't critical for Wallet
-          }
-        }
-      } else {
-        print("❌ [ORDER VERIFICATION] Could not retrieve order after save");
-        return false;
-      }
-    } else {
-      print("❌ [ORDER SAVE] Failed to save order");
-      return false;
-    }
-  } catch (e) {
-    print("❌ [ORDER SAVE] Error: $e");
-    return false;
-  }
-}
-  /// Create Stripe pre-auth transaction for recovery purposes
-  Future<void> _createStripePreAuthTransaction(OrderModel order) async {
-    try {
-      WalletTransactionModel preAuthTransaction = WalletTransactionModel(
-        id: Constant.getUuid(),
-        amount: "-${order.preAuthAmount}", // Negative amount for pre-auth
-        createdDate: Timestamp.now(),
-        paymentType: "Stripe",
-        transactionId: order.id,
-        userId: FireStoreUtils.getCurrentUid(),
-        orderType: "city", 
-        userType: "customer",
-        note: "Stripe pre-authorization for ride ${order.id} - Payment Intent: ${order.paymentIntentId}",
-      );
-
-      await FireStoreUtils.setWalletTransaction(preAuthTransaction);
-      print("💾 [STRIPE PRE-AUTH] Created recovery transaction: ${preAuthTransaction.id}");
-      print("   Note: ${preAuthTransaction.note}");
-    } catch (e) {
-      print("❌ [STRIPE PRE-AUTH] Failed to create transaction: $e");
-    }
-  }
-  
   /// Reset all payment-related state
   void resetPaymentState() {
     sourceLocationController.value.clear();

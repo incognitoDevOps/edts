@@ -1860,44 +1860,6 @@ class FireStoreUtils {
     }
   }
 
-  /// FIX: Properly assign driver to order when they accept
-  static Future<bool> assignDriverToOrder(
-      String orderId, String driverId) async {
-    try {
-      print("🔧 FIX: Assigning driver $driverId to order $orderId");
-
-      // Get the driver acceptance data
-      final acceptanceDoc = await FirebaseFirestore.instance
-          .collection(CollectionName.orders)
-          .doc(orderId)
-          .collection("acceptedDriver")
-          .doc(driverId)
-          .get();
-
-      if (!acceptanceDoc.exists) {
-        print("❌ Driver acceptance record not found");
-        return false;
-      }
-
-      // Update the main order document with driver assignment
-      await FirebaseFirestore.instance
-          .collection(CollectionName.orders)
-          .doc(orderId)
-          .update({
-        'driverId': driverId,
-        'updateDate': FieldValue.serverTimestamp(),
-        'acceptedDriverId': FieldValue.arrayUnion([driverId]),
-        'status': 'Driver Accepted', // Or appropriate status
-      });
-
-      print("✅ Order successfully updated with driver assignment");
-      return true;
-    } catch (e) {
-      print("❌ Error assigning driver to order: $e");
-      return false;
-    }
-  }
-
   /// CORRECT method to handle driver acceptance
   static Future<bool> handleDriverAcceptance(
       String orderId, String driverId) async {
@@ -2192,27 +2154,6 @@ class FireStoreUtils {
     }
   }
 
-  /// Get order without any recovery - fail fast if data is missing
-  static Future<OrderModel?> getOrder(String orderId) async {
-    OrderModel? orderModel;
-    try {
-      await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderId)
-          .get()
-          .then((value) {
-        if (value.exists && value.data() != null) {
-          orderModel = OrderModel.fromJson(value.data()!);
-          print("✅ Order loaded: $orderId");
-          orderModel!.debugPrint();
-        }
-      });
-    } catch (error) {
-      print("❌ Error loading order $orderId: $error");
-    }
-    return orderModel;
-  }
-
   /// Verify order data integrity after save
   static Future<void> verifyOrderDataIntegrity(String orderId) async {
     try {
@@ -2240,94 +2181,315 @@ class FireStoreUtils {
     }
   }
 
-  /// Clean atomic setOrder with validation
-  static Future<bool> setOrder(OrderModel orderModel) async {
-    try {
-      // 🔥 CRITICAL: Validate before save
-      if (!orderModel.validateForSave()) {
-        print("❌ [SET ORDER] Validation failed for order ${orderModel.id}");
-        return false;
-      }
-
-      print("💾 [SET ORDER] Saving order ${orderModel.id}");
-      print("   driverId: ${orderModel.driverId}");
-      print("   paymentIntentId: ${orderModel.paymentIntentId}");
-      print("   paymentType: ${orderModel.paymentType}");
-      print("   status: ${orderModel.status}");
-
-      // Ensure commission data
-      if (orderModel.adminCommission == null && Constant.adminCommission != null) {
-        orderModel.adminCommission = Constant.adminCommission;
-      }
-
-      // 🔥 ATOMIC WRITE - Full document, no merge
-      await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .set(orderModel.toJson());
-
-      print("✅ [SET ORDER] Order saved successfully");
-      return true;
-    } catch (error) {
-      print("❌ [SET ORDER] Save failed: $error");
+/// Clean atomic setOrder with validation and payment data protection
+static Future<bool> setOrder(OrderModel orderModel) async {
+  try {
+    // 🔥 CRITICAL: Validate before save
+    if (!orderModel.validateForSave()) {
+      print("❌ [SET ORDER] Validation failed for order ${orderModel.id}");
       return false;
     }
+
+    // 🔥 CRITICAL: Debug payment data before save
+    print("💾 [SET ORDER] Saving order ${orderModel.id}");
+    print("   driverId: ${orderModel.driverId}");
+    print("   paymentIntentId: ${orderModel.paymentIntentId}");
+    print("   paymentType: ${orderModel.paymentType}");
+    print("   status: ${orderModel.status}");
+    print("   preAuthAmount: ${orderModel.preAuthAmount}");
+    print("   paymentIntentStatus: ${orderModel.paymentIntentStatus}");
+    print("   preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
+
+    // Ensure commission data is always included
+    if (orderModel.adminCommission == null) {
+      print("💡 [SET ORDER] Adding missing admin commission to order before saving");
+      if (Constant.adminCommission != null) {
+        orderModel.adminCommission = Constant.adminCommission;
+      } else {
+        orderModel.adminCommission = AdminCommission(
+          isEnabled: false,
+          type: "percentage",
+          amount: "0",
+          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+        );
+      }
+    }
+
+    // 🔥 CRITICAL: Use merge: true to preserve existing fields not in the current object
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .set(orderModel.toJson(), SetOptions(merge: true));
+
+    print("✅ [SET ORDER] Order saved successfully");
+    
+    // Quick verification
+    await Future.delayed(Duration(milliseconds: 300));
+    final quickVerify = await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .get();
+    
+    if (quickVerify.exists) {
+      final data = quickVerify.data();
+      print("🔍 [SET ORDER] Quick verification:");
+      print("   paymentIntentId: ${data?['paymentIntentId']}");
+      print("   preAuthAmount: ${data?['preAuthAmount']}");
+    }
+    
+    return true;
+  } catch (error) {
+    print("❌ [SET ORDER] Save failed for order ${orderModel.id}: $error");
+    print("   Stack trace: ${StackTrace.current}");
+    return false;
   }
+}
 
-  static Future<bool> setOrderWithVerification(OrderModel orderModel) async {
-    try {
-      print("💾 [SET ORDER WITH VERIFICATION] Saving order ${orderModel.id}");
-      print("   driverId: ${orderModel.driverId}");
-      print("   paymentIntentId: ${orderModel.paymentIntentId}");
-      print("   status: ${orderModel.status}");
+/// Enhanced setOrder with comprehensive verification
+static Future<bool> setOrderWithVerification(OrderModel orderModel) async {
+  try {
+    print("💾 [SET ORDER WITH VERIFICATION] Saving order ${orderModel.id}");
+    
+    // 🔥 CRITICAL: Debug all payment fields
+    orderModel.debugPaymentData();
 
-      // Ensure commission data is always included
-      if (orderModel.adminCommission == null) {
-        print("💡 Adding missing admin commission to order before saving");
-        if (Constant.adminCommission != null) {
-          orderModel.adminCommission = Constant.adminCommission;
-        } else {
-          orderModel.adminCommission = AdminCommission(
-            isEnabled: false,
-            type: "percentage",
-            amount: "0",
-            flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
-          );
+    // Ensure commission data is always included
+    if (orderModel.adminCommission == null) {
+      print("💡 [SET ORDER VERIFICATION] Adding missing admin commission");
+      if (Constant.adminCommission != null) {
+        orderModel.adminCommission = Constant.adminCommission;
+      } else {
+        orderModel.adminCommission = AdminCommission(
+          isEnabled: false,
+          type: "percentage",
+          amount: "0",
+          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+        );
+      }
+    }
+
+    // Save the order with merge
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .set(orderModel.toJson(), SetOptions(merge: true));
+
+    print("✅ [SET ORDER WITH VERIFICATION] Successfully saved order ${orderModel.id}");
+
+    // 🔥 CRITICAL: Enhanced verification with retry logic
+    OrderModel? verifiedOrder;
+    for (int i = 0; i < 3; i++) {
+      await Future.delayed(Duration(milliseconds: 500));
+      verifiedOrder = await getOrder(orderModel.id!);
+      
+      if (verifiedOrder != null) {
+        print("🔍 [SET ORDER VERIFICATION] Attempt ${i + 1}:");
+        verifiedOrder.debugPaymentData();
+        
+        // Check if payment data is intact
+        if (verifiedOrder.hasValidPaymentData()) {
+          break;
         }
       }
-
-      // Save the order
-      await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .set(orderModel.toJson(), SetOptions(merge: true));
-
-      print(
-          "✅ [SET ORDER WITH VERIFICATION] Successfully saved order ${orderModel.id}");
-
-      // 🔥 CRITICAL: Immediate verification
-      await Future.delayed(Duration(seconds: 1));
-      final verifiedOrder = await getOrder(orderModel.id!);
-
-      if (verifiedOrder != null) {
-        bool driverMatch = verifiedOrder.driverId == orderModel.driverId;
-        bool paymentMatch =
-            verifiedOrder.paymentIntentId == orderModel.paymentIntentId;
-
-        print("🔍 [SET ORDER VERIFICATION] Results:");
-        print(
-            "   driverId match: $driverMatch (expected: ${orderModel.driverId}, got: ${verifiedOrder.driverId})");
-        print("   paymentIntentId match: $paymentMatch");
-
-        return driverMatch && paymentMatch;
-      } else {
-        print("❌ [SET ORDER VERIFICATION] Could not retrieve order after save");
-        return false;
+      
+      if (i < 2) {
+        print("🔄 [SET ORDER VERIFICATION] Retrying verification...");
       }
-    } catch (error) {
-      print(
-          "❌ [SET ORDER WITH VERIFICATION] Failed to save order ${orderModel.id}: $error");
+    }
+
+    if (verifiedOrder != null) {
+      bool driverMatch = verifiedOrder.driverId == orderModel.driverId;
+      bool paymentMatch = verifiedOrder.paymentIntentId == orderModel.paymentIntentId;
+      bool preAuthMatch = verifiedOrder.preAuthAmount == orderModel.preAuthAmount;
+      bool hasValidPayment = verifiedOrder.hasValidPaymentData();
+
+      print("🔍 [SET ORDER VERIFICATION] Final Results:");
+      print("   driverId match: $driverMatch");
+      print("   paymentIntentId match: $paymentMatch");
+      print("   preAuthAmount match: $preAuthMatch");
+      print("   has valid payment data: $hasValidPayment");
+      print("   expected driver: ${orderModel.driverId}, got: ${verifiedOrder.driverId}");
+      print("   expected payment: ${orderModel.paymentIntentId}, got: ${verifiedOrder.paymentIntentId}");
+
+      return driverMatch && paymentMatch && preAuthMatch && hasValidPayment;
+    } else {
+      print("❌ [SET ORDER VERIFICATION] Could not retrieve order after save");
       return false;
     }
+  } catch (error) {
+    print("❌ [SET ORDER WITH VERIFICATION] Failed to save order ${orderModel.id}: $error");
+    print("   Stack trace: ${StackTrace.current}");
+    return false;
   }
+}
+
+/// Safe order update that preserves payment data
+static Future<bool> updateOrder(String orderId, Map<String, dynamic> updateData) async {
+  try {
+    print("🔄 [UPDATE ORDER] Updating order $orderId");
+    print("   Update data: $updateData");
+    
+    // Get current order to preserve payment data
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder == null) {
+      print("❌ [UPDATE ORDER] Order $orderId not found");
+      return false;
+    }
+    
+    // Debug current payment state
+    print("🔍 [UPDATE ORDER] Current payment state:");
+    currentOrder.debugPaymentData();
+    
+    // Perform the update
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderId)
+        .update(updateData);
+    
+    print("✅ [UPDATE ORDER] Order updated successfully");
+    
+    // Verify payment data was preserved
+    await Future.delayed(Duration(milliseconds: 300));
+    final verifiedOrder = await getOrder(orderId);
+    if (verifiedOrder != null && verifiedOrder.hasValidPaymentData()) {
+      print("✅ [UPDATE ORDER] Payment data preserved after update");
+      return true;
+    } else {
+      print("⚠️  [UPDATE ORDER] Payment data may have been affected");
+      return false;
+    }
+  } catch (error) {
+    print("❌ [UPDATE ORDER] Failed to update order $orderId: $error");
+    return false;
+  }
+}
+
+/// Enhanced getOrder with payment data recovery
+static Future<OrderModel?> getOrder(String orderId) async {
+  try {
+    final document = await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderId)
+        .get();
+
+    if (document.exists) {
+      final order = OrderModel.fromJson(document.data()!);
+      
+      // 🔥 CRITICAL: Debug the raw Firestore data
+      final rawData = document.data()!;
+      print("🔍 [GET ORDER] Raw Firestore data for $orderId:");
+      print("   paymentIntentId: ${rawData['paymentIntentId']}");
+      print("   preAuthAmount: ${rawData['preAuthAmount']}");
+      print("   paymentIntentStatus: ${rawData['paymentIntentStatus']}");
+      print("   preAuthCreatedAt: ${rawData['preAuthCreatedAt']}");
+      print("   preAuthCreatedAt type: ${rawData['preAuthCreatedAt']?.runtimeType}");
+      
+      // Debug parsed order
+      order.debugPaymentData();
+      
+      return order;
+    }
+    
+    print("❌ [GET ORDER] Order $orderId not found in Firestore");
+    return null;
+  } catch (error) {
+    print("❌ [GET ORDER] Error fetching order $orderId: $error");
+    return null;
+  }
+}
+
+/// Recovery function for orders with lost payment data
+static Future<bool> recoverOrderPaymentData(String orderId, OrderModel sourceOrder) async {
+  try {
+    print("🔄 [PAYMENT RECOVERY] Attempting to recover payment data for order $orderId");
+    
+    // Get the current order state
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder == null) {
+      print("❌ [PAYMENT RECOVERY] Order $orderId not found");
+      return false;
+    }
+    
+    // Check if recovery is needed
+    if (currentOrder.hasValidPaymentData()) {
+      print("✅ [PAYMENT RECOVERY] Order already has valid payment data, no recovery needed");
+      return true;
+    }
+    
+    // Restore payment data from source order
+    currentOrder.restorePaymentData(sourceOrder);
+    
+    // Save the recovered order
+    final success = await setOrder(currentOrder);
+    
+    if (success) {
+      print("✅ [PAYMENT RECOVERY] Payment data recovered successfully");
+      
+      // Final verification
+      final verifiedOrder = await getOrder(orderId);
+      if (verifiedOrder != null && verifiedOrder.hasValidPaymentData()) {
+        print("✅ [PAYMENT RECOVERY] Recovery verified successfully");
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    print("❌ [PAYMENT RECOVERY] Failed to recover payment data: $error");
+    return false;
+  }
+}
+
+/// Safe driver assignment with payment data protection
+static Future<bool> assignDriverToOrder(String orderId, String driverId) async {
+  try {
+    print("👤 [ASSIGN DRIVER] Assigning driver $driverId to order $orderId");
+    
+    // Use update to only change driver fields, preserving payment data
+    final updateData = {
+      'driverId': driverId,
+      'status': Constant.rideActive,
+      'updateDate': Timestamp.now(),
+    };
+    
+    // Add to accepted drivers list safely
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder != null) {
+      List<dynamic> existingAccepted = currentOrder.acceptedDriverId ?? [];
+      if (!existingAccepted.contains(driverId)) {
+        existingAccepted.add(driverId);
+      }
+      updateData['acceptedDriverId'] = existingAccepted;
+    }
+    
+    return await updateOrder(orderId, updateData);
+  } catch (error) {
+    print("❌ [ASSIGN DRIVER] Failed to assign driver: $error");
+    return false;
+  }
+}
+
+/// Enhanced order streaming with payment data monitoring
+static Stream<OrderModel?> monitorOrderWithPayment(String orderId) {
+  return fireStore
+      .collection(CollectionName.orders)
+      .doc(orderId)
+      .snapshots()
+      .map((document) {
+        if (document.exists) {
+          final order = OrderModel.fromJson(document.data()!);
+          
+          // Monitor payment data changes
+          print("📊 [ORDER STREAM] Order ${order.id} update:");
+          order.debugPaymentData();
+          
+          return order;
+        }
+        return null;
+      })
+      .handleError((error) {
+        print("❌ [ORDER STREAM] Error monitoring order $orderId: $error");
+      });
+}
+
 }

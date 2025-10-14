@@ -508,41 +508,33 @@ Future<bool> bookRide() async {
     orderModel.otp = Constant.getReferralCode();
     orderModel.taxList = Constant.taxList;
 
-    // ✅ STRIPE PRE-AUTHORIZATION BLOCK (ENHANCED)
-    bool isStripePayment = selectedPaymentMethod.value.toLowerCase() == "stripe" ||
-        selectedPaymentMethod.value.toLowerCase().contains("stripe");
-        
-    if (isStripePayment) {
-      print("🎯 [STRIPE DEBUG] Stripe payment section EXECUTING");
-      print("   stripePaymentIntentId: ${stripePaymentIntentId.value}");
-      print("   stripePreAuthAmount: ${stripePreAuthAmount.value}");
-
-      if (stripePaymentIntentId.value.isNotEmpty && stripePreAuthAmount.value.isNotEmpty) {
-        orderModel.paymentIntentId = stripePaymentIntentId.value;
-        orderModel.preAuthAmount = stripePreAuthAmount.value;
-        orderModel.paymentIntentStatus = 'requires_capture';
-        orderModel.preAuthCreatedAt = Timestamp.now();
-
-        print("✅ [STRIPE DEBUG] Payment data set on OrderModel:");
-        print("   paymentIntentId: ${orderModel.paymentIntentId}");
-        print("   preAuthAmount: ${orderModel.preAuthAmount}");
-        print("   paymentIntentStatus: ${orderModel.paymentIntentStatus}");
-        print("   preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
-
-        // 🔥 CRITICAL: Create wallet transaction for recovery
-        await _createStripePreAuthTransaction(orderModel);
-      } else {
-        print("❌ [STRIPE DEBUG] stripePaymentIntentId or stripePreAuthAmount is EMPTY!");
-        ShowToastDialog.showToast("Payment authorization missing. Please select Stripe payment again.");
+    // ✅ STRIPE PRE-AUTHORIZATION - Atomic payment data recording
+    if (selectedPaymentMethod.value.toLowerCase().contains("stripe")) {
+      if (stripePaymentIntentId.value.isEmpty || stripePreAuthAmount.value.isEmpty) {
+        print("❌ Stripe payment data missing");
+        ShowToastDialog.showToast("Payment authorization error. Please try again.");
         return false;
       }
+
+      // Set ALL payment fields atomically - this data is immutable
+      orderModel.paymentIntentId = stripePaymentIntentId.value;
+      orderModel.preAuthAmount = stripePreAuthAmount.value;
+      orderModel.paymentIntentStatus = 'requires_capture';
+      orderModel.preAuthCreatedAt = Timestamp.now();
+      orderModel.paymentCapturedAt = null;
+      orderModel.paymentCanceledAt = null;
+
+      print("✅ Stripe payment data set atomically");
+      print("   paymentIntentId: ${orderModel.paymentIntentId}");
+      print("   preAuthAmount: ${orderModel.preAuthAmount}");
     } else {
-      print("💰 [WALLET DEBUG] Using Wallet payment - no Stripe data needed");
-      // Explicitly set Stripe fields to null for wallet payments
+      // For non-Stripe, explicitly set null
       orderModel.paymentIntentId = null;
       orderModel.preAuthAmount = null;
       orderModel.paymentIntentStatus = null;
       orderModel.preAuthCreatedAt = null;
+      orderModel.paymentCapturedAt = null;
+      orderModel.paymentCanceledAt = null;
     }
 
     // Handle booking for someone else
@@ -580,34 +572,28 @@ Future<bool> bookRide() async {
       return false;
     }
 
-    // Final debug before saving
-    print("🔍 [BOOK RIDE DEBUG] Payment data before Firestore save:");
-    print("   stripePaymentIntentId: ${stripePaymentIntentId.value}");
-    print("   stripePreAuthAmount: ${stripePreAuthAmount.value}");
-    print("   orderModel.paymentIntentId: ${orderModel.paymentIntentId}");
-    print("   orderModel.preAuthAmount: ${orderModel.preAuthAmount}");
-    print("   orderModel.paymentIntentStatus: ${orderModel.paymentIntentStatus}");
-    print("   orderModel.preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
-    print("   orderModel.paymentType: ${orderModel.paymentType}");
-
-    if (isStripePayment) {
-      print("✅ [BOOK RIDE DEBUG] Stripe payment section executed");
-    } else {
-      print("✅ [BOOK RIDE DEBUG] Wallet payment - no Stripe data expected");
+    // 🔥 CRITICAL: Validate order before saving
+    if (!orderModel.validateForSave()) {
+      ShowToastDialog.showToast("Order validation failed. Please check your details.");
+      return false;
     }
 
-    // 🔥 CRITICAL: Enhanced order saving with verification
-    bool success = await _saveOrderWithVerification(orderModel, isStripePayment);
+    // Debug log before save
+    orderModel.debugPrint();
+
+    // Atomic save
+    bool success = await FireStoreUtils.setOrder(orderModel);
 
     if (success) {
-      print("🔍 Verifying commission data was saved to Firestore...");
-      await FireStoreUtils.verifyOrderCommission(orderModel.id!);
+      // Place ride request (send to drivers)
+      await FireStoreUtils.placeRideRequest(orderModel);
 
-      // Clear form data
+      // Clear form
       resetPaymentState();
       return true;
     }
 
+    ShowToastDialog.showToast("Failed to place ride request");
     return false;
   } catch (e) {
     print("❌ Error in bookRide: $e");

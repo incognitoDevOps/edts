@@ -118,33 +118,12 @@ class OrderModel {
     zone = json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null;
     zoneId = json['zoneId'];
 
-    // 🔥 CRITICAL FIX: Ensure ALL payment fields are properly loaded with null checks
     paymentIntentId = json['paymentIntentId'];
     preAuthAmount = json['preAuthAmount'];
     paymentIntentStatus = json['paymentIntentStatus'];
     preAuthCreatedAt = json['preAuthCreatedAt'];
     paymentCapturedAt = json['paymentCapturedAt'];
     paymentCanceledAt = json['paymentCanceledAt'];
-
-    // 🔍 ENHANCED DEBUGGING: Log what's actually being loaded
-    print("💾 [ORDER FROMJSON] Payment fields loaded from JSON:");
-    print("   paymentIntentId: $paymentIntentId");
-    print("   preAuthAmount: $preAuthAmount");
-    print("   paymentIntentStatus: $paymentIntentStatus");
-    print("   paymentType: $paymentType");
-    print("   preAuthCreatedAt: $preAuthCreatedAt");
-
-    // Debug the raw JSON to see what's actually there
-    print("🔍 [ORDER FROMJSON] Raw JSON payment fields:");
-    print("   json['paymentIntentId']: ${json['paymentIntentId']}");
-    print("   json['preAuthAmount']: ${json['preAuthAmount']}");
-    print("   json['paymentIntentStatus']: ${json['paymentIntentStatus']}");
-
-    // 🔥 CRITICAL: If payment type is Stripe but payment data is missing, log warning
-  if ((paymentType?.toLowerCase().contains("stripe") == true) && 
-      (paymentIntentId == null || paymentIntentId!.isEmpty)) {
-    print("🚨 [ORDER FROMJSON] WARNING: Stripe payment but missing paymentIntentId!");
-  }
 
     if (json['taxList'] != null) {
       taxList = <TaxModel>[];
@@ -182,7 +161,6 @@ class OrderModel {
     }
     data['zoneId'] = zoneId;
 
-    // 🔥 CRITICAL FIX: Ensure ALL payment fields are saved
     data['paymentIntentId'] = paymentIntentId;
     data['preAuthAmount'] = preAuthAmount;
     data['paymentIntentStatus'] = paymentIntentStatus;
@@ -212,14 +190,58 @@ class OrderModel {
       data['position'] = position!.toJson();
     }
 
-    // 🔍 ENHANCED DEBUGGING: Log what's being saved
-    print("💾 [ORDER TOJSON] Payment fields being saved:");
-    print("   paymentIntentId: $paymentIntentId");
-    print("   preAuthAmount: $preAuthAmount");
-    print("   paymentIntentStatus: $paymentIntentStatus");
-    print("   paymentType: $paymentType");
-    print("   preAuthCreatedAt: $preAuthCreatedAt");
-
     return data;
+  }
+
+  /// Validates critical order data before saving
+  bool validateForSave() {
+    if (id == null || id!.isEmpty) {
+      print("❌ Order validation failed: Missing ID");
+      return false;
+    }
+
+    if (userId == null || userId!.isEmpty) {
+      print("❌ Order validation failed: Missing userId");
+      return false;
+    }
+
+    // For Stripe payments, payment intent is REQUIRED
+    if (paymentType?.toLowerCase().contains("stripe") == true) {
+      if (paymentIntentId == null || paymentIntentId!.isEmpty) {
+        print("❌ Order validation failed: Stripe payment missing paymentIntentId");
+        return false;
+      }
+      if (preAuthAmount == null || preAuthAmount!.isEmpty) {
+        print("❌ Order validation failed: Stripe payment missing preAuthAmount");
+        return false;
+      }
+      if (preAuthCreatedAt == null) {
+        print("❌ Order validation failed: Stripe payment missing preAuthCreatedAt timestamp");
+        return false;
+      }
+    }
+
+    print("✅ Order validation passed for order: $id");
+    return true;
+  }
+
+  /// Creates a deep copy to prevent reference issues
+  OrderModel clone() {
+    return OrderModel.fromJson(this.toJson());
+  }
+
+  /// Debug helper to print order state
+  void debugPrint() {
+    print("📋 Order Debug Info:");
+    print("   ID: $id");
+    print("   User ID: $userId");
+    print("   Driver ID: $driverId");
+    print("   Status: $status");
+    print("   Payment Type: $paymentType");
+    print("   Payment Intent ID: $paymentIntentId");
+    print("   Pre-auth Amount: $preAuthAmount");
+    print("   Payment Intent Status: $paymentIntentStatus");
+    print("   Pre-auth Created: $preAuthCreatedAt");
+    print("   Payment Status: $paymentStatus");
   }
 }

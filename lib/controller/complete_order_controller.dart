@@ -25,64 +25,53 @@ class CompleteOrderController extends GetxController {
   getArgument() async {
     try {
       isLoading.value = true;
-      driverError.value = "";
 
       dynamic argumentData = Get.arguments;
-      if (argumentData != null) {
-        OrderModel passedOrder = argumentData['orderModel'];
+      if (argumentData == null) {
+        print("❌ No order data provided");
+        isLoading.value = false;
+        return;
+      }
 
-        print(
-            "🔄 [COMPLETE SCREEN] Loading order with enhanced data recovery...");
-        print("   Order ID: ${passedOrder.id}");
-        print("   Passed Driver ID: ${passedOrder.driverId}");
-        print("   Passed Payment Intent: ${passedOrder.paymentIntentId}");
+      OrderModel passedOrder = argumentData['orderModel'];
 
-        // 🔥 CRITICAL FIX: Load FRESH order with payment recovery
-        final freshOrder =
-            await FireStoreUtils.getOrderWithPaymentRecovery(passedOrder.id!) ??
-                passedOrder;
+      // 🔥 CRITICAL: Load FRESH from Firestore - NO RECOVERY
+      final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+
+      if (freshOrder == null) {
+        print("❌ Order not found");
+        orderModel.value = passedOrder;
+      } else {
         orderModel.value = freshOrder;
+      }
 
-        print("✅ [COMPLETE SCREEN] Order loaded with recovery:");
-        print("   Driver ID: ${orderModel.value.driverId}");
-        print("   Payment Intent: ${orderModel.value.paymentIntentId}");
-        print("   Pre-auth Amount: ${orderModel.value.preAuthAmount}");
-        print("   Payment Status: ${orderModel.value.paymentIntentStatus}");
-        print("   Pre-auth Created: ${orderModel.value.preAuthCreatedAt}");
+      print("✅ [COMPLETE SCREEN] Order loaded:");
+      orderModel.value.debugPrint();
 
-        // 🔥 CRITICAL FIX: Load driver information if driver exists
-        if (orderModel.value.driverId != null &&
-            orderModel.value.driverId!.isNotEmpty) {
-          await _loadDriverInformation();
+      // Load driver if assigned
+      if (orderModel.value.driverId != null &&
+          orderModel.value.driverId!.isNotEmpty) {
+        await _loadDriverInformation();
+      } else {
+        driverError.value = "No driver assigned";
+      }
+
+      // Load coupon
+      if (orderModel.value.coupon != null) {
+        couponModel.value = orderModel.value.coupon!;
+        if (orderModel.value.coupon!.type == "fix") {
+          couponAmount.value = orderModel.value.coupon!.amount.toString();
         } else {
-          print("⚠️ [COMPLETE SCREEN] No driver assigned to this order");
-          driverError.value = "No driver assigned to this ride";
+          couponAmount.value =
+              ((double.parse(orderModel.value.finalRate.toString()) *
+                          double.parse(
+                              orderModel.value.coupon!.amount.toString())) /
+                      100)
+                  .toString();
         }
-
-        // Load coupon data if exists
-        if (orderModel.value.coupon != null) {
-          couponModel.value = orderModel.value.coupon!;
-          if (orderModel.value.coupon?.code != null) {
-            if (orderModel.value.coupon!.type == "fix") {
-              couponAmount.value = orderModel.value.coupon!.amount.toString();
-            } else {
-              couponAmount.value =
-                  ((double.parse(orderModel.value.finalRate.toString()) *
-                              double.parse(
-                                  orderModel.value.coupon!.amount.toString())) /
-                          100)
-                      .toString();
-            }
-          }
-        }
-
-        // 🔥 ADD: Debug the driver state
-        _debugOrderDriverState();
-
-        print("🎉 [COMPLETE SCREEN] All data loaded successfully");
       }
     } catch (e) {
-      print("❌ [COMPLETE SCREEN] Error loading order data: $e");
+      print("❌ Error loading order: $e");
       driverError.value = "Error loading ride details";
     } finally {
       isLoading.value = false;

@@ -722,34 +722,6 @@ class FireStoreUtils {
     return isAdded;
   }
 
-  static Future<OrderModel?> getOrder(String orderId) async {
-    OrderModel? orderModel;
-    try {
-      await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderId)
-          .get()
-          .then((value) {
-        if (value.exists && value.data() != null) {
-          orderModel = OrderModel.fromJson(value.data()!);
-
-          print("getOrder: Successfully loaded order $orderId");
-          if (orderModel!.paymentIntentId != null &&
-              orderModel!.paymentIntentId!.isNotEmpty) {
-            print("   💳 Payment Intent found:");
-            print("     ID: ${orderModel!.paymentIntentId}");
-            print("     Pre-auth amount: ${orderModel!.preAuthAmount}");
-            print("     Status: ${orderModel!.paymentIntentStatus}");
-          } else {
-            print("   ℹ️  No payment intent data in this order");
-          }
-        }
-      });
-    } catch (error) {
-      print("getOrder: Error loading order $orderId: $error");
-    }
-    return orderModel;
-  }
 
   static Future<InterCityOrderModel?> getInterCityOrder(String orderId) async {
     InterCityOrderModel? orderModel;
@@ -2220,235 +2192,25 @@ class FireStoreUtils {
     }
   }
 
-  // Add this to your FireStoreUtils
-  static Future<OrderModel?> getOrderWithPaymentRecovery(String orderId) async {
+  /// Get order without any recovery - fail fast if data is missing
+  static Future<OrderModel?> getOrder(String orderId) async {
+    OrderModel? orderModel;
     try {
-      print("🔄 [PAYMENT RECOVERY] Loading order: $orderId");
-
-      final DocumentSnapshot orderDoc = await FirebaseFirestore.instance
+      await fireStore
           .collection(CollectionName.orders)
           .doc(orderId)
-          .get();
-
-      if (!orderDoc.exists) {
-        print("❌ [PAYMENT RECOVERY] Order not found: $orderId");
-        return null;
-      }
-
-      final data = orderDoc.data() as Map<String, dynamic>;
-
-      // Create order from Firestore data
-      OrderModel order = OrderModel.fromJson(data);
-
-      // 🔥 CRITICAL: Check if payment data is missing but should exist
-      final isStripePayment =
-          order.paymentType?.toLowerCase().contains("stripe") == true;
-      final hasMissingPaymentData =
-          order.paymentIntentId == null || order.paymentIntentId!.isEmpty;
-
-      if (isStripePayment && hasMissingPaymentData) {
-        print(
-            "🚨 [PAYMENT RECOVERY] Stripe payment with missing data - attempting recovery");
-
-        // Store the original order for reference
-        final OrderModel originalOrder = OrderModel.fromJson(data);
-
-        // Attempt recovery from transaction history
-        await _attemptPaymentDataRecovery(order);
-
-        // If recovery was successful, SAVE the recovered data back to Firestore
-        if (order.paymentIntentId != null &&
-            order.paymentIntentId!.isNotEmpty) {
-          print(
-              "💾 [PAYMENT RECOVERY] Recovery successful - saving to Firestore");
-
-          // Update Firestore with recovered data
-          await FirebaseFirestore.instance
-              .collection(CollectionName.orders)
-              .doc(orderId)
-              .update({
-            'paymentIntentId': order.paymentIntentId,
-            'preAuthAmount': order.preAuthAmount,
-            'paymentIntentStatus': order.paymentIntentStatus,
-            'preAuthCreatedAt': order.preAuthCreatedAt,
-          });
-
-          print(
-              "✅ [PAYMENT RECOVERY] Recovered payment data saved to Firestore");
-        } else {
-          print(
-              "⚠️ [PAYMENT RECOVERY] Payment data still missing after all recovery attempts");
-          _createEmergencyPaymentPlaceholder(order);
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          orderModel = OrderModel.fromJson(value.data()!);
+          print("✅ Order loaded: $orderId");
+          orderModel!.debugPrint();
         }
-      }
-
-      // 🔍 Final verification
-      print("\n✅ [PAYMENT RECOVERY] Final order state:");
-      print("   paymentIntentId: ${order.paymentIntentId}");
-      print("   preAuthAmount: ${order.preAuthAmount}");
-      print("   paymentIntentStatus: ${order.paymentIntentStatus}");
-      print("   paymentType: ${order.paymentType}");
-
-      return order;
-    } catch (e) {
-      print("❌ [PAYMENT RECOVERY] Error loading order: $e");
-      return null;
+      });
+    } catch (error) {
+      print("❌ Error loading order $orderId: $error");
     }
-  }
-
-  /// Create emergency placeholder to prevent null errors
-  static void _createEmergencyPaymentPlaceholder(OrderModel order) {
-    print("🆘 [PAYMENT RECOVERY] Creating emergency payment placeholder");
-
-    // Set placeholder values to prevent null errors with ALL required fields
-    order.paymentIntentId = "missing_after_recovery_${order.id}";
-    order.paymentIntentStatus = "requires_recovery";
-    order.preAuthAmount = "0.00";
-    order.preAuthCreatedAt = Timestamp.now(); // 🔥 CRITICAL: Add timestamp
-    order.paymentCapturedAt = null;
-    order.paymentCanceledAt = null;
-
-    print("💡 Emergency placeholder created with timestamp");
-    print("   paymentIntentId: ${order.paymentIntentId}");
-    print("   preAuthAmount: ${order.preAuthAmount}");
-    print("   paymentIntentStatus: ${order.paymentIntentStatus}");
-    print("   preAuthCreatedAt: ${order.preAuthCreatedAt}");
-  }
-
-  static Future<void> _attemptPaymentDataRecovery(OrderModel order) async {
-    try {
-      print("🔧 [PAYMENT RECOVERY] Searching transaction history...");
-
-      // METHOD 1: Try with composite index query (primary method)
-      try {
-        final transactionQuery = await FirebaseFirestore.instance
-            .collection(CollectionName.walletTransaction)
-            .where('transactionId', isEqualTo: order.id)
-            .where('paymentType', isEqualTo: 'Stripe')
-            .orderBy('createdDate', descending: true)
-            .limit(5)
-            .get();
-
-        print(
-            "📋 Found ${transactionQuery.docs.length} Stripe transactions via index");
-
-        for (var doc in transactionQuery.docs) {
-          final transaction = doc.data();
-          final note = transaction['note'] ?? '';
-          final amount = transaction['amount'] ?? '';
-
-          print("🔍 Checking transaction: $note");
-
-          if (_recoverPaymentFromTransaction(
-              order, note, amount, transaction['createdDate'])) {
-            return; // Successfully recovered
-          }
-        }
-      } catch (indexError) {
-        print("⚠️ [PAYMENT RECOVERY] Index query failed: $indexError");
-        print("💡 Falling back to alternative recovery methods...");
-      }
-
-      // METHOD 2: Fallback - Simple query without ordering
-      try {
-        final simpleQuery = await FirebaseFirestore.instance
-            .collection(CollectionName.walletTransaction)
-            .where('transactionId', isEqualTo: order.id)
-            .where('paymentType', isEqualTo: 'Stripe')
-            .limit(10)
-            .get();
-
-        print(
-            "📋 Found ${simpleQuery.docs.length} Stripe transactions via simple query");
-
-        for (var doc in simpleQuery.docs) {
-          final transaction = doc.data();
-          final note = transaction['note'] ?? '';
-          final amount = transaction['amount'] ?? '';
-
-          if (_recoverPaymentFromTransaction(
-              order, note, amount, transaction['createdDate'])) {
-            return; // Successfully recovered
-          }
-        }
-      } catch (simpleError) {
-        print("⚠️ [PAYMENT RECOVERY] Simple query failed: $simpleError");
-      }
-
-      // METHOD 3: Final fallback - Search all transactions for this order
-      try {
-        final allTransactions = await FirebaseFirestore.instance
-            .collection(CollectionName.walletTransaction)
-            .where('transactionId', isEqualTo: order.id)
-            .limit(20)
-            .get();
-
-        print(
-            "📋 Found ${allTransactions.docs.length} total transactions for order");
-
-        for (var doc in allTransactions.docs) {
-          final transaction = doc.data();
-          final note = transaction['note'] ?? '';
-          final amount = transaction['amount'] ?? '';
-          final paymentType = transaction['paymentType'] ?? '';
-
-          // Look for Stripe transactions or any transaction with payment intent
-          if (paymentType == 'Stripe' || note.contains('pi_')) {
-            if (_recoverPaymentFromTransaction(
-                order, note, amount, transaction['createdDate'])) {
-              return; // Successfully recovered
-            }
-          }
-        }
-      } catch (finalError) {
-        print("⚠️ [PAYMENT RECOVERY] Final fallback failed: $finalError");
-      }
-
-      print("❌ [PAYMENT RECOVERY] No recoverable payment data found");
-    } catch (e) {
-      print("❌ [PAYMENT RECOVERY] Recovery attempt failed: $e");
-    }
-  }
-
-  /// Helper method to extract and apply payment data from transaction
-  static bool _recoverPaymentFromTransaction(
-      OrderModel order, String note, String amount, Timestamp? createdAt) {
-    // Try to extract payment intent ID from note
-    if (note.contains('pi_')) {
-      final regex = RegExp(r'pi_[a-zA-Z0-9_]+');
-      final match = regex.firstMatch(note);
-      if (match != null) {
-        final recoveredPaymentIntentId = match.group(0);
-        print(
-            "✅ [PAYMENT RECOVERY] Recovered paymentIntentId: $recoveredPaymentIntentId");
-
-        // Update the order with ALL recovered data
-        order.paymentIntentId = recoveredPaymentIntentId;
-        order.paymentIntentStatus = 'requires_capture';
-
-        // Try to recover pre-auth amount from transaction
-        if (amount.toString().startsWith('-')) {
-          order.preAuthAmount = amount.toString().replaceFirst('-', '');
-        } else if (amount.isNotEmpty) {
-          order.preAuthAmount = amount;
-        }
-
-        // 🔥 CRITICAL: Set timestamp - use transaction date or current time
-        order.preAuthCreatedAt = createdAt ?? Timestamp.now();
-        order.paymentCapturedAt = null;
-        order.paymentCanceledAt = null;
-
-        print(
-            "💾 [PAYMENT RECOVERY] Applying recovered payment data to order:");
-        print("   paymentIntentId: ${order.paymentIntentId}");
-        print("   preAuthAmount: ${order.preAuthAmount}");
-        print("   paymentIntentStatus: ${order.paymentIntentStatus}");
-        print("   preAuthCreatedAt: ${order.preAuthCreatedAt}");
-
-        return true;
-      }
-    }
-    return false;
+    return orderModel;
   }
 
   /// Verify order data integrity after save
@@ -2478,51 +2240,38 @@ class FireStoreUtils {
     }
   }
 
-  /// Enhanced setOrder with data integrity validation
-  static Future<bool?> setOrder(OrderModel orderModel) async {
-    bool isAdded = false;
+  /// Clean atomic setOrder with validation
+  static Future<bool> setOrder(OrderModel orderModel) async {
     try {
-      // 🔥 CRITICAL: Log what we're about to save
-      print("💾 [SET ORDER] Saving order ${orderModel.id} with payment data:");
-      print("   paymentIntentId: ${orderModel.paymentIntentId}");
-      print("   preAuthAmount: ${orderModel.preAuthAmount}");
-      print("   paymentIntentStatus: ${orderModel.paymentIntentStatus}");
-      print("   paymentType: ${orderModel.paymentType}");
-
-      // Ensure commission data is always included
-      if (orderModel.adminCommission == null) {
-        print("💡 Adding missing admin commission to order before saving");
-        if (Constant.adminCommission != null) {
-          orderModel.adminCommission = Constant.adminCommission;
-          print("✅ Commission added: ${Constant.adminCommission!.toJson()}");
-        } else {
-          print("❌ Cannot add commission: Constant.adminCommission is null");
-          // Create a default commission to avoid null errors
-          orderModel.adminCommission = AdminCommission(
-              isEnabled: false,
-              type: "percentage",
-              amount: "0",
-              flatRatePromotion:
-                  FlatRatePromotion(isEnabled: false, amount: 0.0));
-        }
+      // 🔥 CRITICAL: Validate before save
+      if (!orderModel.validateForSave()) {
+        print("❌ [SET ORDER] Validation failed for order ${orderModel.id}");
+        return false;
       }
 
+      print("💾 [SET ORDER] Saving order ${orderModel.id}");
+      print("   driverId: ${orderModel.driverId}");
+      print("   paymentIntentId: ${orderModel.paymentIntentId}");
+      print("   paymentType: ${orderModel.paymentType}");
+      print("   status: ${orderModel.status}");
+
+      // Ensure commission data
+      if (orderModel.adminCommission == null && Constant.adminCommission != null) {
+        orderModel.adminCommission = Constant.adminCommission;
+      }
+
+      // 🔥 ATOMIC WRITE - Full document, no merge
       await fireStore
           .collection(CollectionName.orders)
           .doc(orderModel.id)
-          .set(orderModel.toJson(), SetOptions(merge: true))
-          .then((value) {
-        isAdded = true;
-        print("✅ [SET ORDER] Successfully saved order ${orderModel.id}");
+          .set(orderModel.toJson());
 
-        // 🔍 VERIFICATION: Read back immediately to confirm save
-        verifyOrderDataIntegrity(orderModel.id!);
-      });
+      print("✅ [SET ORDER] Order saved successfully");
+      return true;
     } catch (error) {
-      print("❌ [SET ORDER] Failed to save order ${orderModel.id}: $error");
-      isAdded = false;
+      print("❌ [SET ORDER] Save failed: $error");
+      return false;
     }
-    return isAdded;
   }
 
   static Future<bool> setOrderWithVerification(OrderModel orderModel) async {

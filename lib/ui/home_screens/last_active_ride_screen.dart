@@ -1519,70 +1519,49 @@ class _AcceptRejectDriverModal extends StatelessWidget {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
 
-      // 🔥 CRITICAL: Preserve ALL payment data AND driver data when updating order
-      final String? preservedPaymentIntentId = order.paymentIntentId;
-      final String? preservedPreAuthAmount = order.preAuthAmount;
-      final String? preservedPaymentIntentStatus = order.paymentIntentStatus;
-      final Timestamp? preservedPreAuthCreatedAt = order.preAuthCreatedAt;
-      final Timestamp? preservedPaymentCapturedAt = order.paymentCapturedAt;
-      final Timestamp? preservedPaymentCanceledAt = order.paymentCanceledAt;
+      // 🔥 CRITICAL: Clone order to prevent reference issues
+      OrderModel updatedOrder = order.clone();
 
-      // 🔥 CRITICAL: Create a NEW OrderModel instance to avoid reference issues
-      OrderModel updatedOrder =
-          OrderModel.fromJson(order.toJson()); // Clone the order
-
-      updatedOrder.acceptedDriverId = [];
-      updatedOrder.driverId = driver.id; // 🔥 Make sure this is set correctly
+      // Set driver data - THIS IS PERMANENT AND IMMUTABLE
+      updatedOrder.driverId = driver.id;
       updatedOrder.status = Constant.rideActive;
+      updatedOrder.acceptedDriverId = [driver.id];
       updatedOrder.updateDate = Timestamp.now();
 
-      // Restore ALL preserved payment data
-      updatedOrder.paymentIntentId = preservedPaymentIntentId;
-      updatedOrder.preAuthAmount = preservedPreAuthAmount;
-      updatedOrder.paymentIntentStatus = preservedPaymentIntentStatus;
-      updatedOrder.preAuthCreatedAt = preservedPreAuthCreatedAt;
-      updatedOrder.paymentCapturedAt = preservedPaymentCapturedAt;
-      updatedOrder.paymentCanceledAt = preservedPaymentCanceledAt;
-
-      print("💾 [ACCEPT DRIVER] Preserving ALL payment and driver data:");
+      print("💾 [ACCEPT DRIVER] Assigning driver permanently:");
       print("   driverId: ${updatedOrder.driverId}");
-      print("   paymentIntentId: $preservedPaymentIntentId");
-      print("   preAuthAmount: $preservedPreAuthAmount");
-      print("   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+      print("   paymentIntentId: ${updatedOrder.paymentIntentId}");
+      updatedOrder.debugPrint();
 
-      // 🔥 CRITICAL: Use enhanced setOrder with verification
-      bool success =
-          await FireStoreUtils.setOrderWithVerification(updatedOrder);
+      // 🔥 CRITICAL: Validate before save
+      if (!updatedOrder.validateForSave()) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Failed to assign driver - invalid data");
+        return;
+      }
+
+      // Atomic save
+      bool success = await FireStoreUtils.setOrder(updatedOrder);
+
+      ShowToastDialog.closeLoader();
 
       if (success) {
-        // Update local state
-        order.driverId = driver.id;
-        order.status = Constant.rideActive;
-        order.updateDate = Timestamp.now();
-
-        // Send notification to driver
+        // Send notification
         if (driver.fcmToken != null) {
           await SendNotification.sendOneNotification(
             token: driver.fcmToken!,
             title: 'Ride Confirmed'.tr,
-            body:
-                'Your ride request has been accepted by the passenger. Please proceed to the pickup location.'
-                    .tr,
+            body: 'Your ride has been accepted. Please proceed to pickup.'.tr,
             payload: {"type": "ride_accepted", "orderId": order.id},
           );
         }
-
-        ShowToastDialog.closeLoader();
-        ShowToastDialog.showToast("Driver accepted! They are on their way.");
-
-        // 🔥 CRITICAL: Verify the update was successful
-        await _verifyDriverAssignment(order.id!, driver.id!);
+        ShowToastDialog.showToast("Driver accepted!");
       } else {
-        throw Exception("Failed to save order with driver assignment");
+        ShowToastDialog.showToast("Failed to assign driver");
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
-      ShowToastDialog.showToast("Failed to accept driver: ${e.toString()}");
+      ShowToastDialog.showToast("Error: ${e.toString()}");
       print("❌ [ACCEPT DRIVER] Error: $e");
     }
   }

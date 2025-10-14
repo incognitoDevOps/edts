@@ -44,73 +44,55 @@ class PaymentOrderController extends GetxController {
 
   Rx<OrderModel> orderModel = OrderModel().obs;
 
-   getArgument() async {
+  getArgument() async {
     try {
-      print("🔄 [PAYMENT LOAD] Starting payment controller initialization...");
-      
+      print("🔄 [PAYMENT LOAD] Loading payment screen...");
+
       dynamic argumentData = Get.arguments;
       if (argumentData == null) {
-        print("❌ [PAYMENT LOAD] No arguments passed to payment screen");
+        print("❌ No order data provided");
         isLoading.value = false;
-        update();
         return;
       }
 
       OrderModel passedOrder = argumentData['orderModel'];
-      if (passedOrder.id == null || passedOrder.id!.isEmpty) {
-        print("❌ [PAYMENT LOAD] Invalid order data in arguments");
+
+      // 🔥 CRITICAL: Load FRESH from Firestore - NO RECOVERY
+      final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+
+      if (freshOrder == null) {
+        print("❌ Order not found in database");
         isLoading.value = false;
-        update();
+        ShowToastDialog.showToast("Order data not found");
         return;
       }
 
-      print("📦 [PAYMENT LOAD] Processing order: ${passedOrder.id}");
-      print("   Passed Driver ID: ${passedOrder.driverId}");
-      print("   Passed Payment Intent: ${passedOrder.paymentIntentId}");
-      print("   Passed Payment Type: ${passedOrder.paymentType}");
+      // Validate payment data exists for Stripe
+      if (freshOrder.paymentType?.toLowerCase().contains("stripe") == true) {
+        if (freshOrder.paymentIntentId == null ||
+            freshOrder.paymentIntentId!.isEmpty) {
+          print("❌ CRITICAL: Stripe payment missing payment intent");
+          ShowToastDialog.showToast(
+              "Payment authorization missing. Contact support with order ID: ${freshOrder.id}");
+          isLoading.value = false;
+          return;
+        }
+      }
 
-      // Set the passed order immediately for UI
-      orderModel.value = passedOrder;
-      selectedPaymentMethod.value = passedOrder.paymentType ?? '';
+      orderModel.value = freshOrder;
+      selectedPaymentMethod.value = freshOrder.paymentType ?? '';
 
-      // 🔥 CRITICAL: Load fresh data from Firestore with recovery
-      await _loadOrderWithRecovery(passedOrder.id!);
-      
-    } catch (e, stack) {
-      print("❌ [PAYMENT LOAD] Error in getArgument: $e");
-      print("📋 Stack trace: $stack");
-      isLoading.value = false;
-      update();
-      ShowToastDialog.showToast("Error loading order data");
-    }
-  }
+      print("✅ [PAYMENT LOAD] Order loaded:");
+      freshOrder.debugPrint();
 
-  // 🔥 NEW: Enhanced order loading with recovery
-  Future<void> _loadOrderWithRecovery(String orderId) async {
-    try {
-      print("🔄 [ORDER RECOVERY] Loading fresh order data from Firestore...");
-      
-      // Load fresh order data
-      final freshOrder = await FireStoreUtils.getOrderWithPaymentRecovery(orderId);
-      
-      if (freshOrder != null) {
-        orderModel.value = freshOrder;
-        print("✅ [ORDER RECOVERY] Order loaded successfully");
-        print("   Driver ID: ${freshOrder.driverId}");
-        print("   Payment Intent: ${freshOrder.paymentIntentId}");
-        print("   Status: ${freshOrder.status}");
-        
-        // Now load payment configuration and other data
-        await getPaymentData();
-      } else {
-        print("⚠️ [ORDER RECOVERY] Failed to load fresh order, using passed data");
-        // Continue with existing orderModel value
-        await getPaymentData();
+      // Load driver if assigned
+      if (freshOrder.driverId != null && freshOrder.driverId!.isNotEmpty) {
+        await _loadDriverInformation();
       }
     } catch (e) {
-      print("❌ [ORDER RECOVERY] Error loading order: $e");
-      // Continue with payment data loading even if order recovery fails
-      await getPaymentData();
+      print("❌ Error loading order: $e");
+      isLoading.value = false;
+      ShowToastDialog.showToast("Error loading order data");
     }
   }
   

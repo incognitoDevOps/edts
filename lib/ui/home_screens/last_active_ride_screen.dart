@@ -2,6 +2,8 @@ import 'package:customer/constant/collection_name.dart';
 import 'package:customer/constant/send_notification.dart';
 import 'package:customer/model/order_model.dart';
 import 'package:customer/model/driver_user_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
+import 'package:customer/services/stripe_service.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/ui/contact_us/contact_us_screen.dart';
 import 'package:customer/utils/fire_store_utils.dart';
@@ -833,40 +835,97 @@ class LastActiveRideScreen extends StatelessWidget {
                           if (confirm == true) {
                             ShowToastDialog.showLoader('Cancelling ride...');
 
-                            // 🔥 CRITICAL: Preserve ALL payment data when cancelling
-                            final String? preservedPaymentIntentId =
-                                order.paymentIntentId;
-                            final String? preservedPreAuthAmount =
-                                order.preAuthAmount;
-                            final String? preservedPaymentIntentStatus =
-                                order.paymentIntentStatus;
-                            final Timestamp? preservedPreAuthCreatedAt =
-                                order.preAuthCreatedAt;
-                            final Timestamp? preservedPaymentCapturedAt =
-                                order.paymentCapturedAt;
-                            final Timestamp? preservedPaymentCanceledAt =
-                                order.paymentCanceledAt;
+                            try {
+                              // 🔥 CRITICAL: Handle Stripe refund if payment method is Stripe
+                              if (order.paymentType?.toLowerCase().contains('stripe') == true &&
+                                  order.paymentIntentId != null &&
+                                  order.paymentIntentId!.isNotEmpty) {
 
-                            order.status = Constant.rideCanceled;
+                                print("💳 [CANCEL RIDE] Processing Stripe refund...");
+                                print("   Payment Intent: ${order.paymentIntentId}");
+                                print("   Amount: ${order.preAuthAmount}");
 
-                            // Restore ALL preserved payment data
-                            order.paymentIntentId = preservedPaymentIntentId;
-                            order.preAuthAmount = preservedPreAuthAmount;
-                            order.paymentIntentStatus =
-                                preservedPaymentIntentStatus;
-                            order.preAuthCreatedAt = preservedPreAuthCreatedAt;
-                            order.paymentCapturedAt =
-                                preservedPaymentCapturedAt;
-                            order.paymentCanceledAt =
-                                preservedPaymentCanceledAt;
+                                // Get Stripe configuration
+                                final paymentModel = await FireStoreUtils().getPayment();
+                                if (paymentModel?.strip != null &&
+                                    paymentModel!.strip!.stripeSecret != null) {
 
-                            await FireStoreUtils.setOrder(order);
-                            ShowToastDialog.closeLoader();
-                            ShowToastDialog.showToast('Ride cancelled');
-                            Future.delayed(const Duration(milliseconds: 300),
-                                () {
-                              Get.offAllNamed('/');
-                            });
+                                  final stripeService = StripeService(
+                                    stripeSecret: paymentModel.strip!.stripeSecret!,
+                                    publishableKey: paymentModel.strip!.clientpublishableKey!,
+                                  );
+
+                                  // Release the pre-authorization (immediate refund)
+                                  final refundSuccess = await stripeService.releasePreAuthorization(
+                                    paymentIntentId: order.paymentIntentId!,
+                                  );
+
+                                  if (refundSuccess) {
+                                    print("✅ [CANCEL RIDE] Stripe pre-authorization released successfully");
+
+                                    // Update payment status
+                                    order.paymentIntentStatus = 'cancelled';
+                                    order.paymentCanceledAt = Timestamp.now();
+
+                                    // Log refund transaction
+                                    final refundTransaction = WalletTransactionModel(
+                                      id: Constant.getUuid(),
+                                      amount: "0",
+                                      createdDate: Timestamp.now(),
+                                      paymentType: "Stripe",
+                                      transactionId: order.id,
+                                      userId: FireStoreUtils.getCurrentUid(),
+                                      orderType: "city",
+                                      userType: "customer",
+                                      note: "Stripe pre-authorization released for cancelled ride ${order.id} - Payment Intent: ${order.paymentIntentId}",
+                                    );
+
+                                    await FireStoreUtils.setWalletTransaction(refundTransaction);
+                                    print("💾 [CANCEL RIDE] Refund transaction logged");
+                                  } else {
+                                    print("⚠️  [CANCEL RIDE] Failed to release Stripe pre-authorization");
+                                    ShowToastDialog.closeLoader();
+                                    ShowToastDialog.showToast(
+                                      "Failed to process refund. Please contact support.",
+                                      duration: Duration(seconds: 5),
+                                    );
+                                    return;
+                                  }
+                                } else {
+                                  print("⚠️  [CANCEL RIDE] Stripe not configured properly");
+                                }
+                              }
+
+                              // Update order status
+                              order.status = Constant.rideCanceled;
+                              order.updateDate = Timestamp.now();
+
+                              // Save order with updated status
+                              await FireStoreUtils.setOrder(order);
+
+                              ShowToastDialog.closeLoader();
+
+                              // Show appropriate message based on payment method
+                              if (order.paymentType?.toLowerCase().contains('stripe') == true) {
+                                ShowToastDialog.showToast(
+                                  'Ride cancelled. The held amount has been released to your card.',
+                                  duration: Duration(seconds: 4),
+                                );
+                              } else {
+                                ShowToastDialog.showToast('Ride cancelled');
+                              }
+
+                              Future.delayed(const Duration(milliseconds: 300), () {
+                                Get.offAllNamed('/');
+                              });
+                            } catch (e) {
+                              ShowToastDialog.closeLoader();
+                              print("❌ [CANCEL RIDE] Error: $e");
+                              ShowToastDialog.showToast(
+                                "Failed to cancel ride. Please try again or contact support.",
+                                duration: Duration(seconds: 4),
+                              );
+                            }
                           }
                         },
                       ),
@@ -1519,19 +1578,54 @@ class _AcceptRejectDriverModal extends StatelessWidget {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
 
-      // 🔥 CRITICAL: Clone order to prevent reference issues
-      OrderModel updatedOrder = order.clone();
+      // 🔥 CRITICAL: Read fresh order data from Firestore to get latest payment info
+      print("📥 [ACCEPT DRIVER] Fetching fresh order data from Firestore...");
+      final freshOrderDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(order.id)
+          .get();
 
-      // Set driver data - THIS IS PERMANENT AND IMMUTABLE
+      if (!freshOrderDoc.exists || freshOrderDoc.data() == null) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Order not found");
+        return;
+      }
+
+      // Create updated order with fresh data
+      OrderModel updatedOrder = OrderModel.fromJson(freshOrderDoc.data()!);
+
+      // 🔥 PRESERVE ALL existing payment data (these are IMMUTABLE)
+      final String? preservedPaymentIntentId = updatedOrder.paymentIntentId;
+      final String? preservedPreAuthAmount = updatedOrder.preAuthAmount;
+      final String? preservedPaymentIntentStatus = updatedOrder.paymentIntentStatus;
+      final Timestamp? preservedPreAuthCreatedAt = updatedOrder.preAuthCreatedAt;
+      final Timestamp? preservedPaymentCapturedAt = updatedOrder.paymentCapturedAt;
+      final Timestamp? preservedPaymentCanceledAt = updatedOrder.paymentCanceledAt;
+
+      print("💾 [ACCEPT DRIVER] Preserved payment data:");
+      print("   paymentIntentId: $preservedPaymentIntentId");
+      print("   preAuthAmount: $preservedPreAuthAmount");
+      print("   paymentIntentStatus: $preservedPaymentIntentStatus");
+      print("   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+
+      // Set driver data - THIS IS PERMANENT
       updatedOrder.driverId = driver.id;
       updatedOrder.status = Constant.rideActive;
       updatedOrder.acceptedDriverId = [driver.id];
       updatedOrder.updateDate = Timestamp.now();
 
-      print("💾 [ACCEPT DRIVER] Assigning driver permanently:");
+      // 🔥 RESTORE ALL payment data (NEVER lose this)
+      updatedOrder.paymentIntentId = preservedPaymentIntentId;
+      updatedOrder.preAuthAmount = preservedPreAuthAmount;
+      updatedOrder.paymentIntentStatus = preservedPaymentIntentStatus;
+      updatedOrder.preAuthCreatedAt = preservedPreAuthCreatedAt;
+      updatedOrder.paymentCapturedAt = preservedPaymentCapturedAt;
+      updatedOrder.paymentCanceledAt = preservedPaymentCanceledAt;
+
+      print("💾 [ACCEPT DRIVER] Assigning driver with payment data:");
       print("   driverId: ${updatedOrder.driverId}");
       print("   paymentIntentId: ${updatedOrder.paymentIntentId}");
-      updatedOrder.debugPrint();
+      print("   preAuthAmount: ${updatedOrder.preAuthAmount}");
 
       // 🔥 CRITICAL: Validate before save
       if (!updatedOrder.validateForSave()) {
@@ -1540,8 +1634,33 @@ class _AcceptRejectDriverModal extends StatelessWidget {
         return;
       }
 
-      // Atomic save
+      // Atomic save with verification
       bool success = await FireStoreUtils.setOrder(updatedOrder);
+
+      if (success) {
+        // Verify payment data was saved
+        await Future.delayed(Duration(milliseconds: 500));
+        final verifyDoc = await FirebaseFirestore.instance
+            .collection(CollectionName.orders)
+            .doc(order.id)
+            .get();
+
+        if (verifyDoc.exists) {
+          final verifyData = verifyDoc.data();
+          print("✅ [ACCEPT DRIVER] Verification after save:");
+          print("   paymentIntentId: ${verifyData?['paymentIntentId']}");
+          print("   preAuthAmount: ${verifyData?['preAuthAmount']}");
+
+          if (preservedPaymentIntentId != null &&
+              preservedPaymentIntentId.isNotEmpty &&
+              verifyData?['paymentIntentId'] != preservedPaymentIntentId) {
+            print("❌ [ACCEPT DRIVER] CRITICAL: Payment data was lost!");
+            ShowToastDialog.closeLoader();
+            ShowToastDialog.showToast("Error: Payment data was lost. Please try again.");
+            return;
+          }
+        }
+      }
 
       ShowToastDialog.closeLoader();
 

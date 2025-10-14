@@ -1206,8 +1206,18 @@ class BookingDetailsScreen extends StatelessWidget {
         if (method.toLowerCase().contains('stripe')) {
           await _handleStripeSelection(context, controller, method);
         } else {
-          // For other payment methods, just set it
+          // For other payment methods (Wallet, Cash, etc.)
+          // Clear any previous Stripe payment data
+          if (controller.selectedPaymentMethod.value.toLowerCase().contains('stripe')) {
+            print("🔄 [PAYMENT SWITCH] Switching from Stripe to ${method}");
+            print("   Clearing previous Stripe authorization...");
+            controller.stripePaymentIntentId.value = "";
+            controller.stripePreAuthAmount.value = "";
+          }
+
+          // Set the new payment method
           controller.selectedPaymentMethod.value = method;
+          print("✅ [PAYMENT SWITCH] Payment method changed to: $method");
         }
       },
     );
@@ -1320,10 +1330,17 @@ class BookingDetailsScreen extends StatelessWidget {
           );
         } else {
           // Payment failed or was cancelled
-          controller.resetPaymentState();
+          // Clear only the Stripe-specific data, keep payment method selection
+          controller.stripePaymentIntentId.value = "";
+          controller.stripePreAuthAmount.value = "";
+          // Clear the payment method selection so user can choose again
+          controller.selectedPaymentMethod.value = "";
 
           if (paymentResult['cancelled'] == true) {
-            ShowToastDialog.showToast("Payment authorization was cancelled.");
+            ShowToastDialog.showToast(
+              "Payment authorization was cancelled. You can select a different payment method.",
+              duration: Duration(seconds: 4),
+            );
           } else if (paymentResult['message'] != null) {
             // Show specific error message from Stripe
             ShowToastDialog.showToast(
@@ -1335,13 +1352,17 @@ class BookingDetailsScreen extends StatelessWidget {
         }
       } else {
         // Pre-authorization failed
-        controller.resetPaymentState();
+        controller.stripePaymentIntentId.value = "";
+        controller.stripePreAuthAmount.value = "";
+        controller.selectedPaymentMethod.value = "";
         final errorMessage = preAuthResult['error'] ?? 'Unknown error';
         ShowToastDialog.showToast("Payment setup failed: $errorMessage");
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
-      controller.resetPaymentState();
+      controller.stripePaymentIntentId.value = "";
+      controller.stripePreAuthAmount.value = "";
+      controller.selectedPaymentMethod.value = "";
 
       // Handle specific Stripe errors
       if (e is StripeException) {

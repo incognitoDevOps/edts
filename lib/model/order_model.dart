@@ -62,6 +62,8 @@ class OrderModel {
     this.offerRate,
     this.finalRate,
     this.paymentStatus,
+    this.acceptedDriverId,
+    this.rejectedDriverId,
     this.createdDate,
     this.updateDate,
     this.taxList,
@@ -79,67 +81,87 @@ class OrderModel {
     this.paymentCanceledAt,
   });
 
-  OrderModel.fromJson(Map<String, dynamic> json) {
-    serviceId = json['serviceId'];
-    sourceLocationName = json['sourceLocationName'];
-    paymentType = json['paymentType'];
-    destinationLocationName = json['destinationLocationName'];
-    sourceLocationLAtLng = json['sourceLocationLAtLng'] != null
-        ? LocationLatLng.fromJson(json['sourceLocationLAtLng'])
-        : null;
-    destinationLocationLAtLng = json['destinationLocationLAtLng'] != null
-        ? LocationLatLng.fromJson(json['destinationLocationLAtLng'])
-        : null;
-    coupon =
-        json['coupon'] != null ? CouponModel.fromJson(json['coupon']) : null;
-    someOneElse = json['someOneElse'] != null
-        ? ContactModel.fromJson(json['someOneElse'])
-        : null;
-    id = json['id'];
-    userId = json['userId'];
-    offerRate = json['offerRate'];
-    finalRate = json['finalRate'];
-    distance = json['distance'];
-    distanceType = json['distanceType'];
-    status = json['status'];
-    driverId = json['driverId'];
-    otp = json['otp'];
-
-    // 🔥 CRITICAL: Handle all timestamp fields with proper parsing
-    createdDate = _parseTimestamp(json['createdDate']);
-    updateDate = _parseTimestamp(json['updateDate']);
-
-    acceptedDriverId = json['acceptedDriverId'];
-    rejectedDriverId = json['rejectedDriverId'];
-    paymentStatus = json['paymentStatus'];
-    position =
-        json['position'] != null ? Positions.fromJson(json['position']) : null;
-    service =
-        json['service'] != null ? ServiceModel.fromJson(json['service']) : null;
-    adminCommission = json['adminCommission'] != null
-        ? AdminCommission.fromJson(json['adminCommission'])
-        : null;
-    zone = json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null;
-    zoneId = json['zoneId'];
-
-    // 🔥 CRITICAL: Properly handle payment fields with null checks
-    paymentIntentId = json['paymentIntentId'];
-    preAuthAmount = json['preAuthAmount'];
-    paymentIntentStatus = json['paymentIntentStatus'];
-
-    // Handle payment timestamp fields properly
-    preAuthCreatedAt = _parseTimestamp(json['preAuthCreatedAt']);
-    paymentCapturedAt = _parseTimestamp(json['paymentCapturedAt']);
-    paymentCanceledAt = _parseTimestamp(json['paymentCanceledAt']);
-
-    if (json['taxList'] != null) {
-      taxList = <TaxModel>[];
-      json['taxList'].forEach((v) {
-        taxList!.add(TaxModel.fromJson(v));
-      });
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+  print("🔄 [ORDER FROM JSON] Parsing order from JSON");
+  
+  // 🔥 CRITICAL: MANUALLY PRESERVE PAYMENT DATA BEFORE ANY PARSING
+  final preservedPaymentIntentId = json['paymentIntentId']?.toString();
+  final preservedPreAuthAmount = json['preAuthAmount']?.toString();
+  final preservedPaymentIntentStatus = json['paymentIntentStatus']?.toString();
+  
+  // MANUAL timestamp parsing - don't rely on _parseTimestamp
+  Timestamp? preservedPreAuthCreatedAt;
+  final preAuthCreatedAtData = json['preAuthCreatedAt'];
+  if (preAuthCreatedAtData is Timestamp) {
+    preservedPreAuthCreatedAt = preAuthCreatedAtData;
+  } else if (preAuthCreatedAtData is Map) {
+    final seconds = preAuthCreatedAtData['_seconds'] ?? preAuthCreatedAtData['seconds'];
+    final nanoseconds = preAuthCreatedAtData['_nanoseconds'] ?? preAuthCreatedAtData['nanoseconds'] ?? 0;
+    if (seconds != null) {
+      preservedPreAuthCreatedAt = Timestamp(seconds, nanoseconds);
     }
   }
 
+  // Now do normal parsing
+  OrderModel order = OrderModel(
+    serviceId: json['serviceId'],
+    sourceLocationName: json['sourceLocationName'],
+    paymentType: json['paymentType'],
+    destinationLocationName: json['destinationLocationName'],
+    sourceLocationLAtLng: json['sourceLocationLAtLng'] != null
+        ? LocationLatLng.fromJson(json['sourceLocationLAtLng'])
+        : null,
+    destinationLocationLAtLng: json['destinationLocationLAtLng'] != null
+        ? LocationLatLng.fromJson(json['destinationLocationLAtLng'])
+        : null,
+    coupon: json['coupon'] != null ? CouponModel.fromJson(json['coupon']) : null,
+    someOneElse: json['someOneElse'] != null
+        ? ContactModel.fromJson(json['someOneElse'])
+        : null,
+    id: json['id'],
+    userId: json['userId'],
+    offerRate: json['offerRate'],
+    finalRate: json['finalRate'],
+    distance: json['distance'],
+    distanceType: json['distanceType'],
+    status: json['status'],
+    driverId: json['driverId'],
+    otp: json['otp'],
+    createdDate: json['createdDate'],
+    updateDate: json['updateDate'],
+    acceptedDriverId: json['acceptedDriverId'],
+    rejectedDriverId: json['rejectedDriverId'],
+    paymentStatus: json['paymentStatus'],
+    position: json['position'] != null ? Positions.fromJson(json['position']) : null,
+    service: json['service'] != null ? ServiceModel.fromJson(json['service']) : null,
+    adminCommission: json['adminCommission'] != null
+        ? AdminCommission.fromJson(json['adminCommission'])
+        : null,
+    zone: json['zone'] != null ? ZoneModel.fromJson(json['zone']) : null,
+    zoneId: json['zoneId'],
+    // 🔥 CRITICAL: Use preserved payment data instead of parsing
+    paymentIntentId: preservedPaymentIntentId,
+    preAuthAmount: preservedPreAuthAmount,
+    paymentIntentStatus: preservedPaymentIntentStatus,
+    preAuthCreatedAt: preservedPreAuthCreatedAt,
+    paymentCapturedAt: json['paymentCapturedAt'],
+    paymentCanceledAt: json['paymentCanceledAt'],
+  );
+
+  if (json['taxList'] != null) {
+    order.taxList = <TaxModel>[];
+    json['taxList'].forEach((v) {
+      order.taxList!.add(TaxModel.fromJson(v));
+    });
+  }
+
+  print("✅ [ORDER FROM JSON] Payment data preserved:");
+  print("   paymentIntentId: ${order.paymentIntentId}");
+  print("   preAuthAmount: ${order.preAuthAmount}");
+  print("   preAuthCreatedAt: ${order.preAuthCreatedAt}");
+
+  return order;
+}
   // 🔥 CRITICAL: Helper method to parse timestamps safely from Firestore
   Timestamp? _parseTimestamp(dynamic timestampData) {
     if (timestampData == null) return null;

@@ -2373,19 +2373,14 @@ static Future<OrderModel?> getOrder(String orderId) async {
         .get();
 
     if (document.exists) {
+      // 🔥 Use the FIXED OrderModel.fromJson that preserves payment data
       final order = OrderModel.fromJson(document.data()!);
       
-      // 🔥 CRITICAL: Debug the raw Firestore data
-      final rawData = document.data()!;
-      print("🔍 [GET ORDER] Raw Firestore data for $orderId:");
-      print("   paymentIntentId: ${rawData['paymentIntentId']}");
-      print("   preAuthAmount: ${rawData['preAuthAmount']}");
-      print("   paymentIntentStatus: ${rawData['paymentIntentStatus']}");
-      print("   preAuthCreatedAt: ${rawData['preAuthCreatedAt']}");
-      print("   preAuthCreatedAt type: ${rawData['preAuthCreatedAt']?.runtimeType}");
-      
-      // Debug parsed order
-      order.debugPaymentData();
+      // Final validation
+      if (order.paymentType?.toLowerCase().contains("stripe") == true && 
+          !order.hasValidPaymentData()) {
+        print("🚨 [GET ORDER] WARNING: Payment data may be corrupted after parsing");
+      }
       
       return order;
     }
@@ -2397,7 +2392,6 @@ static Future<OrderModel?> getOrder(String orderId) async {
     return null;
   }
 }
-
 /// Recovery function for orders with lost payment data
 static Future<bool> recoverOrderPaymentData(String orderId, OrderModel sourceOrder) async {
   try {

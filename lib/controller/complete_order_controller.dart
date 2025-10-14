@@ -35,18 +35,40 @@ class CompleteOrderController extends GetxController {
 
       OrderModel passedOrder = argumentData['orderModel'];
 
-      // 🔥 CRITICAL: Load FRESH from Firestore - NO RECOVERY
-      final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+      // 🔥 CRITICAL: Validate passed order before using it
+      print("🔍 [COMPLETE SCREEN] Passed order validation:");
+      passedOrder.debugPaymentData();
 
-      if (freshOrder == null) {
-        print("❌ Order not found");
+      // 🔥 CRITICAL: Use the passed order if it has valid payment data
+      if (passedOrder.hasValidPaymentData()) {
+        print("✅ [COMPLETE SCREEN] Using passed order with valid payment data");
         orderModel.value = passedOrder;
       } else {
-        orderModel.value = freshOrder;
+        // Only fetch from Firestore if passed order is missing payment data
+        print(
+            "⚠️  [COMPLETE SCREEN] Passed order missing payment data, fetching from Firestore");
+        final freshOrder = await FireStoreUtils.getOrder(passedOrder.id!);
+
+        // 🔥 VALIDATE the fetched order too
+        if (freshOrder != null && freshOrder.hasValidPaymentData()) {
+          print("✅ [COMPLETE SCREEN] Firestore order has valid payment data");
+          orderModel.value = freshOrder;
+        } else {
+          print(
+              "❌ [COMPLETE SCREEN] Both passed and Firestore orders missing payment data");
+          orderModel.value = passedOrder; // Use original as fallback
+        }
       }
 
-      print("✅ [COMPLETE SCREEN] Order loaded:");
-      orderModel.value.debugPrint();
+      // 🔥 FINAL VALIDATION
+      print("✅ [COMPLETE SCREEN] Final order state:");
+      orderModel.value.debugPaymentData();
+
+      if (orderModel.value.paymentType?.toLowerCase().contains("stripe") ==
+              true &&
+          !orderModel.value.hasValidPaymentData()) {
+        print("🚨 [COMPLETE SCREEN] CRITICAL: Stripe payment data is missing!");
+      }
 
       // Load driver if assigned
       if (orderModel.value.driverId != null &&
@@ -91,7 +113,8 @@ class CompleteOrderController extends GetxController {
       // Use retry mechanism to load driver
       final driver = await FireStoreUtils.getDriverWithRetry(
         orderModel.value.driverId,
-        maxRetries: 2, retryDelay: Duration(seconds: 2),
+        maxRetries: 2,
+        retryDelay: Duration(seconds: 2),
       );
 
       if (driver != null) {
@@ -189,31 +212,5 @@ class CompleteOrderController extends GetxController {
       return Constant().formatTimestamp(orderModel.value.createdDate!);
     }
     return "Date not available";
-  }
-
-  // 🔥 ADD TO CompleteOrderController
-  void _debugOrderDriverState() {
-    print("🔍 [ORDER DRIVER DEBUG] Complete Order Analysis:");
-    print("   Order ID: ${orderModel.value.id}");
-    print("   Driver ID: ${orderModel.value.driverId}");
-    print("   Status: ${orderModel.value.status}");
-    print("   Payment Intent: ${orderModel.value.paymentIntentId}");
-    print("   Pre-auth Amount: ${orderModel.value.preAuthAmount}");
-    print("   Created Date: ${orderModel.value.createdDate}");
-
-    // Check if this is a completed ride without driver
-    if (orderModel.value.driverId == null ||
-        orderModel.value.driverId!.isEmpty) {
-      print("🚨 [ORDER DRIVER DEBUG] ORDER HAS NO DRIVER ASSIGNED!");
-
-      if (orderModel.value.status == Constant.rideComplete) {
-        print(
-            "💡 This is a COMPLETED ride without driver assignment - this shouldn't happen!");
-      } else if (orderModel.value.status == Constant.ridePlaced) {
-        print("💡 This ride is still PLACED - waiting for driver acceptance");
-      } else if (orderModel.value.status == Constant.rideCanceled) {
-        print("💡 This ride was CANCELLED - no driver assigned");
-      }
-    }
   }
 }

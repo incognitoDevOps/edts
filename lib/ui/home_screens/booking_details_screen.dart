@@ -1214,13 +1214,9 @@ class BookingDetailsScreen extends StatelessWidget {
         } else {
           // For other payment methods (Wallet, Cash, etc.)
           // Clear any previous Stripe payment data
-<<<<<<< HEAD
           if (controller.selectedPaymentMethod.value
               .toLowerCase()
               .contains('stripe')) {
-=======
-          if (controller.selectedPaymentMethod.value.toLowerCase().contains('stripe')) {
->>>>>>> a0a0d44109c83a678a9f55ea9b669c732a6e2e77
             print("🔄 [PAYMENT SWITCH] Switching from Stripe to ${method}");
             print("   Clearing previous Stripe authorization...");
             controller.stripePaymentIntentId.value = "";

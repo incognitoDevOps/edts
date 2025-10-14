@@ -265,7 +265,818 @@ class LastActiveRideScreen extends StatelessWidget {
             "📱 [LAST ACTIVE RIDE] Displaying ride: ${order.id} with status: ${order.status}");
         order.debugPaymentData();
 
+<<<<<<< HEAD
         return _buildRideScreen(context, order);
+=======
+        if (order.status == Constant.rideComplete &&
+            order.paymentStatus == true) {
+          // Payment is complete, show confirmation and Rate Driver button
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Ride Complete',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 80),
+                  const SizedBox(height: 24),
+                  Text('Payment Confirmed!',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                          color: Colors.green)),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.star, color: Colors.amber),
+                    label: const Text('Rate Driver'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      textStyle: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600, fontSize: 18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      // Remove 'const' before ReviewScreen to fix the error
+                      Get.to(ReviewScreen(), arguments: {
+                        "type": "orderModel",
+                        "orderModel": order,
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Enhanced ride display with real-time updates
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: Text('Your Ride',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.help_outline),
+                tooltip: 'Support',
+                onPressed: () {
+                  // Navigate to support/contact screen
+                  Get.to(() => const ContactUsScreen());
+                },
+              ),
+            ],
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, Colors.teal.shade700],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          body: Stack(
+            children: [
+              // Map view (fullscreen, under content)
+              if (order.sourceLocationLAtLng != null &&
+                  order.destinationLocationLAtLng != null)
+                StreamBuilder<DriverUserModel?>(
+                  stream: order.driverId != null
+                      ? _getDriverUpdates(order.driverId!)
+                      : null,
+                  builder: (context, driverSnapshot) {
+                    return FutureBuilder<List<LatLng>>(
+                      future: _getRoutePolyline(
+                        LatLng(order.sourceLocationLAtLng!.latitude ?? 0.0,
+                            order.sourceLocationLAtLng!.longitude ?? 0.0),
+                        LatLng(order.destinationLocationLAtLng!.latitude ?? 0.0,
+                            order.destinationLocationLAtLng!.longitude ?? 0.0),
+                      ),
+                      builder: (context, routeSnapshot) {
+                        final points = routeSnapshot.data ??
+                            [
+                              LatLng(
+                                  order.sourceLocationLAtLng!.latitude ?? 0.0,
+                                  order.sourceLocationLAtLng!.longitude ?? 0.0),
+                              LatLng(
+                                  order.destinationLocationLAtLng!.latitude ??
+                                      0.0,
+                                  order.destinationLocationLAtLng!.longitude ??
+                                      0.0),
+                            ];
+
+                        final pickup = LatLng(
+                            order.sourceLocationLAtLng!.latitude ?? 0.0,
+                            order.sourceLocationLAtLng!.longitude ?? 0.0);
+                        final dropoff = LatLng(
+                            order.destinationLocationLAtLng!.latitude ?? 0.0,
+                            order.destinationLocationLAtLng!.longitude ?? 0.0);
+
+                        // Create markers set
+                        Set<Marker> markers = {
+                          Marker(
+                            markerId: const MarkerId('pickup'),
+                            position: pickup,
+                            infoWindow: const InfoWindow(title: 'Pickup'),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueGreen),
+                          ),
+                          Marker(
+                            markerId: const MarkerId('dropoff'),
+                            position: dropoff,
+                            infoWindow: const InfoWindow(title: 'Drop-off'),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueRed),
+                          ),
+                        };
+
+                        // Add driver marker if available
+                        if (driverSnapshot.hasData &&
+                            driverSnapshot.data?.location?.latitude != null &&
+                            driverSnapshot.data?.location?.longitude != null) {
+                          final driverLocation = LatLng(
+                            driverSnapshot.data!.location!.latitude!,
+                            driverSnapshot.data!.location!.longitude!,
+                          );
+
+                          markers.add(Marker(
+                            markerId: const MarkerId('driver'),
+                            position: driverLocation,
+                            infoWindow: InfoWindow(
+                              title:
+                                  'Driver: ${driverSnapshot.data?.fullName ?? "Driver"}',
+                              snippet: 'Current location',
+                            ),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueBlue),
+                            rotation: driverSnapshot.data?.rotation ?? 0.0,
+                          ));
+                        }
+
+                        // Calculate bounds
+                        LatLngBounds bounds;
+                        if (pickup.latitude > dropoff.latitude &&
+                            pickup.longitude > dropoff.longitude) {
+                          bounds = LatLngBounds(
+                              southwest: dropoff, northeast: pickup);
+                        } else if (pickup.longitude > dropoff.longitude) {
+                          bounds = LatLngBounds(
+                            southwest:
+                                LatLng(pickup.latitude, dropoff.longitude),
+                            northeast:
+                                LatLng(dropoff.latitude, pickup.longitude),
+                          );
+                        } else if (pickup.latitude > dropoff.latitude) {
+                          bounds = LatLngBounds(
+                            southwest:
+                                LatLng(dropoff.latitude, pickup.longitude),
+                            northeast:
+                                LatLng(pickup.latitude, dropoff.longitude),
+                          );
+                        } else {
+                          bounds = LatLngBounds(
+                              southwest: pickup, northeast: dropoff);
+                        }
+
+                        return Positioned.fill(
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: pickup,
+                              zoom: 13,
+                            ),
+                            markers: markers,
+                            polylines: {
+                              Polyline(
+                                polylineId: const PolylineId('route'),
+                                color: Colors.teal,
+                                width: 4,
+                                points: points,
+                              ),
+                            },
+                            zoomControlsEnabled: false,
+                            myLocationButtonEnabled: false,
+                            liteModeEnabled: false,
+                            onMapCreated: (controller) async {
+                              if (!_mapController.isCompleted) {
+                                _mapController.complete(controller);
+                              }
+                              await Future.delayed(
+                                  const Duration(milliseconds: 300));
+                              controller.animateCamera(
+                                CameraUpdate.newLatLngBounds(bounds, 80),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+
+              // Enhanced foreground content with real-time updates
+              StreamBuilder<OrderModel?>(
+                stream: _getRideUpdates(order.id!),
+                builder: (context, orderSnapshot) {
+                  OrderModel currentOrder;
+
+                  if (orderSnapshot.hasData && orderSnapshot.data != null) {
+                    currentOrder = orderSnapshot.data!;
+
+                    // 🔥 CRITICAL: Preserve ALL payment data when order updates
+                    if ((currentOrder.paymentIntentId == null ||
+                            currentOrder.paymentIntentId!.isEmpty) &&
+                        (order.paymentIntentId != null &&
+                            order.paymentIntentId!.isNotEmpty)) {
+                      print(
+                          "🔄 [STREAM UPDATE] Preserving ALL payment data in stream update");
+
+                      // Preserve ALL payment fields
+                      currentOrder.paymentIntentId = order.paymentIntentId;
+                      currentOrder.preAuthAmount = order.preAuthAmount;
+                      currentOrder.paymentIntentStatus =
+                          order.paymentIntentStatus;
+                      currentOrder.preAuthCreatedAt =
+                          order.preAuthCreatedAt; // 🔥 This was missing!
+                      currentOrder.paymentCapturedAt = order.paymentCapturedAt;
+                      currentOrder.paymentCanceledAt = order.paymentCanceledAt;
+
+                      print("💾 Preserved payment data:");
+                      print(
+                          "   paymentIntentId: ${currentOrder.paymentIntentId}");
+                      print("   preAuthAmount: ${currentOrder.preAuthAmount}");
+                      print(
+                          "   paymentIntentStatus: ${currentOrder.paymentIntentStatus}");
+                      print(
+                          "   preAuthCreatedAt: ${currentOrder.preAuthCreatedAt}");
+                    }
+                  } else {
+                    currentOrder = order;
+                  }
+
+                  return DraggableScrollableSheet(
+                    initialChildSize: 0.45,
+                    minChildSize: 0.35,
+                    maxChildSize: 0.95,
+                    builder: (context, scrollController) => Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(24),
+                          topRight: Radius.circular(24),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
+                          ),
+                        ],
+                      ),
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+                        children: [
+                          Center(
+                              child: Container(
+                                  width: 40,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                      color: Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(2)))),
+
+                          _StatusBanner(
+                            status: currentOrder.status ?? '',
+                            driverFound: currentOrder.acceptedDriverId !=
+                                    null &&
+                                currentOrder.acceptedDriverId!.isNotEmpty &&
+                                (currentOrder.status == Constant.ridePlaced),
+                          ),
+
+                          // Driver information when found
+                          if (currentOrder.driverId != null &&
+                              currentOrder.driverId!.isNotEmpty)
+                            StreamBuilder<DriverUserModel?>(
+                              stream: _getDriverUpdates(currentOrder.driverId!),
+                              builder: (context, driverSnapshot) {
+                                if (driverSnapshot.hasData &&
+                                    driverSnapshot.data != null) {
+                                  final driver = driverSnapshot.data!;
+                                  return _DriverInfoCard(
+                                      driver: driver, order: currentOrder);
+                                }
+                                return const SizedBox();
+                              },
+                            ),
+
+                          // Show driver selection when multiple drivers respond
+                          if (currentOrder.acceptedDriverId != null &&
+                              currentOrder.acceptedDriverId!.isNotEmpty &&
+                              currentOrder.status == Constant.ridePlaced)
+                            ...currentOrder.acceptedDriverId!
+                                .map((driverId) =>
+                                    FutureBuilder<DriverUserModel?>(
+                                      future:
+                                          FireStoreUtils.getDriver(driverId),
+                                      builder: (context, driverSnapshot) {
+                                        if (driverSnapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return Constant.loader();
+                                        }
+                                        if (!driverSnapshot.hasData ||
+                                            driverSnapshot.data == null) {
+                                          return const SizedBox();
+                                        }
+                                        final driverModel =
+                                            driverSnapshot.data!;
+                                        return _AcceptRejectDriverModal(
+                                          order: currentOrder,
+                                          driverModel: driverModel,
+                                        );
+                                      },
+                                    ))
+                                .toList(),
+
+                          // Ride timer for active rides
+                          if (currentOrder.status == Constant.rideActive &&
+                              currentOrder.createdDate != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.timer,
+                                      color: Colors.teal.shade300),
+                                  const SizedBox(width: 6),
+                                  _RideTimer(
+                                      startTime: currentOrder.createdDate!),
+                                  const Spacer(),
+                                  if (currentOrder.distance != null)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.directions_car,
+                                            color: Colors.teal.shade300),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                            'Distance: ${currentOrder.distance}',
+                                            style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                          // Ride details card
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Material(
+                              elevation: 1,
+                              borderRadius: BorderRadius.circular(16),
+                              color: Theme.of(context).cardColor,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    LocationView(
+                                      sourceLocation:
+                                          currentOrder.sourceLocationName,
+                                      destinationLocation:
+                                          currentOrder.destinationLocationName,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.attach_money,
+                                            color: Colors.teal.shade400,
+                                            size: 20),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                            currentOrder.finalRate ??
+                                                currentOrder.offerRate ??
+                                                '-',
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16)),
+                                        const SizedBox(width: 16),
+                                        Icon(Icons.payment,
+                                            color: Colors.teal.shade400,
+                                            size: 20),
+                                        const SizedBox(width: 4),
+                                        Text(currentOrder.paymentType ?? '-',
+                                            style: GoogleFonts.poppins()),
+                                        const Spacer(),
+                                        Icon(Icons.calendar_today,
+                                            color: Colors.teal.shade400,
+                                            size: 18),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                            currentOrder.createdDate != null
+                                                ? DateFormat('MMM d, h:mm a')
+                                                    .format(currentOrder
+                                                        .createdDate!
+                                                        .toDate())
+                                                : '-',
+                                            style: GoogleFonts.poppins(
+                                                fontSize: 13)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Text('Payment: ',
+                                            style: GoogleFonts.poppins()),
+                                        Text(
+                                            currentOrder.paymentStatus == true
+                                                ? 'Paid'
+                                                : 'Unpaid',
+                                            style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.bold,
+                                                color: currentOrder
+                                                            .paymentStatus ==
+                                                        true
+                                                    ? Colors.teal
+                                                    : Colors.red)),
+                                        const Spacer(),
+                                        if (currentOrder.otp != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.teal.shade50,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.lock,
+                                                    size: 16,
+                                                    color: Colors.teal),
+                                                const SizedBox(width: 4),
+                                                Text('OTP: ${currentOrder.otp}',
+                                                    style: GoogleFonts.poppins(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Colors.teal)),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+
+                                    // Live progress indicator for in-progress rides
+                                    if (currentOrder.status ==
+                                        Constant.rideInProgress)
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Divider(),
+                                          Text('Live Route Progress',
+                                              style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600)),
+                                          const SizedBox(height: 8),
+                                          LinearProgressIndicator(
+                                            value:
+                                                0.5, // TODO: Calculate actual progress based on driver location
+                                            backgroundColor: Colors.grey[200],
+                                            color: Colors.teal,
+                                            minHeight: 6,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Additional ride information
+                          if (currentOrder.someOneElse != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.person,
+                                      color: Colors.teal.shade400),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                      'Ride for: ${currentOrder.someOneElse?.fullName ?? '-'}',
+                                      style: GoogleFonts.poppins()),
+                                ],
+                              ),
+                            ),
+
+                          if (currentOrder.coupon != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.local_offer,
+                                      color: Colors.teal.shade400),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                      'Coupon: ${currentOrder.coupon?.code ?? '-'}',
+                                      style: GoogleFonts.poppins()),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // Enhanced persistent bottom action bar
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor.withOpacity(0.98),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 12,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _UberActionButton(
+                        icon: Icons.share,
+                        label: 'Share Ride',
+                        color: Colors.blueAccent,
+                        onTap: () async {
+                          final shareText =
+                              'I am on a BuzRyde!\nRide ID: ${order.id ?? '-'}\nPickup: ${order.sourceLocationName ?? '-'}\nDrop-off: ${order.destinationLocationName ?? '-'}\nFare: ${order.finalRate ?? order.offerRate ?? '-'}\nStatus: ${order.status ?? '-'}';
+                          await Share.share(shareText);
+                        },
+                      ),
+                      _UberActionButton(
+                        icon: Icons.cancel,
+                        label: 'Cancel Ride',
+                        color: Colors.redAccent,
+                        onTap: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Cancel Ride'),
+                              content: const Text(
+                                  'Are you sure you want to cancel this ride?'),
+                              actions: [
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(false),
+                                    child: const Text('No')),
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(true),
+                                    child: const Text('Yes')),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            ShowToastDialog.showLoader('Cancelling ride...');
+
+                            try {
+                              // 🔥 CRITICAL: Handle Stripe refund if payment method is Stripe
+                              if (order.paymentType?.toLowerCase().contains('stripe') == true &&
+                                  order.paymentIntentId != null &&
+                                  order.paymentIntentId!.isNotEmpty) {
+
+                                print("💳 [CANCEL RIDE] Processing Stripe refund...");
+                                print("   Payment Intent: ${order.paymentIntentId}");
+                                print("   Amount: ${order.preAuthAmount}");
+
+                                // Get Stripe configuration
+                                final paymentModel = await FireStoreUtils().getPayment();
+                                if (paymentModel?.strip != null &&
+                                    paymentModel!.strip!.stripeSecret != null) {
+
+                                  final stripeService = StripeService(
+                                    stripeSecret: paymentModel.strip!.stripeSecret!,
+                                    publishableKey: paymentModel.strip!.clientpublishableKey!,
+                                  );
+
+                                  // Release the pre-authorization (immediate refund)
+                                  final refundSuccess = await stripeService.releasePreAuthorization(
+                                    paymentIntentId: order.paymentIntentId!,
+                                  );
+
+                                  if (refundSuccess) {
+                                    print("✅ [CANCEL RIDE] Stripe pre-authorization released successfully");
+
+                                    // Update payment status
+                                    order.paymentIntentStatus = 'cancelled';
+                                    order.paymentCanceledAt = Timestamp.now();
+
+                                    // Log refund transaction
+                                    final refundTransaction = WalletTransactionModel(
+                                      id: Constant.getUuid(),
+                                      amount: "0",
+                                      createdDate: Timestamp.now(),
+                                      paymentType: "Stripe",
+                                      transactionId: order.id,
+                                      userId: FireStoreUtils.getCurrentUid(),
+                                      orderType: "city",
+                                      userType: "customer",
+                                      note: "Stripe pre-authorization released for cancelled ride ${order.id} - Payment Intent: ${order.paymentIntentId}",
+                                    );
+
+                                    await FireStoreUtils.setWalletTransaction(refundTransaction);
+                                    print("💾 [CANCEL RIDE] Refund transaction logged");
+                                  } else {
+                                    print("⚠️  [CANCEL RIDE] Failed to release Stripe pre-authorization");
+                                    ShowToastDialog.closeLoader();
+                                    ShowToastDialog.showToast(
+                                      "Failed to process refund. Please contact support.",
+                                      duration: Duration(seconds: 5),
+                                    );
+                                    return;
+                                  }
+                                } else {
+                                  print("⚠️  [CANCEL RIDE] Stripe not configured properly");
+                                }
+                              }
+
+                              // Update order status
+                              order.status = Constant.rideCanceled;
+                              order.updateDate = Timestamp.now();
+
+                              // Save order with updated status
+                              await FireStoreUtils.setOrder(order);
+
+                              ShowToastDialog.closeLoader();
+
+                              // Show appropriate message based on payment method
+                              if (order.paymentType?.toLowerCase().contains('stripe') == true) {
+                                ShowToastDialog.showToast(
+                                  'Ride cancelled. The held amount has been released to your card.',
+                                  duration: Duration(seconds: 4),
+                                );
+                              } else {
+                                ShowToastDialog.showToast('Ride cancelled');
+                              }
+
+                              Future.delayed(const Duration(milliseconds: 300), () {
+                                Get.offAllNamed('/');
+                              });
+                            } catch (e) {
+                              ShowToastDialog.closeLoader();
+                              print("❌ [CANCEL RIDE] Error: $e");
+                              ShowToastDialog.showToast(
+                                "Failed to cancel ride. Please try again or contact support.",
+                                duration: Duration(seconds: 4),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      if (order.status == Constant.rideInProgress)
+                        _UberActionButton(
+                          icon: Icons.check_circle_outline,
+                          label: 'Complete Ride',
+                          color: Colors.green,
+                          onTap: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Complete Ride'),
+                                content: const Text(
+                                    'Are you sure you want to mark this ride as completed?'),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(false),
+                                      child: const Text('No')),
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(ctx).pop(true),
+                                      child: const Text('Yes')),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              ShowToastDialog.showLoader('Completing ride...');
+
+                              // 🔥 CRITICAL: Preserve ALL payment data when completing ride
+                              final String? preservedPaymentIntentId =
+                                  order.paymentIntentId;
+                              final String? preservedPreAuthAmount =
+                                  order.preAuthAmount;
+                              final String? preservedPaymentIntentStatus =
+                                  order.paymentIntentStatus;
+                              final Timestamp? preservedPreAuthCreatedAt =
+                                  order.preAuthCreatedAt;
+                              final Timestamp? preservedPaymentCapturedAt =
+                                  order.paymentCapturedAt;
+                              final Timestamp? preservedPaymentCanceledAt =
+                                  order.paymentCanceledAt;
+
+                              order.status = Constant.rideComplete;
+
+                              // Restore ALL preserved payment data
+                              order.paymentIntentId = preservedPaymentIntentId;
+                              order.preAuthAmount = preservedPreAuthAmount;
+                              order.paymentIntentStatus =
+                                  preservedPaymentIntentStatus;
+                              order.preAuthCreatedAt =
+                                  preservedPreAuthCreatedAt;
+                              order.paymentCapturedAt =
+                                  preservedPaymentCapturedAt;
+                              order.paymentCanceledAt =
+                                  preservedPaymentCanceledAt;
+
+                              print(
+                                  "💾 [COMPLETE RIDE] Preserving ALL payment data for completion:");
+                              print(
+                                  "   paymentIntentId: $preservedPaymentIntentId");
+                              print(
+                                  "   preAuthAmount: $preservedPreAuthAmount");
+                              print(
+                                  "   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+
+                              await FireStoreUtils.setOrder(order);
+                              ShowToastDialog.closeLoader();
+                              ShowToastDialog.showToast('Ride completed');
+                              Future.delayed(const Duration(milliseconds: 300),
+                                  () {
+                                Get.offAllNamed('/');
+                              });
+                            }
+                          },
+                        ),
+                      if (order.driverId != null && order.driverId!.isNotEmpty)
+                        _UberActionButton(
+                          icon: Icons.message,
+                          label: 'Message',
+                          color: Colors.teal,
+                          onTap: () async {
+                            final customer =
+                                await FireStoreUtils.getUserProfile(
+                                    order.userId ?? '');
+                            final driver =
+                                await FireStoreUtils.getDriver(order.driverId!);
+                            if (customer != null && driver != null) {
+                              Get.to(ChatScreens(
+                                driverId: driver.id,
+                                customerId: customer.id,
+                                customerName: customer.fullName,
+                                customerProfileImage: customer.profilePic,
+                                driverName: driver.fullName,
+                                driverProfileImage: driver.profilePic,
+                                orderId: order.id,
+                                token: driver.fcmToken,
+                              ));
+                            }
+                          },
+                        ),
+                      if (order.driverId != null && order.driverId!.isNotEmpty)
+                        _UberActionButton(
+                          icon: Icons.phone,
+                          label: 'Call Driver',
+                          color: Colors.teal,
+                          onTap: () async {
+                            final driver =
+                                await FireStoreUtils.getDriver(order.driverId!);
+                            if (driver?.phoneNumber != null) {
+                              await Constant.makePhoneCall(
+                                  driver!.phoneNumber!);
+                            } else {
+                              ShowToastDialog.showToast(
+                                  "Driver phone number not available");
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+>>>>>>> a0a0d44109c83a678a9f55ea9b669c732a6e2e77
       },
     );
   }
@@ -1696,6 +2507,7 @@ class _AcceptRejectDriverModal extends StatelessWidget {
     try {
       ShowToastDialog.showLoader("Accepting driver...");
 
+<<<<<<< HEAD
       // 🔥 CRITICAL: Use the ORIGINAL order that has valid payment data
       // Don't fetch from Firestore again - the stream already corrupted the data
       OrderModel updatedOrder = order.clone();
@@ -1715,6 +2527,39 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       }
 
       // Set driver data ONLY - preserve all payment data
+=======
+      // 🔥 CRITICAL: Read fresh order data from Firestore to get latest payment info
+      print("📥 [ACCEPT DRIVER] Fetching fresh order data from Firestore...");
+      final freshOrderDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(order.id)
+          .get();
+
+      if (!freshOrderDoc.exists || freshOrderDoc.data() == null) {
+        ShowToastDialog.closeLoader();
+        ShowToastDialog.showToast("Order not found");
+        return;
+      }
+
+      // Create updated order with fresh data
+      OrderModel updatedOrder = OrderModel.fromJson(freshOrderDoc.data()!);
+
+      // 🔥 PRESERVE ALL existing payment data (these are IMMUTABLE)
+      final String? preservedPaymentIntentId = updatedOrder.paymentIntentId;
+      final String? preservedPreAuthAmount = updatedOrder.preAuthAmount;
+      final String? preservedPaymentIntentStatus = updatedOrder.paymentIntentStatus;
+      final Timestamp? preservedPreAuthCreatedAt = updatedOrder.preAuthCreatedAt;
+      final Timestamp? preservedPaymentCapturedAt = updatedOrder.paymentCapturedAt;
+      final Timestamp? preservedPaymentCanceledAt = updatedOrder.paymentCanceledAt;
+
+      print("💾 [ACCEPT DRIVER] Preserved payment data:");
+      print("   paymentIntentId: $preservedPaymentIntentId");
+      print("   preAuthAmount: $preservedPreAuthAmount");
+      print("   paymentIntentStatus: $preservedPaymentIntentStatus");
+      print("   preAuthCreatedAt: $preservedPreAuthCreatedAt");
+
+      // Set driver data - THIS IS PERMANENT
+>>>>>>> a0a0d44109c83a678a9f55ea9b669c732a6e2e77
       updatedOrder.driverId = driver.id;
       updatedOrder.status = Constant.rideActive;
 
@@ -1727,10 +2572,25 @@ class _AcceptRejectDriverModal extends StatelessWidget {
 
       updatedOrder.updateDate = Timestamp.now();
 
+<<<<<<< HEAD
       // 🔥 DEBUG: Final state before save
       print("🔍 [ACCEPT DRIVER] Final state before save:");
       print("   driverId: ${updatedOrder.driverId}");
       updatedOrder.debugPaymentData();
+=======
+      // 🔥 RESTORE ALL payment data (NEVER lose this)
+      updatedOrder.paymentIntentId = preservedPaymentIntentId;
+      updatedOrder.preAuthAmount = preservedPreAuthAmount;
+      updatedOrder.paymentIntentStatus = preservedPaymentIntentStatus;
+      updatedOrder.preAuthCreatedAt = preservedPreAuthCreatedAt;
+      updatedOrder.paymentCapturedAt = preservedPaymentCapturedAt;
+      updatedOrder.paymentCanceledAt = preservedPaymentCanceledAt;
+
+      print("💾 [ACCEPT DRIVER] Assigning driver with payment data:");
+      print("   driverId: ${updatedOrder.driverId}");
+      print("   paymentIntentId: ${updatedOrder.paymentIntentId}");
+      print("   preAuthAmount: ${updatedOrder.preAuthAmount}");
+>>>>>>> a0a0d44109c83a678a9f55ea9b669c732a6e2e77
 
       // 🔥 CRITICAL: Validate before save
       if (!updatedOrder.validateForSave()) {
@@ -1740,8 +2600,37 @@ class _AcceptRejectDriverModal extends StatelessWidget {
         return;
       }
 
+<<<<<<< HEAD
       // Use atomic save
+=======
+      // Atomic save with verification
+>>>>>>> a0a0d44109c83a678a9f55ea9b669c732a6e2e77
       bool success = await FireStoreUtils.setOrder(updatedOrder);
+
+      if (success) {
+        // Verify payment data was saved
+        await Future.delayed(Duration(milliseconds: 500));
+        final verifyDoc = await FirebaseFirestore.instance
+            .collection(CollectionName.orders)
+            .doc(order.id)
+            .get();
+
+        if (verifyDoc.exists) {
+          final verifyData = verifyDoc.data();
+          print("✅ [ACCEPT DRIVER] Verification after save:");
+          print("   paymentIntentId: ${verifyData?['paymentIntentId']}");
+          print("   preAuthAmount: ${verifyData?['preAuthAmount']}");
+
+          if (preservedPaymentIntentId != null &&
+              preservedPaymentIntentId.isNotEmpty &&
+              verifyData?['paymentIntentId'] != preservedPaymentIntentId) {
+            print("❌ [ACCEPT DRIVER] CRITICAL: Payment data was lost!");
+            ShowToastDialog.closeLoader();
+            ShowToastDialog.showToast("Error: Payment data was lost. Please try again.");
+            return;
+          }
+        }
+      }
 
       ShowToastDialog.closeLoader();
 

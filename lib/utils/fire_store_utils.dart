@@ -2534,58 +2534,6 @@ static Future<bool> assignDriverToOrder(String orderId, String driverId) async {
   }
 }
 
-/// CRITICAL: Safe order update that PRESERVES payment data from Firestore
-/// This method ALWAYS fetches existing payment data before updating
-static Future<bool> updateOrderPreservingPayment(OrderModel updatedOrder) async {
-  try {
-    print("🔐 [SAFE UPDATE] Updating order ${updatedOrder.id} with payment preservation");
-
-    // 🔥 STEP 1: Fetch the CURRENT order from Firestore to get latest payment data
-    final currentFirestoreOrder = await fireStore
-        .collection(CollectionName.orders)
-        .doc(updatedOrder.id)
-        .get();
-
-    if (!currentFirestoreOrder.exists) {
-      print("❌ [SAFE UPDATE] Order ${updatedOrder.id} not found in Firestore");
-      return false;
-    }
-
-    final currentData = currentFirestoreOrder.data()!;
-
-    // 🔥 STEP 2: Extract payment data from Firestore (source of truth)
-    final firestorePaymentIntentId = currentData['paymentIntentId']?.toString();
-    final firestorePreAuthAmount = currentData['preAuthAmount']?.toString();
-    final firestorePaymentIntentStatus = currentData['paymentIntentStatus']?.toString();
-    final firestorePreAuthCreatedAt = currentData['preAuthCreatedAt'];
-    final firestorePaymentCapturedAt = currentData['paymentCapturedAt'];
-    final firestorePaymentCanceledAt = currentData['paymentCanceledAt'];
-
-    print("🔍 [SAFE UPDATE] Current Firestore payment data:");
-    print("   paymentIntentId: $firestorePaymentIntentId");
-    print("   preAuthAmount: $firestorePreAuthAmount");
-    print("   paymentIntentStatus: $firestorePaymentIntentStatus");
-
-    // 🔥 STEP 3: Override updatedOrder's payment fields with Firestore data
-    if (firestorePaymentIntentId != null && firestorePaymentIntentId.isNotEmpty) {
-      print("🔒 [SAFE UPDATE] Restoring payment data from Firestore");
-      updatedOrder.paymentIntentId = firestorePaymentIntentId;
-      updatedOrder.preAuthAmount = firestorePreAuthAmount;
-      updatedOrder.paymentIntentStatus = firestorePaymentIntentStatus;
-      updatedOrder.preAuthCreatedAt = firestorePreAuthCreatedAt as Timestamp?;
-      updatedOrder.paymentCapturedAt = firestorePaymentCapturedAt as Timestamp?;
-      updatedOrder.paymentCanceledAt = firestorePaymentCanceledAt as Timestamp?;
-    }
-
-    // 🔥 STEP 4: Now save with guaranteed payment data
-    return await setOrder(updatedOrder);
-
-  } catch (error) {
-    print("❌ [SAFE UPDATE] Error: $error");
-    return false;
-  }
-}
-
 /// Enhanced order streaming with payment data monitoring
 static Stream<OrderModel?> monitorOrderWithPayment(String orderId) {
   return fireStore

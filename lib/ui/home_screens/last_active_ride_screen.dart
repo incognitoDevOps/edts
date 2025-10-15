@@ -1178,7 +1178,6 @@ Future<void> _completeRide(OrderModel order) async {
   try {
     ShowToastDialog.showLoader('Completing ride...');
 
-<<<<<<< HEAD
     // 🔥 STEP 1: Validate order completion requirements
     bool canComplete = await FireStoreUtils.validateOrderCompletion(order.id!);
     if (!canComplete) {
@@ -1196,24 +1195,14 @@ Future<void> _completeRide(OrderModel order) async {
     }
 
     // 🔥 STEP 3: Clone and update order
-=======
-    // 🔥 CRITICAL: Clone the order
->>>>>>> a9b728f6100c07039d47aa4d585078e70f4066de
     OrderModel updatedOrder = order.clone();
     updatedOrder.status = Constant.rideComplete;
     updatedOrder.updateDate = Timestamp.now();
 
-<<<<<<< HEAD
     print("🔍 [COMPLETE RIDE] Final state before save:");
     updatedOrder.debugPaymentData();
 
     // 🔥 STEP 4: Save with payment protection
-=======
-    print("🔍 [COMPLETE RIDE] After status update:");
-    updatedOrder.debugPaymentData();
-
-    // 🔥 CRITICAL: Use safe update method that preserves payment data
->>>>>>> a9b728f6100c07039d47aa4d585078e70f4066de
     bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
 
     ShowToastDialog.closeLoader();
@@ -1923,13 +1912,8 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       updatedOrder.debugPaymentData();
 
       // 🔥 CRITICAL: Use the NEW safe update method that preserves payment data
-<<<<<<< HEAD
       bool success =
           await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
-=======
-      // This method fetches current payment data from Firestore before saving
-      bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
->>>>>>> a9b728f6100c07039d47aa4d585078e70f4066de
 
       ShowToastDialog.closeLoader();
 
@@ -1974,12 +1958,8 @@ class _AcceptRejectDriverModal extends StatelessWidget {
       print("   accepted drivers: ${acceptDriverId.length}");
 
       // 🔥 CRITICAL: Use safe update method
-<<<<<<< HEAD
       bool success =
           await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
-=======
-      bool success = await FireStoreUtils.updateOrderPreservingPayment(updatedOrder);
->>>>>>> a9b728f6100c07039d47aa4d585078e70f4066de
 
       if (success) {
         // Update local state

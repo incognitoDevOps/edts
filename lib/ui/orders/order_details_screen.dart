@@ -185,7 +185,7 @@ class OrderDetailsScreen extends StatelessWidget {
 
                                           orderModel.status = Constant.rideCanceled;
                                           orderModel.acceptedDriverId = acceptDriverId;
-                                          await FireStoreUtils.setOrder(orderModel).then((value) {
+                                          await FireStoreUtils.updateOrderPreservingPayment(orderModel).then((value) {
                                             Get.back();
                                           });
                                         },
@@ -384,7 +384,7 @@ class OrderDetailsScreen extends StatelessWidget {
                                                                                             title: 'Ride Canceled'.tr,
                                                                                             body: 'The passenger has canceled the ride. No action is required from your end.'.tr,
                                                                                             payload: {});
-                                                                                        await FireStoreUtils.setOrder(controller.orderModel.value);
+                                                                                        await FireStoreUtils.updateOrderPreservingPayment(controller.orderModel.value);
                                                                                       },
                                                                                     ),
                                                                                   ),
@@ -401,7 +401,7 @@ class OrderDetailsScreen extends StatelessWidget {
                                                                                         orderModel.driverId = driverIdAcceptReject.driverId.toString();
                                                                                         orderModel.status = Constant.rideActive;
                                                                                         orderModel.finalRate = driverIdAcceptReject.offerAmount;
-                                                                                        FireStoreUtils.setOrder(orderModel);
+                                                                                        await FireStoreUtils.updateOrderPreservingPayment(orderModel);
 
                                                                                         await SendNotification.sendOneNotification(
                                                                                             token: driverModel.fcmToken.toString(),

@@ -29,9 +29,15 @@ class PaymentOrderScreen extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: AppColors.primary,
             title: Text("Payment".tr),
-            leading: InkWell(
-              onTap: () => Get.back(),
-              child: const Icon(Icons.arrow_back),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (!controller.isPaymentProcessing.value && !controller.isLoading.value) {
+                  Get.back();
+                } else {
+                  ShowToastDialog.showToast("Please wait, payment is being processed");
+                }
+              },
             ),
           ),
           body: Column(

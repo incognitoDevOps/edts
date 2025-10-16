@@ -6,6 +6,7 @@ import 'dart:math' as maths;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/constant/collection_name.dart';
 import 'package:customer/constant/constant.dart';
+import 'package:customer/ui/orders/complete_order_screen.dart';
 import 'package:customer/constant/send_notification.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/model/admin_commission.dart';
@@ -270,6 +271,7 @@ class PaymentOrderController extends GetxController {
     }
 
     isPaymentProcessing.value = true;
+    isLoading.value = true;
 
     try {
       print("💳 [CAPTURE] Starting capture with retry...");
@@ -282,6 +284,7 @@ class PaymentOrderController extends GetxController {
       if (stripeConfig == null || stripeConfig.stripeSecret == null) {
         ShowToastDialog.closeLoader();
         isPaymentProcessing.value = false;
+        isLoading.value = false;
         ShowToastDialog.showToast("Stripe not configured properly");
         return;
       }
@@ -387,9 +390,11 @@ class PaymentOrderController extends GetxController {
           );
         }
 
-        completeOrder();
+        await completeOrder();
       } else {
         print("❌ [CAPTURE] All retry attempts failed");
+        isPaymentProcessing.value = false;
+        isLoading.value = false;
         ShowToastDialog.showToast(
           "Payment capture failed after multiple attempts. Please contact support with order ID: ${orderModel.value.id}",
           duration: const Duration(seconds: 7),
@@ -397,10 +402,10 @@ class PaymentOrderController extends GetxController {
       }
     } catch (e) {
       ShowToastDialog.closeLoader();
+      isPaymentProcessing.value = false;
+      isLoading.value = false;
       log("❌ [CAPTURE] Fatal error: $e");
       ShowToastDialog.showToast("Payment capture failed: $e");
-    } finally {
-      isPaymentProcessing.value = false;
     }
   }
 
@@ -610,7 +615,7 @@ class PaymentOrderController extends GetxController {
   }
 
    // 🔥 ENHANCED: Complete order with comprehensive validation
-  completeOrder() async {
+  Future<void> completeOrder() async {
     print("💰 [COMPLETE ORDER] Starting complete order process...");
 
     // Prevent multiple simultaneous payments
@@ -620,6 +625,7 @@ class PaymentOrderController extends GetxController {
     }
 
     isPaymentProcessing.value = true;
+    isLoading.value = true;
 
     try {
       // DEBUG: Check order state before starting
@@ -633,6 +639,7 @@ class PaymentOrderController extends GetxController {
       // 🔥 CRITICAL: Validate essential data
       if (!_validateOrderCompletion()) {
         isPaymentProcessing.value = false;
+        isLoading.value = false;
         return;
       }
 
@@ -647,13 +654,6 @@ class PaymentOrderController extends GetxController {
       orderModel.value.updateDate = Timestamp.now();
 
       print("✅ [COMPLETE ORDER] Step 1 Complete: Order status updated");
-
-      // Handle Stripe pre-authorization capture if needed
-      if ((selectedPaymentMethod.value.toLowerCase() == "stripe" ||
-              selectedPaymentMethod.value.toLowerCase().contains("stripe")) &&
-          orderModel.value.paymentIntentId != null) {
-        await _captureStripePreAuthorization();
-      }
 
       // Calculate amount with debug
       final amount = calculateAmount();
@@ -697,28 +697,34 @@ class PaymentOrderController extends GetxController {
       // Final order save
       print("🔄 [COMPLETE ORDER] Step 7: Saving final order...");
       final success = await FireStoreUtils.setOrder(orderModel.value);
-      
+
       if (success == true) {
         ShowToastDialog.closeLoader();
         print("🎉 [COMPLETE ORDER] PAYMENT COMPLETE SUCCESSFULLY!");
-        ShowToastDialog.showToast("Ride Complete successfully");
+        ShowToastDialog.showToast("Payment completed successfully");
 
-        // Navigate away
-        Get.back();
+        // Navigate to complete order screen
+        Get.off(() => const CompleteOrderScreen(), arguments: {
+          'orderModel': orderModel.value,
+        });
       } else {
         print("❌ [COMPLETE ORDER] Failed to save order");
         ShowToastDialog.closeLoader();
+        isPaymentProcessing.value = false;
+        isLoading.value = false;
         ShowToastDialog.showToast("Failed to complete ride");
       }
 
     } catch (e, stack) {
       ShowToastDialog.closeLoader();
       isPaymentProcessing.value = false;
+      isLoading.value = false;
       print("❌ [COMPLETE ORDER] ERROR: $e");
       print("📋 Stack trace: $stack");
       ShowToastDialog.showToast("Error completing order: ${e.toString()}");
     } finally {
       isPaymentProcessing.value = false;
+      isLoading.value = false;
     }
   }
 

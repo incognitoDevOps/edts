@@ -357,7 +357,7 @@ class PaymentOrderController extends GetxController {
         orderModel.value.paymentStatus = true;
         orderModel.value.paymentCapturedAt = Timestamp.now();
 
-        await FireStoreUtils.setOrder(orderModel.value);
+        await FireStoreUtils.updateOrderPreservingPayment(orderModel.value);
 
         if (capturedAmount < authorizedAmount) {
           final difference = authorizedAmount - capturedAmount;
@@ -389,6 +389,11 @@ class PaymentOrderController extends GetxController {
             duration: const Duration(seconds: 3),
           );
         }
+
+        // 🔥 CRITICAL FIX: Reset payment processing flag BEFORE calling completeOrder
+        // This prevents completeOrder from returning early due to the flag check
+        isPaymentProcessing.value = false;
+        isLoading.value = false;
 
         await completeOrder();
       } else {
@@ -696,7 +701,7 @@ class PaymentOrderController extends GetxController {
 
       // Final order save
       print("🔄 [COMPLETE ORDER] Step 7: Saving final order...");
-      final success = await FireStoreUtils.setOrder(orderModel.value);
+      final success = await FireStoreUtils.updateOrderPreservingPayment(orderModel.value);
 
       if (success == true) {
         ShowToastDialog.closeLoader();

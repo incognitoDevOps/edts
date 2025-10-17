@@ -1,6 +1,40 @@
-# Payment Flow Fixes - Summary
+# Payment Flow Fixes - Complete Summary
 
-## Issues Fixed
+## LATEST FIX: Infinite Loading & Driver Payment Issue (Oct 14, 2025)
+
+### Critical Issue Resolved
+**Problem:** After successful Stripe payment capture, the app entered an infinite loading state and driver did not receive payment.
+
+**Symptoms:**
+1. Payment captured successfully on Stripe ✅
+2. Page rotates/loads forever without navigation ❌
+3. "Please wait, payment is being processed" toast on back button ❌
+4. Driver does NOT receive payment in wallet ❌
+5. Both rider and driver status show "payment completed" but driver has no funds ❌
+
+**Root Cause:**
+The `capturePreAuthorization` method was setting `isPaymentProcessing = true`, then calling `completeOrder()`. However, `completeOrder()` checks this flag at the start and exits early if it's true, preventing:
+- Driver wallet update
+- Admin commission processing
+- Navigation to completion screen
+
+**Solution Applied:**
+Reset the payment processing flags BEFORE calling `completeOrder()`:
+
+```dart
+// 🔥 CRITICAL FIX: Reset flags before calling completeOrder
+isPaymentProcessing.value = false;
+isLoading.value = false;
+
+await completeOrder();
+```
+
+**Additional Fix:**
+Changed order saving methods to use `updateOrderPreservingPayment()` to ensure payment data is never lost during updates.
+
+---
+
+## Previous Issues Fixed
 
 ### 1. Payment Button Double-Click Prevention
 **Problem:** After successful Stripe payment, the "Complete Payment" button remained enabled, allowing users to potentially pay multiple times.

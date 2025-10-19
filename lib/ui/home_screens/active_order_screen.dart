@@ -372,14 +372,20 @@ class ActiveOrderScreen extends StatelessWidget {
     OrderModel orderModel) {
   final themeChange = Provider.of<DarkThemeProvider>(context);
 
-  return Dialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
+  return WillPopScope(
+    onWillPop: () async {
+      // Clear OTP field when dialog is dismissed
+      controller.otpController.value.clear();
+      return true;
+    },
+    child: Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
           const SizedBox(height: 10),
           Text("OTP verify from customer".tr,
               style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
@@ -421,9 +427,23 @@ class ActiveOrderScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          ButtonThem.buildButton(context, 
-            title: "OTP verify".tr,
-            onPress: () async {
+          Row(
+            children: [
+              Expanded(
+                child: ButtonThem.buildButton(context,
+                  title: "Cancel".tr,
+                  btnColor: Colors.grey,
+                  onPress: () {
+                    controller.otpController.value.clear();
+                    Get.back();
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ButtonThem.buildButton(context,
+                  title: "Verify".tr,
+                  onPress: () async {
               if (orderModel.otp.toString() == controller.otpController.value.text) {
                 Get.back();
 
@@ -474,7 +494,10 @@ class ActiveOrderScreen extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 10),
+        ),
+      ],
+    ),
+    const SizedBox(height: 10),
         ],
       ),
     ),

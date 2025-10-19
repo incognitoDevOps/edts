@@ -28,7 +28,7 @@ class NewOrderScreen extends StatelessWidget {
         },
         builder: (controller) {
           return Scaffold(
-            body: controller.isLoading.value
+            body: controller.isLoading.value || controller.driverModel.value.id == null
                 ? Constant.loader(context)
                 : controller.driverModel.value.isOnline == false
                     ? Center(
@@ -52,7 +52,7 @@ class NewOrderScreen extends StatelessWidget {
                               itemBuilder: (context, index) {
                                 OrderModel orderModel = snapshot.data![index];
                                 String amount;
-                                
+
                                 // Special handling for test orders that might have missing service data
                                 orderModel.service ??= ServiceModel(
                                     id: "test_service_id",
@@ -61,13 +61,14 @@ class NewOrderScreen extends StatelessWidget {
                                     enable: true,
                                     offerRate: true
                                   );
-                                
+
+                                int decimalDigits = Constant.currencyModel?.decimalDigits ?? 2;
                                 if (Constant.distanceType == "Km") {
                                   amount = Constant.amountCalculate(orderModel.service!.kmCharge.toString(), orderModel.distance.toString())
-                                      .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
+                                      .toStringAsFixed(decimalDigits);
                                 } else {
                                   amount = Constant.amountCalculate(orderModel.service!.kmCharge.toString(), orderModel.distance.toString())
-                                      .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
+                                      .toStringAsFixed(decimalDigits);
                                 }
                                 
                                 // Check if this is a test order
@@ -159,7 +160,7 @@ class NewOrderScreen extends StatelessWidget {
                                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                                       child: Center(
                                                         child: Text(
-                                                          'Recommended Price is ${Constant.amountShow(amount: amount)}. Approx distance ${double.parse(orderModel.distance.toString()).toStringAsFixed(Constant.currencyModel!.decimalDigits!)} ${Constant.distanceType}',
+                                                          'Recommended Price is ${Constant.amountShow(amount: amount)}. Approx distance ${double.parse(orderModel.distance.toString()).toStringAsFixed(decimalDigits)} ${Constant.distanceType}',
                                                           style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
                                                         ),
                                                       ),

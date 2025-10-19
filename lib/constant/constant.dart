@@ -4,54 +4,60 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:driver/model/driver_user_model.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:customer/constant/show_toast_dialog.dart';
-import 'package:customer/model/ChatVideoContainer.dart';
-import 'package:customer/model/admin_commission.dart';
-import 'package:customer/model/airport_model.dart';
-import 'package:customer/model/conversation_model.dart';
-import 'package:customer/model/currency_model.dart';
-import 'package:customer/model/driver_user_model.dart';
-import 'package:customer/model/language_model.dart';
-import 'package:customer/model/map_model.dart';
-import 'package:customer/model/tax_model.dart';
-import 'package:customer/utils/Preferences.dart';
+import 'package:driver/constant/show_toast_dialog.dart';
+import 'package:driver/model/ChatVideoContainer.dart';
+import 'package:driver/model/admin_commission.dart';
+import 'package:driver/model/conversation_model.dart';
+import 'package:driver/model/currency_model.dart';
+import 'package:driver/model/language_model.dart';
+import 'package:driver/model/map_model.dart';
+import 'package:driver/model/order/location_lat_lng.dart';
+import 'package:driver/model/tax_model.dart';
+import 'package:driver/themes/app_colors.dart';
+import 'package:driver/utils/DarkThemeProvider.dart';
+import 'package:driver/utils/Preferences.dart';
+import 'package:driver/services/payment_method_service.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import '../widget/buzryde_loader.dart';
 
 class Constant {
   static const String phoneLoginType = "phone";
   static const String googleLoginType = "google";
   static const String appleLoginType = "apple";
-  static String mapAPIKey = "";
-  static String senderId = '116120217389';
-  static String jsonNotificationFileURL = '';
-  static String radius = "10";
-  static String distanceType = "";
-  static CurrencyModel? currencyModel;
-  static AdminCommission? adminCommission;
-  static String? referralAmount = "0";
-  static String? supportURL = "";
+  static LocationLatLng? currentLocation;
 
+  static String mapAPIKey = "";
+  static String senderId = '';
+  static String jsonNotificationFileURL = '';
+  static String radius = "";
+  static String distanceType = "";
+  static String minimumAmountToWithdrawal = "0.0";
+  static String minimumDepositToRideAccept = "0.0";
   static String termsAndConditions = "";
   static String privacyPolicy = "";
+  static String? supportURL = "";
   static String appVersion = "";
+
+  static List<TaxModel>? taxList;
+  static AdminCommission? adminCommission;
 
   static String mapType = "google";
   static String selectedMapType = 'osm';
   static String driverLocationUpdate = "10";
+
+  static CurrencyModel? currencyModel;
 
   static const String ridePlaced = "Ride Placed";
   static const String rideActive = "Ride Active";
@@ -59,21 +65,17 @@ class Constant {
   static const String rideComplete = "Ride Completed";
   static const String rideCanceled = "Ride Canceled";
 
-  static const globalUrl = "https://buzryde.com/";
+  static String? referralAmount = "0";
+
+  static const globalUrl = "https://foodie.siswebapp.com/";
+
   static const userPlaceHolder =
       "https://firebasestorage.googleapis.com/v0/b/goride-1a752.appspot.com/o/placeholderImages%2Fuser-placeholder.jpeg?alt=media&token=34a73d67-ba1d-4fe4-a29f-271d3e3ca115";
 
-  static Position? currentLocation;
-  static String? country;
-  static String? city;
-  static List<TaxModel>? taxList;
-  static List<AriPortModel>? airaPortList;
-
-  static var emailLoginType;
-
-  static Widget loader() {
+  static Widget loader(BuildContext context) {
+    // final themeChange = Provider.of<DarkThemeProvider>(context);
     return const Center(
-      child: BuzRydeLoader(),
+      child: CircularProgressIndicator(color: AppColors.darkModePrimary),
     );
   }
 
@@ -85,68 +87,18 @@ class Constant {
     await launchUrl(launchUri);
   }
 
-  static bool? validateEmail(String? value) {
-    String pattern =
-        r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
-    RegExp regex = RegExp(pattern);
-    if (!regex.hasMatch(value ?? '')) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  static bool isPointInPolygon(LatLng point, List<GeoPoint> polygon) {
-    int crossings = 0;
-    for (int i = 0; i < polygon.length; i++) {
-      int next = (i + 1) % polygon.length;
-      if (polygon[i].latitude <= point.latitude &&
-              polygon[next].latitude > point.latitude ||
-          polygon[i].latitude > point.latitude &&
-              polygon[next].latitude <= point.latitude) {
-        double edgeLong = polygon[next].longitude - polygon[i].longitude;
-        double edgeLat = polygon[next].latitude - polygon[i].latitude;
-        double interpol = (point.latitude - polygon[i].latitude) / edgeLat;
-        if (point.longitude < polygon[i].longitude + interpol * edgeLong) {
-          crossings++;
-        }
-      }
-    }
-    return (crossings % 2 != 0);
-  }
-
-  static Future<MapModel?> getDurationDistance(
-      LatLng departureLatLong, LatLng destinationLatLong) async {
+  static Future<MapModel?> getDurationDistance(LatLng departureLatLong, LatLng destinationLatLong) async {
     String url = 'https://maps.googleapis.com/maps/api/distancematrix/json';
-    http.Response restaurantToCustomerTime = await http.get(Uri.parse(
-        '$url?units=metric&origins=${departureLatLong.latitude},'
+    http.Response restaurantToCustomerTime = await http.get(Uri.parse('$url?units=metric&origins=${departureLatLong.latitude},'
         '${departureLatLong.longitude}&destinations=${destinationLatLong.latitude},${destinationLatLong.longitude}&key=${Constant.mapAPIKey}'));
+    MapModel mapModel = MapModel.fromJson(jsonDecode(restaurantToCustomerTime.body));
 
-    log(restaurantToCustomerTime.body.toString());
-    MapModel mapModel =
-        MapModel.fromJson(jsonDecode(restaurantToCustomerTime.body));
-
-    if (mapModel.status == 'OK' &&
-        mapModel.rows!.first.elements!.first.status == "OK") {
+    if (mapModel.status == 'OK' && mapModel.rows!.first.elements!.first.status == "OK") {
       return mapModel;
     } else {
       ShowToastDialog.showToast(mapModel.errorMessage);
     }
     return null;
-  }
-
-  static Future<Map<String, dynamic>> getDurationOsmDistance(
-      LatLng departureLatLong, LatLng destinationLatLong) async {
-    String url = 'http://router.project-osrm.org/route/v1/driving';
-    String coordinates =
-        '${departureLatLong.longitude},${departureLatLong.latitude};${destinationLatLong.longitude},${destinationLatLong.latitude}';
-
-    http.Response response = await http
-        .get(Uri.parse('$url/$coordinates?overview=false&steps=false'));
-
-    log(response.body.toString());
-
-    return jsonDecode(response.body);
   }
 
   static double amountCalculate(String amount, String distance) {
@@ -158,162 +110,25 @@ class Constant {
     return finalAmount;
   }
 
-  static String getUuid() {
-    return const Uuid().v4();
-  }
-
-  String formatTimestamp(Timestamp? timestamp) {
-    var format = DateFormat('dd-MM-yyyy hh:mm aa'); // <- use skeleton here
-    return format.format(timestamp!.toDate());
-  }
-
-  static String dateAndTimeFormatTimestamp(Timestamp? timestamp) {
-    var format = DateFormat('dd MMM yyyy hh:mm aa'); // <- use skeleton here
-    return format.format(timestamp!.toDate());
-  }
-
-  static String dateFormatTimestamp(Timestamp? timestamp) {
-    var format = DateFormat('dd MMM yyyy'); // <- use skeleton here
-    return format.format(timestamp!.toDate());
-  }
-
-  double calculateTax({String? amount, TaxModel? taxModel}) {
-    double taxAmount = 0.0;
-    if (taxModel != null && taxModel.enable == true) {
-      if (taxModel.type == "fix") {
-        taxAmount = double.parse(taxModel.tax.toString());
-      } else {
-        taxAmount = (double.parse(amount.toString()) *
-                double.parse(taxModel.tax!.toString())) /
-            100;
-      }
-    }
-    return taxAmount;
-  }
-
-  static String amountShow({required String? amount}) {
-    String symbol = Constant.currencyModel?.symbol?.toString() ?? "";
-    int decimalDigits = Constant.currencyModel?.decimalDigits ?? 2;
-    bool symbolAtRight = Constant.currencyModel?.symbolAtRight ?? false;
-
-    String formattedAmount;
-    if (amount == null || amount.isEmpty || amount == "null") {
-      formattedAmount = double.parse("0.00").toStringAsFixed(decimalDigits);
+  static bool? validateEmail(String? value) {
+    String pattern = r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
+    RegExp regex = RegExp(pattern);
+    if (!regex.hasMatch(value ?? '')) {
+      return false;
     } else {
-      try {
-        formattedAmount = double.parse(amount).toStringAsFixed(decimalDigits);
-      } catch (e) {
-        formattedAmount = double.parse("0.00").toStringAsFixed(decimalDigits);
-      }
-    }
-
-    if (symbolAtRight) {
-      return "$formattedAmount $symbol";
-    } else {
-      return "$symbol $formattedAmount";
+      return true;
     }
   }
 
-  static double calculateOrderAdminCommission(
-      {String? amount,
-      AdminCommission? adminCommission,
-      DriverUserModel? driver // Optional driver parameter
-      }) {
-    try {
-      print("🧮 Calculating admin commission:");
-      print("   Ride amount: $amount");
-      print("   Commission enabled: ${adminCommission?.isEnabled}");
-      print("   Commission type: '${adminCommission?.type}'");
-      print("   Commission amount: '${adminCommission?.amount}'");
-      print(
-          "   Flat rate enabled: ${adminCommission?.flatRatePromotion?.isEnabled}");
-      print(
-          "   Flat rate amount: ${adminCommission?.flatRatePromotion?.amount}");
-
-      if (driver != null) {
-        print("   Driver flatRateActive: ${driver.flatRateActive}");
-        print("   Driver paymentMethod: ${driver.paymentMethod}");
-      }
-
-      // Check if commission is enabled and properly configured
-      bool hasValidCommission = adminCommission?.isEnabled == true &&
-          adminCommission?.amount != null &&
-          adminCommission!.amount!.isNotEmpty &&
-          adminCommission.type != null &&
-          adminCommission.type!.isNotEmpty;
-
-      bool hasValidFlatRate =
-          adminCommission?.flatRatePromotion?.isEnabled == true;
-
-      if (!hasValidCommission && !hasValidFlatRate) {
-        print("❌ No valid commission or flat rate configured");
-        return 0.0;
-      }
-
-      double rideAmount;
-      try {
-        rideAmount = double.parse(amount ?? "0.0");
-      } catch (e) {
-        print("❌ Failed to parse ride amount: $amount, using 0.0");
-        rideAmount = 0.0;
-      }
-
-      double commissionAmount = 0.0;
-
-      // Check driver preference if provided
-      bool useFlatRate = false;
-      if (driver != null) {
-        useFlatRate = driver.flatRateActive == true ||
-            (driver.paymentMethod == "flat_rate" && hasValidFlatRate);
-      }
-
-      if (useFlatRate && hasValidFlatRate) {
-        // Use flat rate commission
-        commissionAmount = adminCommission?.flatRatePromotion!.amount ?? 0.0;
-        print("💰 Using flat rate commission: $commissionAmount");
-      } else if (hasValidCommission) {
-        // Use regular commission calculation - pass the RIDE amount, not commission amount
-        commissionAmount =
-            adminCommission.calculateCommissionAmount(rideAmount);
-        print("💰 Using regular commission: $commissionAmount");
-      }
-
-      return commissionAmount;
-    } catch (e) {
-      print("❌ Error in calculateOrderAdminCommission: $e");
-      return 0.0;
-    }
+  static Future<String> uploadUserImageToFireStorage(File image, String filePath, String fileName) async {
+    Reference upload = FirebaseStorage.instance.ref().child('$filePath/$fileName');
+    UploadTask uploadTask = upload.putFile(image);
+    var downloadUrl = await (await uploadTask.whenComplete(() {})).ref.getDownloadURL();
+    return downloadUrl.toString();
   }
 
-  static String calculateReview(
-      {required String? reviewCount, required String? reviewSum}) {
-    if (reviewCount == "0.0" && reviewSum == "0.0") {
-      return "0.0";
-    }
-    return (double.parse(reviewSum.toString()) /
-            double.parse(reviewCount.toString()))
-        .toStringAsFixed(Constant.currencyModel!.decimalDigits!);
-  }
-
-  static bool IsNegative(double number) {
-    return number < 0;
-  }
-
-  static LanguageModel getLanguage() {
-    final String user = Preferences.getString(Preferences.languageCodeKey);
-    Map<String, dynamic> userMap = jsonDecode(user);
-    log(userMap.toString());
-    return LanguageModel.fromJson(userMap);
-  }
-
-  static String getReferralCode() {
-    var rng = math.Random();
-    return (rng.nextInt(900000) + 100000).toString();
-  }
-
-  bool hasValidUrl(String value) {
-    String pattern =
-        r'(http|https)://[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;:/~+#-]*[\w@?^=%&amp;/~+#-])?';
+  static bool hasValidUrl(String value) {
+    String pattern = r'(http|https)://[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;:/~+#-]*[\w@?^=%&amp;/~+#-])?';
     RegExp regExp = RegExp(pattern);
     if (value.isEmpty) {
       return false;
@@ -323,71 +138,255 @@ class Constant {
     return true;
   }
 
-  static Future<String> uploadUserImageToFireStorage(
-      File image, String filePath, String fileName) async {
-    Reference upload =
-        FirebaseStorage.instance.ref().child('$filePath/$fileName');
-    UploadTask uploadTask = upload.putFile(image);
-    var downloadUrl =
-        await (await uploadTask.whenComplete(() {})).ref.getDownloadURL();
-    return downloadUrl.toString();
+  static Future<DateTime?> selectFetureDate(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2200),
+      builder: (context, child) {
+        final themeChange = Provider.of<DarkThemeProvider>(context);
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary,
+            colorScheme: ColorScheme.light(primary: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (pickedDate != null) {
+      return pickedDate;
+    }
+    return null;
   }
 
-  Future<Url> uploadChatImageToFireStorage(File image) async {
+  static Future<DateTime?> selectDate(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        final themeChange = Provider.of<DarkThemeProvider>(context);
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary,
+            colorScheme: ColorScheme.light(primary: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (pickedDate != null) {
+      return pickedDate;
+    }
+    return null;
+  }
+
+  static double calculateTax({String? amount, TaxModel? taxModel}) {
+    double taxAmount = 0.0;
+    if (taxModel != null && taxModel.enable == true) {
+      if (taxModel.type == "fix") {
+        taxAmount = double.parse(taxModel.tax.toString());
+      } else {
+        taxAmount = (double.parse(amount.toString()) * double.parse(taxModel.tax!.toString())) / 100;
+      }
+    }
+    return taxAmount;
+  }
+
+  static double calculateAdminCommission({String? amount, AdminCommission? adminCommission}) {
+    double taxAmount = 0.0;
+    if (adminCommission != null) {
+      if (adminCommission.type == "fix") {
+        taxAmount = double.parse(adminCommission.amount.toString());
+      } else {
+        taxAmount = (double.parse(amount.toString()) * double.parse(adminCommission.amount!.toString())) / 100;
+      }
+    }
+    return taxAmount;
+  }
+
+  static String formatCurrency({required double amount, required String symbol, required int decimalDigits, required bool symbolAtRight}) {
+    String formattedAmount = amount.toStringAsFixed(decimalDigits);
+    if (symbolAtRight) {
+      return "$formattedAmount $symbol";
+    } else {
+      return "$symbol $formattedAmount";
+    }
+  }
+
+  static double calculateOrderAdminCommission({String? amount, AdminCommission? adminCommission}) {
+    try {
+      print("🧮 Calculating admin commission:");
+      print("   Amount: $amount");
+      print("   Commission: ${adminCommission?.amount}");
+      print("   Type: ${adminCommission?.type}");
+      print("   Enabled: ${adminCommission?.isEnabled}");
+      print("   FlatRate Enabled: ${adminCommission?.flatRatePromotion?.isEnabled}");
+      print("   FlatRate Amount: ${adminCommission?.flatRatePromotion?.amount}");
+
+      // Return 0 if admin commission is disabled or null
+      if (adminCommission == null || adminCommission.isEnabled != true) {
+        print("ℹ️  Commission disabled or null, returning 0");
+        return 0.0;
+      }
+
+      // Safe amount parsing
+      double amountValue;
+      try {
+        amountValue = double.parse(amount ?? "0.0");
+      } catch (e) {
+        print("❌ Failed to parse amount: $amount, using 0.0");
+        amountValue = 0.0;
+      }
+
+      double commissionAmount = 0.0;
+      
+      // Check if flat rate promotion is enabled and should be used
+      if (adminCommission.flatRatePromotion?.isEnabled == true) {
+        commissionAmount = adminCommission.flatRatePromotion?.amount ?? 0.0;
+        print("💰 Using FlatRate commission: $commissionAmount");
+      } else {
+        // Use regular commission calculation
+        double commissionAmountValue;
+        try {
+          commissionAmountValue = double.parse(adminCommission.amount ?? "0.0");
+        } catch (e) {
+          print("❌ Failed to parse commission amount: ${adminCommission.amount}, using 0.0");
+          commissionAmountValue = 0.0;
+        }
+        
+        if (adminCommission.type == "fix") {
+          commissionAmount = commissionAmountValue;
+          print("💰 Fixed commission: $commissionAmount");
+        } else if (adminCommission.type == "percentage") {
+          commissionAmount = (amountValue * commissionAmountValue) / 100;
+          print("💰 Percentage commission: $commissionAmount (${commissionAmountValue}% of $amountValue)");
+        } else {
+          print("⚠️ Unknown commission type: ${adminCommission.type}");
+          commissionAmount = 0.0;
+        }
+      }
+
+      return commissionAmount;
+      
+    } catch (e) {
+      print("❌ Error in calculateOrderAdminCommission: $e");
+      return 0.0;
+    }
+  }
+
+  /// Calculate driver charge based on payment method
+  static double calculateDriverCharge({
+    required DriverUserModel driver,
+    required AdminCommission adminCommission,
+    required double rideAmount,
+    double discountAmount = 0.0,
+  }) {
+    // Use the updated PaymentMethodService logic
+    return PaymentMethodService.calculateDriverCharge(
+      driver: driver,
+      adminCommission: adminCommission,
+      rideAmount: rideAmount,
+      discountAmount: discountAmount,
+    );
+  }
+
+  static String formatTimestamp(Timestamp? timestamp) {
+    var format = DateFormat('dd-MM-yyyy hh:mm aa'); // <- use skeleton here
+    return format.format(timestamp!.toDate());
+  }
+
+  static String getUuid() {
+    return const Uuid().v4();
+  }
+
+  static String dateFormatTimestamp(Timestamp? timestamp) {
+    var format = DateFormat('dd MMM yyyy'); // <- use skeleton here
+    return format.format(timestamp!.toDate());
+  }
+
+  static String dateAndTimeFormatTimestamp(Timestamp? timestamp) {
+    var format = DateFormat('dd MMM yyyy hh:mm aa'); // <- use skeleton here
+    return format.format(timestamp!.toDate());
+  }
+
+  static bool IsNegative(double number) {
+    return number < 0;
+  }
+
+  static String calculateReview({required String? reviewCount, required String? reviewSum}) {
+    if (reviewCount == "0.0" && reviewSum == "0.0") {
+      return "0.0";
+    }
+
+    return (double.parse(reviewSum.toString()) / double.parse(reviewCount.toString())).toStringAsFixed(Constant.currencyModel!.decimalDigits!);
+  }
+
+  static String amountShow({required String? amount}) {
+    if (amount == null || amount.isEmpty) {
+      amount = "0";
+    }
+
+    try {
+      return "${Constant.currencyModel!.symbol.toString()} ${double.parse(amount).toStringAsFixed(Constant.currencyModel!.decimalDigits!)}";
+    } catch (e) {
+      return "${Constant.currencyModel!.symbol.toString()} 0.${List.filled(Constant.currencyModel!.decimalDigits!, '0').join()}";
+    }
+  }
+
+  static LanguageModel getLanguage() {
+    final String user = Preferences.getString(Preferences.languageCodeKey);
+    Map<String, dynamic> userMap = jsonDecode(user);
+    log(userMap.toString());
+    return LanguageModel.fromJson(userMap);
+  }
+
+  static Future<Url> uploadChatImageToFireStorage(File image) async {
     ShowToastDialog.showLoader('Uploading image...');
     var uniqueID = const Uuid().v4();
-    Reference upload =
-        FirebaseStorage.instance.ref().child('/chat/images/$uniqueID.png');
+    Reference upload = FirebaseStorage.instance.ref().child('/chat/images/$uniqueID.png');
     UploadTask uploadTask = upload.putFile(image);
     var storageRef = (await uploadTask.whenComplete(() {})).ref;
     var downloadUrl = await storageRef.getDownloadURL();
     var metaData = await storageRef.getMetadata();
     ShowToastDialog.closeLoader();
-    return Url(
-        mime: metaData.contentType ?? 'image', url: downloadUrl.toString());
+    return Url(mime: metaData.contentType ?? 'image', url: downloadUrl.toString());
   }
 
-  Future<ChatVideoContainer> uploadChatVideoToFireStorage(File video) async {
+  static Future<ChatVideoContainer> uploadChatVideoToFireStorage(File video) async {
     ShowToastDialog.showLoader('Uploading video...');
     var uniqueID = const Uuid().v4();
-    Reference upload =
-        FirebaseStorage.instance.ref().child('/chat/videos/$uniqueID.mp4');
+    Reference upload = FirebaseStorage.instance.ref().child('/chat/videos/$uniqueID.mp4');
     SettableMetadata metadata = SettableMetadata(contentType: 'video');
     UploadTask uploadTask = upload.putFile(video, metadata);
 
     var storageRef = (await uploadTask.whenComplete(() {})).ref;
     var downloadUrl = await storageRef.getDownloadURL();
     var metaData = await storageRef.getMetadata();
-    final uint8list = await VideoThumbnail.thumbnailFile(
-        video: downloadUrl,
-        thumbnailPath: (await getTemporaryDirectory()).path,
-        imageFormat: ImageFormat.PNG);
+    final uint8list = await VideoThumbnail.thumbnailFile(video: downloadUrl, thumbnailPath: (await getTemporaryDirectory()).path, imageFormat: ImageFormat.PNG);
     final file = File(uint8list ?? '');
     String thumbnailDownloadUrl = await uploadVideoThumbnailToFireStorage(file);
     ShowToastDialog.closeLoader();
-    return ChatVideoContainer(
-        videoUrl: Url(
-            url: downloadUrl.toString(), mime: metaData.contentType ?? 'video'),
-        thumbnailUrl: thumbnailDownloadUrl);
+    return ChatVideoContainer(videoUrl: Url(url: downloadUrl.toString(), mime: metaData.contentType ?? 'video'), thumbnailUrl: thumbnailDownloadUrl);
   }
 
-  Future<String> uploadVideoThumbnailToFireStorage(File file) async {
+  static Future<String> uploadVideoThumbnailToFireStorage(File file) async {
     var uniqueID = const Uuid().v4();
-    Reference upload =
-        FirebaseStorage.instance.ref().child('/thumbnails/$uniqueID.png');
+    Reference upload = FirebaseStorage.instance.ref().child('/thumbnails/$uniqueID.png');
     UploadTask uploadTask = upload.putFile(file);
-    var downloadUrl =
-        await (await uploadTask.whenComplete(() {})).ref.getDownloadURL();
+    var downloadUrl = await (await uploadTask.whenComplete(() {})).ref.getDownloadURL();
     return downloadUrl.toString();
   }
 
-  Future<Uint8List> getBytesFromAsset(String path, int width) async {
+  static Future<Uint8List> getBytesFromAsset(String path, int width) async {
     ByteData data = await rootBundle.load(path);
-    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(),
-        targetWidth: width);
+    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(), targetWidth: width);
     ui.FrameInfo fi = await codec.getNextFrame();
-    return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!
-        .buffer
-        .asUint8List();
+    return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
   }
 }

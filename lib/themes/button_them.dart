@@ -1,6 +1,6 @@
-import 'package:customer/themes/app_colors.dart';
-import 'package:customer/themes/responsive.dart';
-import 'package:customer/utils/DarkThemeProvider.dart';
+import 'package:driver/themes/app_colors.dart';
+import 'package:driver/themes/responsive.dart';
+import 'package:driver/utils/DarkThemeProvider.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +14,7 @@ class ButtonThem {
     double btnHeight = 48,
     double txtSize = 14,
     double btnWidthRatio = 0.9,
-    double btnRadius = 6,
+    double btnRadius = 10,
     required Function() onPress,
     bool isVisible = true,
   }) {
@@ -45,10 +45,10 @@ class ButtonThem {
   static buildBorderButton(
     BuildContext context, {
     required String title,
-    double btnHeight = 48,
+    double btnHeight = 50,
     double txtSize = 14,
     double btnWidthRatio = 0.9,
-    double borderRadius = 6,
+    double borderRadius = 10,
     required Function() onPress,
     bool isVisible = true,
     bool iconVisibility = false,
@@ -63,9 +63,9 @@ class ButtonThem {
         height: btnHeight,
         child: ElevatedButton(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all<Color>(themeChange.getThem() ? Colors.transparent : Colors.white),
-            foregroundColor: MaterialStateProperty.all<Color>(themeChange.getThem() ? AppColors.darkModePrimary : Colors.white),
-            shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+            backgroundColor: WidgetStateProperty.all<Color>(themeChange.getThem() ? Colors.transparent : Colors.white),
+            foregroundColor: WidgetStateProperty.all<Color>(themeChange.getThem() ? AppColors.darkModePrimary : Colors.white),
+            shape: WidgetStateProperty.all<RoundedRectangleBorder>(
               RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(borderRadius),
                 side: BorderSide(
@@ -101,14 +101,14 @@ class ButtonThem {
   static roundButton(
     BuildContext context, {
     required String title,
-    required Color btnColor,
-    required Color txtColor,
     double btnHeight = 48,
     double txtSize = 14,
     double btnWidthRatio = 0.9,
     required Function() onPress,
     bool isVisible = true,
   }) {
+    final themeChange = Provider.of<DarkThemeProvider>(context);
+
     return Visibility(
       visible: isVisible,
       child: SizedBox(
@@ -120,11 +120,11 @@ class ButtonThem {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
-          color: btnColor,
+          color: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary,
           child: Text(
             title.toUpperCase(),
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: txtColor, fontSize: txtSize, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(fontSize: txtSize, fontWeight: FontWeight.w600),
           ),
         ),
       ),

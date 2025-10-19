@@ -14,17 +14,17 @@ class PaymentModel {
 
   PaymentModel(
       {this.flutterWave,
-      this.payStack,
-      this.strip,
-      this.wallet,
-      this.mercadoPago,
-      this.razorpay,
-      this.paytm,
-      this.payfast,
-      this.cash,
-      this.xendit,
-      this.orangePay,
-      this.midtrans});
+        this.payStack,
+        this.strip,
+        this.wallet,
+        this.mercadoPago,
+        this.razorpay,
+        this.paytm,
+        this.payfast,
+        this.cash,
+        this.xendit,
+        this.orangePay,
+        this.midtrans});
 
   PaymentModel.fromJson(Map<String, dynamic> json) {
     flutterWave = json['flutterWave'] != null ? FlutterWave.fromJson(json['flutterWave']) : null;
@@ -401,16 +401,16 @@ class OrangePay {
 
   OrangePay(
       {this.clientId = '',
-      this.clientSecret = '',
-      this.merchantKey,
-      this.auth,
-      this.returnUrl = '',
-      this.cancelUrl = '',
-      this.notifUrl = '',
-      this.name,
-      this.isSandbox = false,
-      this.image,
-      this.enable = false});
+        this.clientSecret = '',
+        this.merchantKey,
+        this.auth,
+        this.returnUrl = '',
+        this.cancelUrl = '',
+        this.notifUrl = '',
+        this.name,
+        this.isSandbox = false,
+        this.image,
+        this.enable = false});
 
   OrangePay.fromJson(Map<String, dynamic> parsedJson) {
     clientId = parsedJson['clientId'];

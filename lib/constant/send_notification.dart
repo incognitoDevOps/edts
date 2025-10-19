@@ -1,10 +1,10 @@
 // ignore_for_file: non_constant_identifier_names
 
 import 'dart:convert';
-import 'package:customer/constant/constant.dart';
+
+import 'package:driver/constant/constant.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:googleapis_auth/auth_io.dart';
-import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
 
 class SendNotification {
@@ -28,11 +28,6 @@ class SendNotification {
 
   static sendOneNotification({required String token, required String title, required String body, required Map<String, dynamic> payload}) async {
     try {
-      if (token.isEmpty) {
-        debugPrint("❌ Empty FCM token provided");
-        return false;
-      }
-      
       final String accessToken = await getAccessToken();
       debugPrint("accessToken=======>");
       debugPrint(accessToken);
@@ -57,24 +52,37 @@ class SendNotification {
       debugPrint("Notification=======>");
       debugPrint(response.statusCode.toString());
       debugPrint(response.body);
-      
-      // Check if notification was sent successfully
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        if (responseData.containsKey('name')) {
-          debugPrint("✅ Notification sent successfully");
-          return true;
-        } else {
-          debugPrint("❌ Notification failed: ${responseData}");
-          return false;
-        }
-      } else {
-        debugPrint("❌ Notification failed with status: ${response.statusCode}");
-        return false;
-      }
+      return true;
     } catch (e) {
       debugPrint(e.toString());
       return false;
     }
+  }
+
+  static sendMultiPleNotification(List<String> tokens, String title, String body, Map<String, dynamic>? payload) async {
+    final String accessToken = await getAccessToken();
+    debugPrint("accessToken=======>");
+    debugPrint(accessToken);
+
+    final response = await http.post(
+      Uri.parse('https://fcm.googleapis.com/v1/projects/${Constant.senderId}/messages:send'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(
+        <String, dynamic>{
+          'message': {
+            'token': tokens,
+            'notification': {'body': body, 'title': title},
+            'data': payload,
+          }
+        },
+      ),
+    );
+
+    debugPrint("Notification=======>");
+    debugPrint(response.statusCode.toString());
+    debugPrint(response.body);
   }
 }

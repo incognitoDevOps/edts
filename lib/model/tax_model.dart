@@ -6,7 +6,8 @@ class TaxModel {
   String? type;
   String? title;
 
-  TaxModel({this.country, this.enable, this.tax, this.id, this.type, this.title});
+  TaxModel(
+      {this.country, this.enable, this.tax, this.id, this.type, this.title});
 
   TaxModel.fromJson(Map<String, dynamic> json) {
     country = json['country'];

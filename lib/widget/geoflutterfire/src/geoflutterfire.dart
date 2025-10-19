@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:customer/widget/geoflutterfire/src/collection/with_converter.dart';
+import 'package:driver/widget/geoflutterfire/src/collection/with_converter.dart';
 
 import 'collection/default.dart';
 import 'models/point.dart';

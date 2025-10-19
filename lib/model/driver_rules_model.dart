@@ -5,7 +5,8 @@ class DriverRulesModel {
   String? name;
   String? id;
 
-  DriverRulesModel({this.image, this.isDeleted, this.enable, this.name, this.id});
+  DriverRulesModel(
+      {this.image, this.isDeleted, this.enable, this.name, this.id});
 
   DriverRulesModel.fromJson(Map<String, dynamic> json) {
     image = json['image'];

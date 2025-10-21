@@ -229,19 +229,71 @@ class RegisterScreen extends StatelessWidget {
                             if (value == null || value.isEmpty) {
                               return "Please enter password".tr;
                             }
+                            
+                            // Comprehensive password validation
                             if (value.length < 8) {
-                              return "Password must be at least 8 characters"
-                                  .tr;
+                              return "Password must be at least 8 characters".tr;
                             }
-                            if (!value.contains(RegExp(r'[A-Z]'))) {
-                              return "Include at least one uppercase letter".tr;
+                            
+                            if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                              return "Include at least one uppercase letter (A-Z)".tr;
                             }
-                            if (!value.contains(RegExp(r'[0-9]'))) {
-                              return "Include at least one number".tr;
+                            
+                            if (!RegExp(r'[a-z]').hasMatch(value)) {
+                              return "Include at least one lowercase letter (a-z)".tr;
                             }
+                            
+                            if (!RegExp(r'[0-9]').hasMatch(value)) {
+                              return "Include at least one number (0-9)".tr;
+                            }
+                            
+                            if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+                              return "Include at least one special character (!@#\$%^&* etc.)".tr;
+                            }
+                            
+                            // Check for common weak patterns
+                            if (RegExp(r'(.)\1{2,}').hasMatch(value)) {
+                              return "Avoid repeating characters (aaa, 111)".tr;
+                            }
+                            
+                            if (RegExp(r'(123|abc|password|qwerty)').hasMatch(value.toLowerCase())) {
+                              return "Avoid common sequences or words".tr;
+                            }
+                            
                             return null;
                           },
                         )),
+                    const SizedBox(height: 20),
+
+                    // Password Requirements Helper Text
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: themeChange.getThem()
+                            ? AppColors.darkGray.withOpacity(0.3)
+                            : AppColors.gray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Password must contain:".tr,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _buildRequirementRow("• 8+ characters", controller),
+                          _buildRequirementRow("• Uppercase letter (A-Z)", controller),
+                          _buildRequirementRow("• Lowercase letter (a-z)", controller),
+                          _buildRequirementRow("• Number (0-9)", controller),
+                          _buildRequirementRow("• Special character (!@#\$% etc.)", controller),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
 
                     // Confirm Password
@@ -292,69 +344,75 @@ class RegisterScreen extends StatelessWidget {
                     const SizedBox(height: 40),
 
                     // Register button
-                    // In your RegisterScreen's button section:
-Obx(() {
-  if (controller.isLoading.value) {
-    return const Center(child: CircularProgressIndicator());
-  }
-  return ButtonThem.buildButton(
-    context,
-    title: "Create Account".tr,
-    onPress: () async {
-      print("===== REGISTER BUTTON PRESSED =====");
-      
-      try {
-        // 1. Validate form
-        if (controller.registerFormKey.value.currentState == null) {
-          print("[ERROR] Form key is null");
-          ShowToastDialog.showToast("Form error. Please try again.");
-          return;
-        }
+                    Obx(() {
+                      if (controller.isLoading.value) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return ButtonThem.buildButton(
+                        context,
+                        title: "Create Account".tr,
+                        onPress: () async {
+                          print("===== REGISTER BUTTON PRESSED =====");
+                          
+                          try {
+                            // 1. Validate form
+                            if (controller.registerFormKey.value.currentState == null) {
+                              print("[ERROR] Form key is null");
+                              ShowToastDialog.showToast("Form error. Please try again.");
+                              return;
+                            }
 
-        if (!controller.registerFormKey.value.currentState!.validate()) {
-          print("[ERROR] Form validation failed");
-          // Don't return here - let the form fields show their errors
-        }
+                            if (!controller.registerFormKey.value.currentState!.validate()) {
+                              print("[ERROR] Form validation failed");
+                              // Don't return here - let the form fields show their errors
+                              return;
+                            }
 
-        // 2. Verify passwords match
-        if (controller.registerPasswordController.value.text != 
-            controller.registerConfirmPasswordController.value.text) {
-          print("[ERROR] Passwords do not match");
-          ShowToastDialog.showToast("Passwords do not match");
-          return;
-        }
+                            // 2. Verify passwords match
+                            if (controller.registerPasswordController.value.text != 
+                                controller.registerConfirmPasswordController.value.text) {
+                              print("[ERROR] Passwords do not match");
+                              ShowToastDialog.showToast("Passwords do not match");
+                              return;
+                            }
 
-        // 3. Prepare data with debug prints
-        final fullName = controller.registerFullNameController.value.text.trim();
-        final email = controller.registerEmailController.value.text.trim();
-        final phone = controller.registerPhoneController.value.text.replaceAll(RegExp(r'[^\d]'), '');
-        final password = controller.registerPasswordController.value.text;
-        final countryCode = controller.countryCode.value;
+                            // 3. Additional password strength validation
+                            final password = controller.registerPasswordController.value.text;
+                            if (!_isPasswordStrong(password)) {
+                              ShowToastDialog.showToast("Please meet all password requirements");
+                              return;
+                            }
 
-        print("Registration data:");
-        print("- Name: $fullName");
-        print("- Email: $email");
-        print("- Phone: $phone");
-        print("- Country Code: $countryCode");
-        print("- Password: ${password.replaceAll(RegExp('.'), '*')}"); // Mask password
+                            // 4. Prepare data with debug prints
+                            final fullName = controller.registerFullNameController.value.text.trim();
+                            final email = controller.registerEmailController.value.text.trim();
+                            final phone = controller.registerPhoneController.value.text.replaceAll(RegExp(r'[^\d]'), '');
+                            final countryCode = controller.countryCode.value;
 
-        // 4. Call registration
-        await controller.registerWithEmail(
-          fullName: fullName,
-          email: email,
-          phoneNumber: phone,
-          password: password,
-          countryCode: countryCode,
-        );
+                            print("Registration data:");
+                            print("- Name: $fullName");
+                            print("- Email: $email");
+                            print("- Phone: $phone");
+                            print("- Country Code: $countryCode");
+                            print("- Password: ${password.replaceAll(RegExp('.'), '*')}"); // Mask password
 
-      } catch (e) {
-        print("[UNEXPECTED ERROR] ${e.toString()}");
-        ShowToastDialog.showToast("Registration failed. Please try again.");
-      }
-    },
-  );
-}),
-                    // ... rest of your social login and other UI elements
+                            // 5. Call registration
+                            await controller.registerWithEmail(
+                              fullName: fullName,
+                              email: email,
+                              phoneNumber: phone,
+                              password: password,
+                              countryCode: countryCode,
+                            );
+
+                          } catch (e) {
+                            print("[UNEXPECTED ERROR] ${e.toString()}");
+                            ShowToastDialog.showToast("Registration failed. Please try again.");
+                          }
+                        },
+                      );
+                    }),
+
                     const SizedBox(height: 30),
                     Row(
                       children: [
@@ -381,7 +439,6 @@ Obx(() {
                       title: "Continue with Google".tr,
                       iconVisibility: true,
                       iconAssetImage: 'assets/icons/ic_google.png',
-                      // Wrap in a lambda so type matches
                       onPress: controller.isLoading.value
                           ? () {}
                           : () {
@@ -483,5 +540,27 @@ Obx(() {
         );
       },
     );
+  }
+
+  // Helper method to build requirement rows
+  Widget _buildRequirementRow(String text, AuthController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Text(
+        text.tr,
+        style: GoogleFonts.poppins(
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  // Helper method to check password strength
+  bool _isPasswordStrong(String password) {
+    return password.length >= 8 &&
+        RegExp(r'[A-Z]').hasMatch(password) &&
+        RegExp(r'[a-z]').hasMatch(password) &&
+        RegExp(r'[0-9]').hasMatch(password) &&
+        RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
   }
 }

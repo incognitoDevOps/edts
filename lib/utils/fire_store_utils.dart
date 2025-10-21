@@ -466,24 +466,31 @@ class FireStoreUtils {
         StreamController<List<OrderModel>>.broadcast();
     List<OrderModel> ordersList = [];
 
+    // Calculate timestamp for 30 minutes ago
+    DateTime thirtyMinutesAgo = DateTime.now().subtract(Duration(minutes: 30));
+    Timestamp thirtyMinutesAgoTimestamp = Timestamp.fromDate(thirtyMinutesAgo);
+
     Query<Map<String, dynamic>> query;
 
     // Debug zone information
     print("🔍 Driver zones: ${driverUserModel.zoneIds}");
     print("📍 Driver location: $latitude, $longLatitude");
+    print("⏰ Filtering orders created after: $thirtyMinutesAgo");
 
     // Handle cases where driver has no zones or zoneIds is null
     if (driverUserModel.zoneIds == null || driverUserModel.zoneIds!.isEmpty) {
       print("⚠️ Driver has no zones assigned - using fallback query");
       query = fireStore
           .collection(CollectionName.orders)
-          .where('status', isEqualTo: Constant.ridePlaced);
+          .where('status', isEqualTo: Constant.ridePlaced)
+          .where('createdDate', isGreaterThan: thirtyMinutesAgoTimestamp);
     } else {
       query = fireStore
           .collection(CollectionName.orders)
           .where('serviceId', isEqualTo: driverUserModel.serviceId)
           .where('zoneId', whereIn: driverUserModel.zoneIds)
-          .where('status', isEqualTo: Constant.ridePlaced);
+          .where('status', isEqualTo: Constant.ridePlaced)
+          .where('createdDate', isGreaterThan: thirtyMinutesAgoTimestamp);
     }
 
     // Handle case where location is null
@@ -497,11 +504,14 @@ class FireStoreUtils {
           final data = doc.data() as Map<String, dynamic>;
           OrderModel orderModel = OrderModel.fromJson(data);
 
-          // Check if driver can accept this order
-          if (_canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
+          // Additional client-side time filtering as backup
+          if (_isOrderWithinTimeLimit(orderModel, thirtyMinutesAgo) &&
+              _canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
             ordersList.add(orderModel);
           }
         }
+        print(
+            "📦 Found ${ordersList.length} recent orders (no location filter)");
         getNearestOrderRequestController!.sink.add(ordersList);
       });
     } else {
@@ -522,15 +532,50 @@ class FireStoreUtils {
           final data = document.data() as Map<String, dynamic>;
           OrderModel orderModel = OrderModel.fromJson(data);
 
-          if (_canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
+          // Additional client-side time filtering as backup
+          if (_isOrderWithinTimeLimit(orderModel, thirtyMinutesAgo) &&
+              _canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
             ordersList.add(orderModel);
           }
         }
+        print("📦 Found ${ordersList.length} recent orders within radius");
         getNearestOrderRequestController!.sink.add(ordersList);
       });
     }
 
     yield* getNearestOrderRequestController!.stream;
+  }
+
+// Helper method to check if order is within time limit (client-side backup)
+  bool _isOrderWithinTimeLimit(OrderModel orderModel, DateTime timeLimit) {
+    if (orderModel.createdDate == null) {
+      print("⚠️ Order ${orderModel.id} has no createdDate - excluding");
+      return false;
+    }
+
+    DateTime? orderDate;
+
+    // Handle different date formats
+    if (orderModel.createdDate is Timestamp) {
+      orderDate = (orderModel.createdDate as Timestamp).toDate();
+    } else if (orderModel.createdDate is DateTime) {
+      orderDate = orderModel.createdDate as DateTime;
+    } else if (orderModel.createdDate is String) {
+      orderDate = DateTime.tryParse(orderModel.createdDate as String);
+    }
+
+    if (orderDate == null) {
+      print(
+          "⚠️ Order ${orderModel.id} has invalid createdDate format - excluding");
+      return false;
+    }
+
+    bool isRecent = orderDate.isAfter(timeLimit);
+    if (!isRecent) {
+      print("⏰ Order ${orderModel.id} is too old (${orderDate}) - excluding");
+    }
+
+    return isRecent;
   }
 
   /// Helper method to check if driver can accept order
@@ -1748,4 +1793,5 @@ class FireStoreUtils {
       return null;
     }
   }
+  
 }

@@ -28,7 +28,7 @@ class NewOrderScreen extends StatelessWidget {
         },
         builder: (controller) {
           return Scaffold(
-            body: controller.isLoading.value
+            body: controller.isLoading.value || controller.driverModel.value.id == null
                 ? Constant.loader(context)
                 : controller.driverModel.value.isOnline == false
                     ? Center(
@@ -66,6 +66,7 @@ class NewOrderScreen extends StatelessWidget {
                                     kmCharge: "10",
                                     title: "Test Service",
                                     enable: true,
+<<<<<<< HEAD
                                     offerRate: true);
 
                                 if (Constant.distanceType == "Km") {
@@ -82,6 +83,18 @@ class NewOrderScreen extends StatelessWidget {
                                           orderModel.distance.toString())
                                       .toStringAsFixed(Constant
                                           .currencyModel!.decimalDigits!);
+=======
+                                    offerRate: true
+                                  );
+
+                                int decimalDigits = Constant.currencyModel?.decimalDigits ?? 2;
+                                if (Constant.distanceType == "Km") {
+                                  amount = Constant.amountCalculate(orderModel.service!.kmCharge.toString(), orderModel.distance.toString())
+                                      .toStringAsFixed(decimalDigits);
+                                } else {
+                                  amount = Constant.amountCalculate(orderModel.service!.kmCharge.toString(), orderModel.distance.toString())
+                                      .toStringAsFixed(decimalDigits);
+>>>>>>> f9ad2b4182cab350ca7e8390e3f2d479c3dfe5ea
                                 }
 
                                 // Check if this is a test order
@@ -213,12 +226,17 @@ class NewOrderScreen extends StatelessWidget {
                                                           vertical: 10),
                                                       child: Center(
                                                         child: Text(
+<<<<<<< HEAD
                                                           'Recommended Price is ${Constant.amountShow(amount: amount)}. Approx distance ${double.parse(orderModel.distance.toString()).toStringAsFixed(Constant.currencyModel!.decimalDigits!)} ${Constant.distanceType}',
                                                           style: GoogleFonts
                                                               .poppins(
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .w500),
+=======
+                                                          'Recommended Price is ${Constant.amountShow(amount: amount)}. Approx distance ${double.parse(orderModel.distance.toString()).toStringAsFixed(decimalDigits)} ${Constant.distanceType}',
+                                                          style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+>>>>>>> f9ad2b4182cab350ca7e8390e3f2d479c3dfe5ea
                                                         ),
                                                       ),
                                                     ),

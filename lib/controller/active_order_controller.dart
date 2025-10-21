@@ -5,10 +5,4 @@ import 'package:get/get.dart';
 class ActiveOrderController extends GetxController {
   HomeController homeController = Get.put(HomeController());
   Rx<TextEditingController> otpController = TextEditingController().obs;
-
-  @override
-  void onClose() {
-    otpController.value.dispose();
-    super.onClose();
-  }
 }

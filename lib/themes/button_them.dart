@@ -17,7 +17,6 @@ class ButtonThem {
     double btnRadius = 10,
     required Function() onPress,
     bool isVisible = true,
-    Color? btnColor,
   }) {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
@@ -32,7 +31,7 @@ class ButtonThem {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(btnRadius),
           ),
-          color: btnColor ?? (themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary),
+          color: themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary,
           child: Text(
             title.toUpperCase(),
             textAlign: TextAlign.center,

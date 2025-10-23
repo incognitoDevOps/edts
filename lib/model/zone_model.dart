@@ -7,6 +7,7 @@ class ZoneModel {
   String? name;
   String? id;
   double? longitude;
+  double? radius;
 
   ZoneModel(
       {this.area,
@@ -14,7 +15,8 @@ class ZoneModel {
         this.latitude,
         this.name,
         this.id,
-        this.longitude});
+        this.longitude,
+        this.radius});
 
   ZoneModel.fromJson(Map<String, dynamic> json) {
     if (json['area'] != null) {
@@ -29,6 +31,7 @@ class ZoneModel {
     name = json['name'];
     id = json['id'];
     longitude = json['longitude'];
+    radius = json['radius'];
   }
 
   Map<String, dynamic> toJson() {
@@ -41,6 +44,7 @@ class ZoneModel {
     data['name'] = name;
     data['id'] = id;
     data['longitude'] = longitude;
+    data['radius'] = radius;
     return data;
   }
 }

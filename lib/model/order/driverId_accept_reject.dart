@@ -7,7 +7,7 @@ class DriverIdAcceptReject {
   String? suggestedTime;
   String? suggestedDate;
 
-  DriverIdAcceptReject({this.offerAmount, this.driverId, this.acceptedRejectTime,this.suggestedTime,this.suggestedDate});
+  DriverIdAcceptReject({this.offerAmount, this.driverId, this.acceptedRejectTime, this.suggestedTime, this.suggestedDate});
 
   DriverIdAcceptReject.fromJson(Map<String, dynamic> json) {
     driverId = json['driverId'];

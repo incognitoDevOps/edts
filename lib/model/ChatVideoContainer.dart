@@ -1,4 +1,4 @@
-import 'package:driver/model/conversation_model.dart';
+import 'package:customer/model/conversation_model.dart';
 
 class ChatVideoContainer {
   Url videoUrl;

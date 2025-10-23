@@ -9,8 +9,7 @@ class CouponModel {
   Timestamp? validity;
   String? type;
 
-  CouponModel(
-      {this.title,this.amount, this.code, this.enable, this.id, this.validity, this.type});
+  CouponModel({this.title, this.amount, this.code, this.enable, this.id, this.validity, this.type});
 
   CouponModel.fromJson(Map<String, dynamic> json) {
     title = json['title'];

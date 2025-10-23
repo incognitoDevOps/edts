@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'dart:developer';
 
-import 'package:driver/model/driver_user_model.dart';
-import 'package:driver/model/intercity_order_model.dart';
-import 'package:driver/model/order_model.dart';
-import 'package:driver/model/user_model.dart';
-import 'package:driver/ui/chat_screen/chat_screen.dart';
-import 'package:driver/ui/home_screens/order_map_screen.dart';
-import 'package:driver/ui/order_intercity_screen/complete_intecity_order_screen.dart';
-import 'package:driver/ui/order_screen/complete_order_screen.dart';
-import 'package:driver/utils/fire_store_utils.dart';
+import 'package:customer/model/driver_user_model.dart';
+import 'package:customer/model/intercity_order_model.dart';
+import 'package:customer/model/order_model.dart';
+import 'package:customer/model/user_model.dart';
+import 'package:customer/ui/chat_screen/chat_screen.dart';
+import 'package:customer/ui/intercityOrders/intercity_payment_order_screen.dart';
+import 'package:customer/ui/orders/payment_order_screen.dart';
+import 'package:customer/utils/fire_store_utils.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
@@ -38,7 +37,7 @@ class NotificationService {
     );
 
     if (request.authorizationStatus == AuthorizationStatus.authorized || request.authorizationStatus == AuthorizationStatus.provisional) {
-      const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
       var iosInitializationSettings = const DarwinInitializationSettings();
       final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid, iOS: iosInitializationSettings);
       await flutterLocalNotificationsPlugin.initialize(initializationSettings, onDidReceiveNotificationResponse: (payload) {});
@@ -52,37 +51,21 @@ class NotificationService {
       FirebaseMessaging.onBackgroundMessage((message) => firebaseMessageBackgroundHandle(message));
     }
 
-    // if (initialMessage != null) {
-    //   log('Message also contained a notification: ${initialMessage.notification!.body}');
-    // }
-
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       log("::::::::::::onMessage:::::::::::::::::");
       if (message.notification != null) {
-        log(message.data.toString());
+        log(message.notification.toString());
         display(message);
       }
     });
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
       log("::::::::::::onMessageOpenedApp:::::::::::::::::");
       if (message.notification != null) {
-        log(message.data.toString());
+        log(message.notification.toString());
         // display(message);
-        if (message.data['type'] == "city_order") {
-          Get.to(const OrderMapScreen(), arguments: {"orderModel": message.data['orderId']});
-        } else if (message.data['type'] == "city_order_payment_complete") {
-          OrderModel? orderModel = await FireStoreUtils.getOrder(message.data['orderId']);
-          Get.to(const CompleteOrderScreen(), arguments: {
-            "orderModel": orderModel,
-          });
-        } else if (message.data['type'] == "intercity_order_payment_complete") {
-          InterCityOrderModel? orderModel = await FireStoreUtils.getInterCityOrder(message.data['orderId']);
-          Get.to(const CompleteIntercityOrderScreen(), arguments: {
-            "orderModel": orderModel,
-          });
-        } else if (message.data['type'] == "chat") {
-          UserModel? customer = await FireStoreUtils.getCustomer(message.data['customerId']);
-          DriverUserModel? driver = await FireStoreUtils.getDriverProfile(message.data['driverId']);
+        if (message.data['type'] == "chat") {
+          UserModel? customer = await FireStoreUtils.getUserProfile(message.data['customerId']);
+          DriverUserModel? driver = await FireStoreUtils.getDriver(message.data['driverId']);
 
           Get.to(ChatScreens(
             driverId: driver!.id,
@@ -92,19 +75,28 @@ class NotificationService {
             driverName: driver.fullName,
             driverProfileImage: driver.profilePic,
             orderId: message.data['orderId'],
-            token: customer.fcmToken,
+            token: driver.fcmToken,
           ));
+        } else if (message.data['type'] == "city_order_complete") {
+          OrderModel? orderModel = await FireStoreUtils.getOrder(message.data['orderId']);
+          Get.to(const PaymentOrderScreen(), arguments: {
+            "orderModel": orderModel,
+          });
+        }else if (message.data['type'] == "intercity_order_complete") {
+          InterCityOrderModel? orderModel = await FireStoreUtils.getInterCityOrder(message.data['orderId']);
+          Get.to(const InterCityPaymentOrderScreen(), arguments: {
+            "orderModel": orderModel,
+          });
         }
       }
     });
-
-    await FirebaseMessaging.instance.subscribeToTopic("goRide_driver");
+    await FirebaseMessaging.instance.subscribeToTopic("goRide_customer");
 
   }
 
   static getToken() async {
     String? token = await FirebaseMessaging.instance.getToken();
-    return token!;
+    return token;
   }
 
   void display(RemoteMessage message) async {
@@ -115,8 +107,8 @@ class NotificationService {
 
       AndroidNotificationChannel channel = const AndroidNotificationChannel(
         '0',
-        'goRide-driver',
-        description: 'Show BuzRyde Notification',
+        'goRide-customer',
+        description: 'Show QuickLAI Notification',
         importance: Importance.max,
       );
       AndroidNotificationDetails notificationDetails =

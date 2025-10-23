@@ -1,53 +1,36 @@
 import 'dart:async';
 
-import 'package:driver/constant/constant.dart';
-import 'package:driver/constant/show_toast_dialog.dart';
-import 'package:driver/model/order/location_lat_lng.dart';
-import 'package:driver/utils/location_service.dart';
+import 'package:customer/constant/constant.dart';
+import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:map_launcher/map_launcher.dart';
 
 class Utils {
-  static Future<Position> determinePosition() async {
-    // Use the improved location service
-    LocationLatLng? location = await LocationService.instance.getCurrentLocation();
-    if (location != null) {
-      return Position(
-        longitude: location.longitude!,
-        latitude: location.latitude!,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 0,
-        headingAccuracy: 0,
-        speed: 0,
-        speedAccuracy: 0,
-      );
-    } else {
-      throw Exception('Failed to get location');
-    }
-  }
+
 
   static Future<Position> getCurrentLocation() async {
-    // Use the improved location service
-    LocationLatLng? location = await LocationService.instance.getCurrentLocation();
-    if (location != null) {
-      return Position(
-        longitude: location.longitude!,
-        latitude: location.latitude!,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 0,
-        headingAccuracy: 0,
-        speed: 0,
-        speedAccuracy: 0,
-      );
-    } else {
-      throw Exception('Failed to get location');
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Location services are not enabled don't continue
+      // accessing the position and request users of the
+      // App to enable the location services.
+      await Geolocator.openLocationSettings();
     }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.deniedForever) {
+        return Future.error('Location Not Available');
+      }
+    }
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    return await Geolocator.getCurrentPosition();
   }
 
 
@@ -126,6 +109,5 @@ class Utils {
       }
     }
   }
-
 
 }

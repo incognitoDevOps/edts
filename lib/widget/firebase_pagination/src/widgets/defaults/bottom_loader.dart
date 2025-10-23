@@ -1,5 +1,6 @@
 // Flutter Packages
 import 'package:flutter/material.dart';
+import 'package:customer/widget/buzryde_loader.dart';
 
 /// A circular progress indicator that spins when the [Stream] is loading.
 ///
@@ -19,9 +20,7 @@ class BottomLoader extends StatelessWidget {
         width: 25,
         height: 25,
         margin: const EdgeInsets.all(10),
-        child: const CircularProgressIndicator.adaptive(
-          strokeWidth: 2.5,
-        ),
+        child: const BuzRydeLoader(size: 25),
       ),
     );
   }

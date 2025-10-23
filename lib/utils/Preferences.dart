@@ -3,9 +3,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Preferences {
-  static const isFinishOnBoardingKey = "isFinishOnBoardingKey";
   static const languageCodeKey = "languageCodeKey";
   static const themKey = "themKey";
+  static const isFinishOnBoardingKey = "isFinishOnBoardingKey";
+  static const contactList = "contactList";
 
   static late SharedPreferences pref;
 

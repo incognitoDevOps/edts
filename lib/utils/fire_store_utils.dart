@@ -1,35 +1,40 @@
 import 'dart:async';
-import 'dart:developer';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:driver/constant/collection_name.dart';
-import 'package:driver/constant/constant.dart';
-import 'package:driver/constant/show_toast_dialog.dart';
-import 'package:driver/model/admin_commission.dart';
-import 'package:driver/model/bank_details_model.dart';
-import 'package:driver/model/conversation_model.dart';
-import 'package:driver/model/currency_model.dart';
-import 'package:driver/model/document_model.dart';
-import 'package:driver/model/driver_document_model.dart';
-import 'package:driver/model/driver_rules_model.dart';
-import 'package:driver/model/driver_user_model.dart';
-import 'package:driver/model/inbox_model.dart';
-import 'package:driver/model/intercity_order_model.dart';
-import 'package:driver/model/language_model.dart';
-import 'package:driver/model/on_boarding_model.dart';
-import 'package:driver/model/order/driverId_accept_reject.dart';
-import 'package:driver/model/order_model.dart';
-import 'package:driver/model/payment_model.dart';
-import 'package:driver/model/referral_model.dart';
-import 'package:driver/model/review_model.dart';
-import 'package:driver/model/service_model.dart';
-import 'package:driver/model/user_model.dart';
-import 'package:driver/model/vehicle_type_model.dart';
-import 'package:driver/model/wallet_transaction_model.dart';
-import 'package:driver/model/withdraw_model.dart';
-import 'package:driver/model/zone_model.dart';
-import 'package:driver/widget/geoflutterfire/src/geoflutterfire.dart';
-import 'package:driver/widget/geoflutterfire/src/models/point.dart';
+import 'package:customer/constant/collection_name.dart';
+import 'package:customer/constant/constant.dart';
+import 'package:customer/constant/send_notification.dart';
+import 'package:customer/constant/show_toast_dialog.dart';
+import 'package:customer/model/admin_commission.dart';
+import 'package:customer/model/airport_model.dart';
+import 'package:customer/model/banner_model.dart';
+import 'package:customer/model/conversation_model.dart';
+import 'package:customer/model/coupon_model.dart';
+import 'package:customer/model/currency_model.dart';
+import 'package:customer/model/driver_user_model.dart';
+import 'package:customer/model/faq_model.dart';
+import 'package:customer/model/freight_vehicle.dart';
+import 'package:customer/model/inbox_model.dart';
+import 'package:customer/model/intercity_order_model.dart';
+import 'package:customer/model/intercity_service_model.dart';
+import 'package:customer/model/language_model.dart';
+import 'package:customer/model/on_boarding_model.dart';
+import 'package:customer/model/order/driverId_accept_reject.dart';
+import 'package:customer/model/order_model.dart';
+import 'package:customer/model/payment_model.dart';
+import 'package:customer/model/referral_model.dart';
+import 'package:customer/model/review_model.dart';
+import 'package:customer/model/service_model.dart';
+import 'package:customer/model/sos_model.dart';
+import 'package:customer/model/tax_model.dart';
+import 'package:customer/model/user_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
+import 'package:customer/model/zone_model.dart';
+import 'package:customer/widget/geoflutterfire/src/geoflutterfire.dart';
+import 'package:customer/widget/geoflutterfire/src/models/point.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get/get.dart';
 
 class FireStoreUtils {
   static FirebaseFirestore fireStore = FirebaseFirestore.instance;
@@ -44,936 +49,215 @@ class FireStoreUtils {
     return isLogin;
   }
 
-  getGoogleAPIKey() async {
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("globalKey")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        Constant.mapAPIKey = value.data()!["googleMapKey"];
-      }
-    });
-  }
-
-  getSettings() async {
-    await getGoogleAPIKey();
-
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("notification_setting")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        if (value.data() != null) {
-          Constant.senderId = value.data()!['senderId'].toString();
-          Constant.jsonNotificationFileURL =
-              value.data()!['serviceJson'].toString();
+  static Future<void> getSettings() async {
+    try {
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("globalKey")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          Constant.mapAPIKey = value.data()!["googleMapKey"] ?? "";
         }
-      }
-    });
+      });
 
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("globalValue")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        Constant.distanceType = value.data()!["distanceType"];
-        Constant.radius = value.data()!["radius"];
-        Constant.minimumAmountToWithdrawal =
-            value.data()!["minimumAmountToWithdrawal"];
-        Constant.minimumDepositToRideAccept =
-            value.data()!["minimumDepositToRideAccept"];
-        Constant.mapType = value.data()!["mapType"];
-        Constant.selectedMapType = value.data()!["selectedMapType"];
-        Constant.driverLocationUpdate = value.data()!["driverLocationUpdate"];
-      }
-    });
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("notification_setting")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          Constant.senderId =
+              value.data()!['senderId']?.toString() ?? '116120217389';
+          Constant.jsonNotificationFileURL =
+              value.data()!['serviceJson']?.toString() ?? '';
+        }
+      });
 
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("referral")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        Constant.referralAmount = value.data()!["referralAmount"];
-      }
-    });
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("globalValue")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          final data = value.data()!;
+          Constant.distanceType = data["distanceType"] ?? "Km";
+          Constant.radius = data["radius"] ?? "10";
+          Constant.mapType = data["mapType"] ?? "google";
+          Constant.selectedMapType = data["selectedMapType"] ?? "osm";
+          Constant.driverLocationUpdate = data["driverLocationUpdate"] ?? "10";
+        }
+      });
 
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("global")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        Constant.termsAndConditions = value.data()!["termsAndConditions"];
-        Constant.privacyPolicy = value.data()!["privacyPolicy"];
-        Constant.appVersion = value.data()!["appVersion"];
-      }
-    });
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("global")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          final data = value.data()!;
+          Constant.termsAndConditions = data["termsAndConditions"] ?? "";
+          Constant.privacyPolicy = data["privacyPolicy"] ?? "";
+          Constant.appVersion = data["appVersion"] ?? "1.0.0";
+        }
+      });
 
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("contact_us")
-        .get()
-        .then((value) {
-      if (value.exists) {
-        Constant.supportURL = value.data()!["supportURL"];
+      // In your getSettings() method, update the commission loading section:
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("adminCommission")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          print("🔄 Loading admin commission from Firebase...");
+          print("   Raw data: ${value.data()}");
+
+          try {
+            AdminCommission adminCommission =
+                AdminCommission.fromJson(value.data()!);
+            print("   Parsed commission:");
+            print("     amount: ${adminCommission.amount}");
+            print("     isEnabled: ${adminCommission.isEnabled}");
+            print("     type: ${adminCommission.type}");
+
+            if (adminCommission.flatRatePromotion != null) {
+              print(
+                  "     flatRatePromotion.isEnabled: ${adminCommission.flatRatePromotion!.isEnabled}");
+              print(
+                  "     flatRatePromotion.amount: ${adminCommission.flatRatePromotion!.amount}");
+            }
+
+            // Set commission regardless of isEnabled status for debugging
+            Constant.adminCommission = adminCommission;
+            print("   ✅ Commission loaded successfully");
+          } catch (e) {
+            print("   ❌ Error parsing commission: $e");
+          }
+        } else {
+          print("❌ Commission document not found or empty");
+        }
+      }).catchError((error) {
+        print("❌ Error loading commission: $error");
+      });
+
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("referral")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          Constant.referralAmount = value.data()!["referralAmount"] ?? "0";
+        }
+      });
+
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("contact_us")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          Constant.supportURL = value.data()!["supportURL"] ?? "";
+        }
+      });
+
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("currency")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          Constant.currencyModel = CurrencyModel.fromJson(value.data()!);
+          // Override symbol to C$ for Canadian Dollar
+          if (Constant.currencyModel != null) {
+            Constant.currencyModel!.symbol = "C\$";
+          }
+          print(
+              "FirestoreUtils: Currency Loaded - Symbol: ${Constant.currencyModel?.symbol}");
+        } else {
+          print("FirestoreUtils: Currency document not found or data is null.");
+          // Set default currency if not found
+          Constant.currencyModel = CurrencyModel(
+              id: "default",
+              code: "CAD",
+              decimalDigits: 2,
+              enable: true,
+              name: "Canadian Dollar",
+              symbol: "C\$",
+              symbolAtRight: false);
+        }
+      });
+    } catch (error) {
+      print("FirestoreUtils: Error loading settings - $error");
+      // Set default values on error
+      if (Constant.currencyModel == null) {
+        Constant.currencyModel = CurrencyModel(
+            id: "error_default",
+            code: "CAD",
+            decimalDigits: 2,
+            enable: true,
+            name: "Canadian Dollar",
+            symbol: "C\$",
+            symbolAtRight: false);
       }
-    });
+    }
   }
 
   static String getCurrentUid() {
     return FirebaseAuth.instance.currentUser!.uid;
   }
 
-  static Future<DriverUserModel?> getDriverProfile(String uuid) async {
-    DriverUserModel? driverModel;
+  static Future updateReferralAmount(OrderModel orderModel) async {
+    ReferralModel? referralModel;
     await fireStore
-        .collection(CollectionName.driverUsers)
-        .doc(uuid)
+        .collection(CollectionName.referral)
+        .doc(orderModel.userId)
         .get()
         .then((value) {
-      if (value.exists) {
-        driverModel = DriverUserModel.fromJson(value.data()!);
-      }
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      driverModel = null;
-    });
-    return driverModel;
-  }
-
-  static Future<UserModel?> getCustomer(String uuid) async {
-    UserModel? userModel;
-    await fireStore
-        .collection(CollectionName.users)
-        .doc(uuid)
-        .get()
-        .then((value) {
-      if (value.exists) {
-        userModel = UserModel.fromJson(value.data()!);
-      }
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      userModel = null;
-    });
-    return userModel;
-  }
-
-  static Future<bool> updateUser(UserModel userModel) async {
-    bool isUpdate = false;
-    await fireStore
-        .collection(CollectionName.users)
-        .doc(userModel.id)
-        .set(userModel.toJson())
-        .whenComplete(() {
-      isUpdate = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isUpdate = false;
-    });
-    return isUpdate;
-  }
-
-  Future<PaymentModel?> getPayment() async {
-    PaymentModel? paymentModel;
-    await fireStore
-        .collection(CollectionName.settings)
-        .doc("payment")
-        .get()
-        .then((value) {
-      paymentModel = PaymentModel.fromJson(value.data()!);
-    });
-    return paymentModel;
-  }
-
-  Future<CurrencyModel?> getCurrency() async {
-    CurrencyModel? currencyModel;
-    await fireStore
-        .collection(CollectionName.currency)
-        .where("enable", isEqualTo: true)
-        .get()
-        .then((value) {
-      if (value.docs.isNotEmpty) {
-        currencyModel = CurrencyModel.fromJson(value.docs.first.data());
-      }
-    });
-    return currencyModel;
-  }
-
-  /// SAFE version: Update driver with field-specific updates
-  static Future<bool> updateDriverUser(DriverUserModel userModel) async {
-    try {
-      // Convert to JSON and remove null values to avoid overwriting fields with null
-      Map<String, dynamic> data = userModel.toJson();
-      data.removeWhere((key, value) => value == null);
-
-      await fireStore
-          .collection(CollectionName.driverUsers)
-          .doc(userModel.id)
-          .set(data, SetOptions(merge: true));
-      return true;
-    } catch (e) {
-      log("Failed to update user: $e");
-      return false;
-    }
-  }
-
-  /// Even better: Add safe field-specific update methods
-  static Future<bool> updateDriverFields({
-    required String driverId,
-    required Map<String, dynamic> updates,
-  }) async {
-    try {
-      await fireStore
-          .collection(CollectionName.driverUsers)
-          .doc(driverId)
-          .set(updates, SetOptions(merge: true));
-      return true;
-    } catch (e) {
-      log("Failed to update driver fields: $e");
-      return false;
-    }
-  }
-
-  /// Safe location update method
-  static Future<bool> updateDriverLocation({
-    required String driverId,
-    required double latitude,
-    required double longitude,
-    required double? heading,
-  }) async {
-    try {
-      GeoFirePoint position =
-          Geoflutterfire().point(latitude: latitude, longitude: longitude);
-
-      await fireStore
-          .collection(CollectionName.driverUsers)
-          .doc(driverId)
-          .update({
-        'location': {'latitude': latitude, 'longitude': longitude},
-        'position': {'geoPoint': position.geoPoint, 'geohash': position.hash},
-        'rotation': heading,
-        'lastLocationUpdate': FieldValue.serverTimestamp(),
-      });
-
-      return true;
-    } catch (e) {
-      log("Failed to update driver location: $e");
-      return false;
-    }
-  }
-
-  static Future<DriverIdAcceptReject?> getAcceptedOrders(
-      String orderId, String driverId) async {
-    DriverIdAcceptReject? driverIdAcceptReject;
-    await fireStore
-        .collection(CollectionName.orders)
-        .doc(orderId)
-        .collection("acceptedDriver")
-        .doc(driverId)
-        .get()
-        .then((value) async {
-      if (value.exists) {
-        driverIdAcceptReject = DriverIdAcceptReject.fromJson(value.data()!);
-      }
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      driverIdAcceptReject = null;
-    });
-    return driverIdAcceptReject;
-  }
-
-  static Future<DriverIdAcceptReject?> getInterCItyAcceptedOrders(
-      String orderId, String driverId) async {
-    DriverIdAcceptReject? driverIdAcceptReject;
-    await fireStore
-        .collection(CollectionName.ordersIntercity)
-        .doc(orderId)
-        .collection("acceptedDriver")
-        .doc(driverId)
-        .get()
-        .then((value) async {
-      if (value.exists) {
-        driverIdAcceptReject = DriverIdAcceptReject.fromJson(value.data()!);
-      }
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      driverIdAcceptReject = null;
-    });
-    return driverIdAcceptReject;
-  }
-
-  static Future<bool> userExitOrNot(String uid) async {
-    bool isExit = false;
-
-    await fireStore.collection(CollectionName.driverUsers).doc(uid).get().then(
-      (value) {
-        if (value.exists) {
-          isExit = true;
-        } else {
-          isExit = false;
-        }
-      },
-    ).catchError((error) {
-      log("Failed to update user: $error");
-      isExit = false;
-    });
-    return isExit;
-  }
-
-  static Future<List<DocumentModel>> getDocumentList() async {
-    List<DocumentModel> documentList = [];
-    await fireStore
-        .collection(CollectionName.documents)
-        .where('enable', isEqualTo: true)
-        .where('isDeleted', isEqualTo: false)
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        DocumentModel documentModel = DocumentModel.fromJson(element.data());
-        documentList.add(documentModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return documentList;
-  }
-
-  static Future<List<ServiceModel>> getService() async {
-    List<ServiceModel> serviceList = [];
-    await fireStore
-        .collection(CollectionName.service)
-        .where('enable', isEqualTo: true)
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        ServiceModel documentModel = ServiceModel.fromJson(element.data());
-        serviceList.add(documentModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return serviceList;
-  }
-
-  static Future<DriverDocumentModel?> getDocumentOfDriver() async {
-    DriverDocumentModel? driverDocumentModel;
-    await fireStore
-        .collection(CollectionName.driverDocument)
-        .doc(getCurrentUid())
-        .get()
-        .then((value) async {
-      if (value.exists) {
-        driverDocumentModel = DriverDocumentModel.fromJson(value.data()!);
-      }
-    });
-    return driverDocumentModel;
-  }
-
-  static Future<bool> uploadDriverDocument(Documents documents) async {
-    bool isAdded = false;
-    DriverDocumentModel driverDocumentModel = DriverDocumentModel();
-    List<Documents> documentsList = [];
-    await fireStore
-        .collection(CollectionName.driverDocument)
-        .doc(getCurrentUid())
-        .get()
-        .then((value) async {
-      if (value.exists) {
-        DriverDocumentModel newDriverDocumentModel =
-            DriverDocumentModel.fromJson(value.data()!);
-        documentsList = newDriverDocumentModel.documents!;
-        var contain = newDriverDocumentModel.documents!
-            .where((element) => element.documentId == documents.documentId);
-        if (contain.isEmpty) {
-          documentsList.add(documents);
-
-          driverDocumentModel.id = getCurrentUid();
-          driverDocumentModel.documents = documentsList;
-        } else {
-          var index = newDriverDocumentModel.documents!.indexWhere(
-              (element) => element.documentId == documents.documentId);
-
-          driverDocumentModel.id = getCurrentUid();
-          documentsList.removeAt(index);
-          documentsList.insert(index, documents);
-          driverDocumentModel.documents = documentsList;
-          isAdded = false;
-          ShowToastDialog.showToast("Document is under verification");
-        }
+      if (value.data() != null) {
+        referralModel = ReferralModel.fromJson(value.data()!);
       } else {
-        documentsList.add(documents);
-        driverDocumentModel.id = getCurrentUid();
-        driverDocumentModel.documents = documentsList;
+        return;
       }
     });
+    if (referralModel != null) {
+      if (referralModel!.referralBy != null &&
+          referralModel!.referralBy!.isNotEmpty) {
+        await fireStore
+            .collection(CollectionName.users)
+            .doc(referralModel!.referralBy)
+            .get()
+            .then((value) async {
+          DocumentSnapshot<Map<String, dynamic>> userDocument = value;
+          if (userDocument.data() != null && userDocument.exists) {
+            try {
+              print(userDocument.data());
+              UserModel user = UserModel.fromJson(userDocument.data()!);
+              user.walletAmount = (double.parse(user.walletAmount.toString()) +
+                      double.parse(Constant.referralAmount.toString()))
+                  .toString();
+              updateUser(user);
 
-    await fireStore
-        .collection(CollectionName.driverDocument)
-        .doc(getCurrentUid())
-        .set(driverDocumentModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      isAdded = false;
-      log(error.toString());
-    });
+              WalletTransactionModel transactionModel = WalletTransactionModel(
+                  id: Constant.getUuid(),
+                  amount: Constant.referralAmount.toString(),
+                  createdDate: Timestamp.now(),
+                  paymentType: "Wallet",
+                  transactionId: orderModel.id,
+                  userId: orderModel.driverId.toString(),
+                  orderType: "city",
+                  userType: "customer",
+                  note: "Referral Amount");
 
-    return isAdded;
-  }
-
-  static Future<List<VehicleTypeModel>?> getVehicleType() async {
-    List<VehicleTypeModel> vehicleList = [];
-    await fireStore
-        .collection(CollectionName.vehicleType)
-        .where('enable', isEqualTo: true)
-        .get()
-        .then((value) async {
-      for (var element in value.docs) {
-        VehicleTypeModel vehicleModel =
-            VehicleTypeModel.fromJson(element.data());
-        vehicleList.add(vehicleModel);
-      }
-    });
-    return vehicleList;
-  }
-
-  static Future<List<DriverRulesModel>?> getDriverRules() async {
-    List<DriverRulesModel> driverRulesModel = [];
-    await fireStore
-        .collection(CollectionName.driverRules)
-        .where('enable', isEqualTo: true)
-        .where('isDeleted', isEqualTo: false)
-        .get()
-        .then((value) async {
-      for (var element in value.docs) {
-        DriverRulesModel vehicleModel =
-            DriverRulesModel.fromJson(element.data());
-        driverRulesModel.add(vehicleModel);
-      }
-    });
-    return driverRulesModel;
-  }
-
-  StreamController<List<OrderModel>>? getNearestOrderRequestController;
-
-  Stream<List<OrderModel>> getOrders(DriverUserModel driverUserModel,
-      double? latitude, double? longLatitude) async* {
-    getNearestOrderRequestController =
-        StreamController<List<OrderModel>>.broadcast();
-    List<OrderModel> ordersList = [];
-
-    // Calculate timestamp for 30 minutes ago
-    DateTime thirtyMinutesAgo = DateTime.now().subtract(Duration(minutes: 30));
-    Timestamp thirtyMinutesAgoTimestamp = Timestamp.fromDate(thirtyMinutesAgo);
-
-    Query<Map<String, dynamic>> query;
-
-    // Debug zone information
-    print("🔍 Driver zones: ${driverUserModel.zoneIds}");
-    print("📍 Driver location: $latitude, $longLatitude");
-    print("⏰ Filtering orders created after: $thirtyMinutesAgo");
-
-    // Handle cases where driver has no zones or zoneIds is null
-    if (driverUserModel.zoneIds == null || driverUserModel.zoneIds!.isEmpty) {
-      print("⚠️ Driver has no zones assigned - using fallback query");
-      query = fireStore
-          .collection(CollectionName.orders)
-          .where('status', isEqualTo: Constant.ridePlaced)
-          .where('createdDate', isGreaterThan: thirtyMinutesAgoTimestamp);
-    } else {
-      query = fireStore
-          .collection(CollectionName.orders)
-          .where('serviceId', isEqualTo: driverUserModel.serviceId)
-          .where('zoneId', whereIn: driverUserModel.zoneIds)
-          .where('status', isEqualTo: Constant.ridePlaced)
-          .where('createdDate', isGreaterThan: thirtyMinutesAgoTimestamp);
-    }
-
-    // Handle case where location is null
-    if (latitude == null || longLatitude == null) {
-      print(
-          "⚠️ Driver location is null - using simple query without geo filtering");
-
-      query.snapshots().listen((querySnapshot) {
-        ordersList.clear();
-        for (var doc in querySnapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          OrderModel orderModel = OrderModel.fromJson(data);
-
-          // Additional client-side time filtering as backup
-          if (_isOrderWithinTimeLimit(orderModel, thirtyMinutesAgo) &&
-              _canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
-            ordersList.add(orderModel);
+              await FireStoreUtils.setWalletTransaction(transactionModel);
+            } catch (error) {
+              print(error);
+            }
           }
-        }
-        print(
-            "📦 Found ${ordersList.length} recent orders (no location filter)");
-        getNearestOrderRequestController!.sink.add(ordersList);
-      });
-    } else {
-      // Use geo query
-      GeoFirePoint center =
-          Geoflutterfire().point(latitude: latitude, longitude: longLatitude);
-      Stream<List<DocumentSnapshot>> stream = Geoflutterfire()
-          .collection(collectionRef: query)
-          .within(
-              center: center,
-              radius: double.parse(Constant.radius),
-              field: 'position',
-              strictMode: true);
-
-      stream.listen((List<DocumentSnapshot> documentList) {
-        ordersList.clear();
-        for (var document in documentList) {
-          final data = document.data() as Map<String, dynamic>;
-          OrderModel orderModel = OrderModel.fromJson(data);
-
-          // Additional client-side time filtering as backup
-          if (_isOrderWithinTimeLimit(orderModel, thirtyMinutesAgo) &&
-              _canDriverAcceptOrder(orderModel, driverUserModel.id!)) {
-            ordersList.add(orderModel);
-          }
-        }
-        print("📦 Found ${ordersList.length} recent orders within radius");
-        getNearestOrderRequestController!.sink.add(ordersList);
-      });
-    }
-
-    yield* getNearestOrderRequestController!.stream;
-  }
-
-// Helper method to check if order is within time limit (client-side backup)
-  bool _isOrderWithinTimeLimit(OrderModel orderModel, DateTime timeLimit) {
-    if (orderModel.createdDate == null) {
-      print("⚠️ Order ${orderModel.id} has no createdDate - excluding");
-      return false;
-    }
-
-    DateTime? orderDate;
-
-    // Handle different date formats
-    if (orderModel.createdDate is Timestamp) {
-      orderDate = (orderModel.createdDate as Timestamp).toDate();
-    } else if (orderModel.createdDate is DateTime) {
-      orderDate = orderModel.createdDate as DateTime;
-    } else if (orderModel.createdDate is String) {
-      orderDate = DateTime.tryParse(orderModel.createdDate as String);
-    }
-
-    if (orderDate == null) {
-      print(
-          "⚠️ Order ${orderModel.id} has invalid createdDate format - excluding");
-      return false;
-    }
-
-    bool isRecent = orderDate.isAfter(timeLimit);
-    if (!isRecent) {
-      print("⏰ Order ${orderModel.id} is too old (${orderDate}) - excluding");
-    }
-
-    return isRecent;
-  }
-
-  /// Helper method to check if driver can accept order
-  bool _canDriverAcceptOrder(OrderModel orderModel, String driverId) {
-    // If order has accepted drivers, check if this driver is already there
-    if (orderModel.acceptedDriverId != null &&
-        orderModel.acceptedDriverId!.isNotEmpty) {
-      return !orderModel.acceptedDriverId!.contains(driverId);
-    }
-
-    // If no accepted drivers yet, driver can accept
-    return true;
-  }
-
-  StreamController<List<InterCityOrderModel>>?
-      getNearestFreightOrderRequestController;
-
-  Stream<List<InterCityOrderModel>> getFreightOrders(
-      double? latitude, double? longLatitude) async* {
-    getNearestFreightOrderRequestController =
-        StreamController<List<InterCityOrderModel>>.broadcast();
-    List<InterCityOrderModel> ordersList = [];
-    Query<Map<String, dynamic>> query = fireStore
-        .collection(CollectionName.ordersIntercity)
-        .where('intercityServiceId', isEqualTo: "Kn2VEnPI3ikF58uK8YqY")
-        .where('status', isEqualTo: Constant.ridePlaced);
-    GeoFirePoint center = Geoflutterfire()
-        .point(latitude: latitude ?? 0.0, longitude: longLatitude ?? 0.0);
-    Stream<List<DocumentSnapshot>> stream = Geoflutterfire()
-        .collection(collectionRef: query)
-        .within(
-            center: center,
-            radius: double.parse(Constant.radius),
-            field: 'position',
-            strictMode: true);
-
-    stream.listen((List<DocumentSnapshot> documentList) {
-      ordersList.clear();
-      for (var document in documentList) {
-        final data = document.data() as Map<String, dynamic>;
-        InterCityOrderModel orderModel = InterCityOrderModel.fromJson(data);
-        if (orderModel.acceptedDriverId != null &&
-            orderModel.acceptedDriverId!.isNotEmpty) {
-          if (!orderModel.acceptedDriverId!
-              .contains(FireStoreUtils.getCurrentUid())) {
-            ordersList.add(orderModel);
-          }
-        } else {
-          ordersList.add(orderModel);
-        }
-      }
-      getNearestFreightOrderRequestController!.sink.add(ordersList);
-    });
-
-    yield* getNearestFreightOrderRequestController!.stream;
-  }
-
-  closeStream() {
-    if (getNearestOrderRequestController != null) {
-      getNearestOrderRequestController!.close();
-    }
-  }
-
-  closeFreightStream() {
-    if (getNearestFreightOrderRequestController != null) {
-      getNearestFreightOrderRequestController!.close();
-    }
-  }
-
-  static Future<bool?> setOrder(OrderModel orderModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.orders)
-        .doc(orderModel.id)
-        .set(orderModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<bool?> bankDetailsIsAvailable() async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.bankDetails)
-        .doc(FireStoreUtils.getCurrentUid())
-        .get()
-        .then((value) {
-      if (value.exists) {
-        isAdded = true;
-      } else {
-        isAdded = false;
-      }
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<OrderModel?> getOrder(String orderId) async {
-    OrderModel? orderModel;
-    await fireStore
-        .collection(CollectionName.orders)
-        .doc(orderId)
-        .get()
-        .then((value) {
-      if (value.data() != null) {
-        orderModel = OrderModel.fromJson(value.data()!);
-      }
-    });
-    return orderModel;
-  }
-
-  static Future<InterCityOrderModel?> getInterCityOrder(String orderId) async {
-    InterCityOrderModel? orderModel;
-    await fireStore
-        .collection(CollectionName.ordersIntercity)
-        .doc(orderId)
-        .get()
-        .then((value) {
-      if (value.data() != null) {
-        orderModel = InterCityOrderModel.fromJson(value.data()!);
-      }
-    });
-    return orderModel;
-  }
-
-  static Future<bool?> acceptRide(
-      OrderModel orderModel, DriverIdAcceptReject driverIdAcceptReject) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.orders)
-        .doc(orderModel.id)
-        .collection("acceptedDriver")
-        .doc(driverIdAcceptReject.driverId)
-        .set(driverIdAcceptReject.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<bool?> setReview(ReviewModel reviewModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.reviewCustomer)
-        .doc(reviewModel.id)
-        .set(reviewModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<ReviewModel?> getReview(String orderId) async {
-    ReviewModel? reviewModel;
-    await fireStore
-        .collection(CollectionName.reviewCustomer)
-        .doc(orderId)
-        .get()
-        .then((value) {
-      if (value.data() != null) {
-        reviewModel = ReviewModel.fromJson(value.data()!);
-      }
-    });
-    return reviewModel;
-  }
-
-  static Future<bool?> setInterCityOrder(InterCityOrderModel orderModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.ordersIntercity)
-        .doc(orderModel.id)
-        .set(orderModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<bool?> acceptInterCityRide(InterCityOrderModel orderModel,
-      DriverIdAcceptReject driverIdAcceptReject) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.ordersIntercity)
-        .doc(orderModel.id)
-        .collection("acceptedDriver")
-        .doc(driverIdAcceptReject.driverId)
-        .set(driverIdAcceptReject.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<List<WalletTransactionModel>?> getWalletTransaction() async {
-    List<WalletTransactionModel> walletTransactionModel = [];
-
-    await fireStore
-        .collection(CollectionName.walletTransaction)
-        .where('userId', isEqualTo: FireStoreUtils.getCurrentUid())
-        .orderBy('createdDate', descending: true)
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        WalletTransactionModel taxModel =
-            WalletTransactionModel.fromJson(element.data());
-        walletTransactionModel.add(taxModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return walletTransactionModel;
-  }
-
-  static Future<bool?> setWalletTransaction(
-      WalletTransactionModel walletTransactionModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.walletTransaction)
-        .doc(walletTransactionModel.id)
-        .set(walletTransactionModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<bool?> updatedDriverWallet({required String amount}) async {
-    bool isAdded = false;
-    await getDriverProfile(FireStoreUtils.getCurrentUid()).then((value) async {
-      if (value != null) {
-        DriverUserModel userModel = value;
-        userModel.walletAmount =
-            (double.parse(userModel.walletAmount.toString()) +
-                    double.parse(amount))
-                .toString();
-        await FireStoreUtils.updateDriverUser(userModel).then((value) {
-          isAdded = value;
         });
+      } else {
+        return;
       }
-    });
-    return isAdded;
-  }
-
-  static Future<List<LanguageModel>?> getLanguage() async {
-    List<LanguageModel> languageList = [];
-
-    await fireStore.collection(CollectionName.languages).get().then((value) {
-      for (var element in value.docs) {
-        LanguageModel taxModel = LanguageModel.fromJson(element.data());
-        languageList.add(taxModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return languageList;
-  }
-
-  static Future<List<OnBoardingModel>> getOnBoardingList() async {
-    List<OnBoardingModel> onBoardingModel = [];
-    await fireStore
-        .collection(CollectionName.onBoarding)
-        .where("type", isEqualTo: "driverApp")
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        OnBoardingModel documentModel =
-            OnBoardingModel.fromJson(element.data());
-        onBoardingModel.add(documentModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return onBoardingModel;
-  }
-
-  static Future addInBox(InboxModel inboxModel) async {
-    return await fireStore
-        .collection(CollectionName.chat)
-        .doc(inboxModel.orderId)
-        .set(inboxModel.toJson())
-        .then((document) {
-      return inboxModel;
-    });
-  }
-
-  static Future addChat(ConversationModel conversationModel) async {
-    return await fireStore
-        .collection(CollectionName.chat)
-        .doc(conversationModel.orderId)
-        .collection("thread")
-        .doc(conversationModel.id)
-        .set(conversationModel.toJson())
-        .then((document) {
-      return conversationModel;
-    });
-  }
-
-  static Future<BankDetailsModel?> getBankDetails() async {
-    BankDetailsModel? bankDetailsModel;
-    await fireStore
-        .collection(CollectionName.bankDetails)
-        .doc(FireStoreUtils.getCurrentUid())
-        .get()
-        .then((value) {
-      if (value.data() != null) {
-        bankDetailsModel = BankDetailsModel.fromJson(value.data()!);
-      }
-    });
-    return bankDetailsModel;
-  }
-
-  static Future<bool?> updateBankDetails(
-      BankDetailsModel bankDetailsModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.bankDetails)
-        .doc(bankDetailsModel.userId)
-        .set(bankDetailsModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<bool?> setWithdrawRequest(WithdrawModel withdrawModel) async {
-    bool isAdded = false;
-    await fireStore
-        .collection(CollectionName.withdrawalHistory)
-        .doc(withdrawModel.id)
-        .set(withdrawModel.toJson())
-        .then((value) {
-      isAdded = true;
-    }).catchError((error) {
-      log("Failed to update user: $error");
-      isAdded = false;
-    });
-    return isAdded;
-  }
-
-  static Future<List<WithdrawModel>> getWithDrawRequest() async {
-    List<WithdrawModel> withdrawalList = [];
-    await fireStore
-        .collection(CollectionName.withdrawalHistory)
-        .where('userId', isEqualTo: getCurrentUid())
-        .orderBy('createdDate', descending: true)
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        WithdrawModel documentModel = WithdrawModel.fromJson(element.data());
-        withdrawalList.add(documentModel);
-      }
-    }).catchError((error) {
-      log(error.toString());
-    });
-    return withdrawalList;
-  }
-
-  static Future<bool?> deleteUser() async {
-    bool? isDelete;
-    try {
-      await fireStore
-          .collection(CollectionName.driverUsers)
-          .doc(FireStoreUtils.getCurrentUid())
-          .delete();
-
-      // delete user  from firebase auth
-      await FirebaseAuth.instance.currentUser!.delete().then((value) {
-        isDelete = true;
-      });
-    } catch (e, s) {
-      log('FireStoreUtils.firebaseCreateNewUser $e $s');
-      return false;
     }
-    return isDelete;
   }
 
   static Future<bool> getIntercityFirstOrderOrNOt(
@@ -1018,6 +302,7 @@ class FireStoreUtils {
           DocumentSnapshot<Map<String, dynamic>> userDocument = value;
           if (userDocument.data() != null && userDocument.exists) {
             try {
+              print(userDocument.data());
               UserModel user = UserModel.fromJson(userDocument.data()!);
               user.walletAmount = (double.parse(user.walletAmount.toString()) +
                       double.parse(Constant.referralAmount.toString()))
@@ -1036,7 +321,9 @@ class FireStoreUtils {
                   note: "Referral Amount");
 
               await FireStoreUtils.setWalletTransaction(transactionModel);
-            } catch (error) {}
+            } catch (error) {
+              print(error);
+            }
           }
         });
       } else {
@@ -1062,6 +349,9 @@ class FireStoreUtils {
         if (value.exists && value.data() != null) {
           userModel = UserModel.fromJson(value.data()!);
           print("getUserProfile: Successfully loaded user $uuid");
+
+          // Call commission debug when user profile is loaded
+          _debugCommissionOnUserLoad();
         } else {
           print("getUserProfile: User document not found for $uuid");
         }
@@ -1071,6 +361,121 @@ class FireStoreUtils {
       userModel = null;
     }
     return userModel;
+  }
+
+  /// Commission debug method called when user profile is loaded
+  static Future<void> _debugCommissionOnUserLoad() async {
+    try {
+      print("\n=== COMMISSION DEBUG (Triggered by getUserProfile) ===");
+
+      // 1. Check current commission state
+      print("\n1️⃣ Current commission state:");
+      if (Constant.adminCommission != null) {
+        print("   ✅ Commission loaded in memory:");
+        print("      Enabled: ${Constant.adminCommission!.isEnabled}");
+        print("      Type: '${Constant.adminCommission!.type}'");
+        print("      Amount: '${Constant.adminCommission!.amount}'");
+
+        // Check flat rate promotion
+        if (Constant.adminCommission!.flatRatePromotion != null) {
+          print(
+              "      Flat Rate Enabled: ${Constant.adminCommission!.flatRatePromotion!.isEnabled}");
+          print(
+              "      Flat Rate Amount: ${Constant.adminCommission!.flatRatePromotion!.amount}");
+        } else {
+          print("      Flat Rate: Not configured");
+        }
+
+        // Check payment methods
+        print(
+            "      Has Both Methods: ${Constant.adminCommission!.hasBothPaymentMethods}");
+        print(
+            "      Has Only Commission: ${Constant.adminCommission!.hasOnlyCommission}");
+        print(
+            "      Has Only Flat Rate: ${Constant.adminCommission!.hasOnlyFlatRate}");
+      } else {
+        print("   ❌ No commission loaded in memory");
+      }
+
+      // 2. Check Firebase directly
+      print("\n2️⃣ Checking Firebase commission document...");
+      final commissionDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.settings)
+          .doc("adminCommission")
+          .get();
+
+      if (commissionDoc.exists && commissionDoc.data() != null) {
+        print("   ✅ Commission document exists");
+        final data = commissionDoc.data()!;
+
+        // Show all available fields
+        print("   Available fields in document:");
+        data.forEach((key, value) {
+          print("      $key: $value (${value.runtimeType})");
+        });
+
+        // Parse with your model's structure
+        final commission = AdminCommission.fromJson(data);
+
+        print("\n   Parsed AdminCommission:");
+        print("      amount: '${commission.amount}'");
+        print("      isEnabled: ${commission.isEnabled}");
+        print("      type: '${commission.type}'");
+
+        if (commission.flatRatePromotion != null) {
+          print(
+              "      flatRatePromotion.isEnabled: ${commission.flatRatePromotion!.isEnabled}");
+          print(
+              "      flatRatePromotion.amount: ${commission.flatRatePromotion!.amount}");
+        } else {
+          print("      flatRatePromotion: null");
+        }
+
+        // Test calculations
+        final testAmount = 100.0;
+        print("\n3️⃣ Test calculations with ride amount: \$$testAmount");
+
+        if (commission.isEnabled == true &&
+            commission.amount != null &&
+            commission.type != null) {
+          final commissionResult =
+              commission.calculateCommissionAmount(testAmount);
+          print(
+              "   Commission calculation: \$${commissionResult.toStringAsFixed(2)}");
+
+          if (commission.type == "fix") {
+            print("   Type: Fixed amount (\$${commission.amount})");
+          } else {
+            print("   Type: Percentage (${commission.amount}%)");
+          }
+        } else {
+          print("   ❌ Regular commission not enabled or configured");
+        }
+
+        if (commission.flatRatePromotion?.isEnabled == true) {
+          final flatRateResult = commission.getFlatRateAmount();
+          print("   Flat Rate amount: \$${flatRateResult.toStringAsFixed(2)}");
+        } else {
+          print("   ❌ Flat rate promotion not enabled");
+        }
+
+        // Test the Constant.calculateOrderAdminCommission function
+        print("\n4️⃣ Testing Constant.calculateOrderAdminCommission():");
+        final constantResult = Constant.calculateOrderAdminCommission(
+          amount: testAmount.toString(),
+          adminCommission: commission,
+        );
+        print("   Result: \$${constantResult.toStringAsFixed(2)}");
+      } else {
+        print("   ❌ Commission document does not exist or is empty");
+        print("   Path: ${CollectionName.settings}/adminCommission");
+      }
+
+      print("\n=== END COMMISSION DEBUG ===");
+    } catch (e) {
+      print("❌ Commission debug error: $e");
+      print("Stack trace: ${e.toString()}");
+    }
   }
 
   /// Enhanced getDriver with better error handling and validation
@@ -1116,11 +521,18 @@ class FireStoreUtils {
   }
 
   /// Enhanced method to get driver with retry mechanism
-  static Future<DriverUserModel?> getDriverWithRetry(String uuid,
-      {int maxRetries = 3}) async {
+  /// Enhanced method to get driver with retry mechanism and null safety
+  static Future<DriverUserModel?> getDriverWithRetry(String? uuid,
+      {int maxRetries = 3, required Duration retryDelay}) async {
+    // 🔥 CRITICAL: Check for null or empty UUID
+    if (uuid == null || uuid.isEmpty) {
+      print("❌ [DRIVER RETRY] Invalid driver UUID: $uuid");
+      return null;
+    }
+
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        print("🔄 Attempt $attempt to load driver: $uuid");
+        print("🔄 [DRIVER RETRY] Attempt $attempt to load driver: $uuid");
 
         final doc = await fireStore
             .collection(CollectionName.driverUsers)
@@ -1130,15 +542,17 @@ class FireStoreUtils {
 
         if (doc.exists && doc.data() != null) {
           final driver = DriverUserModel.fromJson(doc.data()!);
-          print("✅ Driver loaded successfully on attempt $attempt");
+          print(
+              "✅ [DRIVER RETRY] Driver loaded successfully on attempt $attempt");
           return driver;
         } else {
-          print("❌ Driver document not found on attempt $attempt");
+          print(
+              "❌ [DRIVER RETRY] Driver document not found on attempt $attempt");
         }
       } catch (e) {
-        print("❌ Error loading driver on attempt $attempt: $e");
+        print("❌ [DRIVER RETRY] Error loading driver on attempt $attempt: $e");
         if (attempt == maxRetries) {
-          print("❌ All retry attempts failed for driver: $uuid");
+          print("❌ [DRIVER RETRY] All retry attempts failed for driver: $uuid");
           return null;
         }
         // Wait before retrying
@@ -1149,7 +563,7 @@ class FireStoreUtils {
   }
 
   /// Debug method to analyze driver assignment issues
-  Future<void> debugDriverAssignmentIssue(String orderId) async {
+  static Future<void> debugDriverAssignmentIssue(String orderId) async {
     try {
       print("🔍 DEBUGGING DRIVER ASSIGNMENT FOR ORDER: $orderId");
 
@@ -1240,6 +654,23 @@ class FireStoreUtils {
     }
   }
 
+  static Future<bool> updateUser(UserModel userModel) async {
+    bool isUpdate = false;
+    try {
+      await fireStore
+          .collection(CollectionName.users)
+          .doc(userModel.id)
+          .set(userModel.toJson())
+          .whenComplete(() {
+        isUpdate = true;
+      });
+    } catch (error) {
+      print("Failed to update user: $error");
+      isUpdate = false;
+    }
+    return isUpdate;
+  }
+
   static Future<bool> updateDriver(DriverUserModel userModel) async {
     bool isUpdate = false;
     try {
@@ -1273,525 +704,1857 @@ class FireStoreUtils {
     return isFirst;
   }
 
-  static Future updateReferralAmount(OrderModel orderModel) async {
-    ReferralModel? referralModel;
+  static Future<bool?> rejectRide(
+      OrderModel orderModel, DriverIdAcceptReject driverIdAcceptReject) async {
+    bool isAdded = false;
     await fireStore
-        .collection(CollectionName.referral)
-        .doc(orderModel.userId)
-        .get()
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .collection("rejectedDriver")
+        .doc(driverIdAcceptReject.driverId)
+        .set(driverIdAcceptReject.toJson())
         .then((value) {
-      if (value.data() != null) {
-        referralModel = ReferralModel.fromJson(value.data()!);
-      } else {
-        return;
-      }
-    });
-    if (referralModel != null) {
-      if (referralModel!.referralBy != null &&
-          referralModel!.referralBy!.isNotEmpty) {
-        await fireStore
-            .collection(CollectionName.users)
-            .doc(referralModel!.referralBy)
-            .get()
-            .then((value) async {
-          DocumentSnapshot<Map<String, dynamic>> userDocument = value;
-          if (userDocument.data() != null && userDocument.exists) {
-            try {
-              UserModel user = UserModel.fromJson(userDocument.data()!);
-              user.walletAmount = (double.parse(user.walletAmount.toString()) +
-                      double.parse(Constant.referralAmount.toString()))
-                  .toString();
-              updateUser(user);
-
-              WalletTransactionModel transactionModel = WalletTransactionModel(
-                  id: Constant.getUuid(),
-                  amount: Constant.referralAmount.toString(),
-                  createdDate: Timestamp.now(),
-                  paymentType: "Wallet",
-                  transactionId: orderModel.id,
-                  userId: orderModel.driverId.toString(),
-                  orderType: "city",
-                  userType: "customer",
-                  note: "Referral Amount");
-
-              await FireStoreUtils.setWalletTransaction(transactionModel);
-            } catch (error) {
-              print(error);
-            }
-          }
-        });
-      } else {
-        return;
-      }
-    }
-  }
-
-  static Future<List<ZoneModel>?> getZone() async {
-    List<ZoneModel> airPortList = [];
-    await fireStore
-        .collection(CollectionName.zone)
-        .where('publish', isEqualTo: true)
-        .get()
-        .then((value) {
-      for (var element in value.docs) {
-        ZoneModel ariPortModel = ZoneModel.fromJson(element.data());
-        airPortList.add(ariPortModel);
-      }
+      isAdded = true;
     }).catchError((error) {
-      log(error.toString());
+      print("Failed to update user: $error");
+      isAdded = false;
     });
-    return airPortList;
+    return isAdded;
   }
 
-  /// Get admin commission settings
-  static Future<AdminCommission?> getAdminCommission() async {
-    AdminCommission? adminCommission;
+
+  static Future<InterCityOrderModel?> getInterCityOrder(String orderId) async {
+    InterCityOrderModel? orderModel;
     try {
-      final doc = await fireStore
-          .collection(CollectionName.settings)
-          .doc('adminCommission')
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        adminCommission = AdminCommission.fromJson(doc.data()!);
-      }
-    } catch (e) {
-      log('Error getting admin commission: $e');
-    }
-    return adminCommission;
-  }
-
-  // debugging................................................................................................
-
-  /// Debug method to check driver's current status
-  static Future<void> debugDriverStatus(String driverId) async {
-    try {
-      final driver = await getDriverProfile(driverId);
-      if (driver != null) {
-        print("🔍 DRIVER DEBUG STATUS:");
-        print("   - ID: ${driver.id}");
-        print("   - Name: ${driver.fullName}");
-        print("   - Online: ${driver.isOnline}");
-        print(
-            "   - FCM Token: ${driver.fcmToken != null ? 'EXISTS' : 'MISSING'}");
-        print("   - Verified: ${driver.documentVerification}");
-        print("   - Approved: ${driver.approvalStatus}");
-        print("   - Service ID: ${driver.serviceId}");
-        print("   - Zone IDs: ${driver.zoneIds}");
-        print(
-            "   - Location: ${driver.location?.latitude},${driver.location?.longitude}");
-
-        // Check if driver can receive orders
-        if (driver.fcmToken == null) {
-          print("❌ CANNOT RECEIVE ORDERS: No FCM token");
-        }
-        if (driver.isOnline != true) {
-          print("❌ CANNOT RECEIVE ORDERS: Not online");
-        }
-        if (driver.documentVerification != true) {
-          print("❌ CANNOT RECEIVE ORDERS: Documents not verified");
-        }
-        if (driver.approvalStatus != "approved") {
-          print("❌ CANNOT RECEIVE ORDERS: Not approved");
-        }
-      }
-    } catch (e) {
-      print("❌ Error debugging driver status: $e");
-    }
-  }
-
-  /// Check if driver can go online
-  static Future<bool> canDriverGoOnline(String driverId) async {
-    final driver = await getDriverProfile(driverId);
-    if (driver == null) return false;
-
-    return driver.fcmToken != null &&
-        driver.fcmToken!.isNotEmpty &&
-        driver.documentVerification == true &&
-        driver.approvalStatus == "approved";
-  }
-
-  // ========== PAYMENT DATA PROTECTION METHODS ==========
-
-  /// 🔥 CRITICAL: Safe order update for drivers that preserves payment data
-  static Future<bool> safeDriverOrderUpdate(OrderModel orderModel) async {
-    try {
-      print(
-          "🛡️  [DRIVER SAFE UPDATE] Starting safe update for order: ${orderModel.id}");
-
-      // Debug payment data before update
-      orderModel.debugPaymentData();
-
-      // Validate that we're not overwriting payment data for Stripe orders
-      if (orderModel.paymentType?.toLowerCase().contains("stripe") == true &&
-          !orderModel.hasValidPaymentData()) {
-        print(
-            "🚨 [DRIVER SAFE UPDATE] CRITICAL: Attempting to save Stripe order with missing payment data!");
-
-        // Try to recover payment data from Firestore first
-        final currentOrder = await getOrder(orderModel.id!);
-        if (currentOrder != null && currentOrder.hasValidPaymentData()) {
-          print(
-              "🔄 [DRIVER SAFE UPDATE] Recovering payment data from Firestore");
-          orderModel.paymentIntentId = currentOrder.paymentIntentId;
-          orderModel.preAuthAmount = currentOrder.preAuthAmount;
-          orderModel.paymentIntentStatus = currentOrder.paymentIntentStatus;
-          orderModel.preAuthCreatedAt = currentOrder.preAuthCreatedAt;
-          orderModel.paymentCapturedAt = currentOrder.paymentCapturedAt;
-          orderModel.paymentCanceledAt = currentOrder.paymentCanceledAt;
-        } else {
-          print(
-              "❌ [DRIVER SAFE UPDATE] Cannot save - payment data permanently lost");
-          return false;
-        }
-      }
-
-      // Convert to JSON and remove null payment fields to prevent overwriting
-      final orderJson = orderModel.toJson();
-
-      // Remove null payment fields to prevent overwriting existing payment data
-      orderJson.removeWhere((key, value) =>
-          value == null &&
-          [
-            'paymentIntentId',
-            'preAuthAmount',
-            'paymentIntentStatus',
-            'preAuthCreatedAt',
-            'paymentCapturedAt',
-            'paymentCanceledAt'
-          ].contains(key));
-
-      print("💾 [DRIVER SAFE UPDATE] Final data to save:");
-      print("   status: ${orderJson['status']}");
-      print("   paymentIntentId: ${orderJson['paymentIntentId']}");
-      print("   preAuthAmount: ${orderJson['preAuthAmount']}");
-
-      // Save with merge to preserve untouched fields
       await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .set(orderJson, SetOptions(merge: true));
+          .collection(CollectionName.ordersIntercity)
+          .doc(orderId)
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          orderModel = InterCityOrderModel.fromJson(value.data()!);
+        }
+      });
+    } catch (error) {
+      print("getInterCityOrder: Error loading order $orderId: $error");
+    }
+    return orderModel;
+  }
 
+  static Future<bool> userExitOrNot(String uid) async {
+    bool isExit = false;
+    try {
+      await fireStore
+          .collection(CollectionName.users)
+          .doc(uid)
+          .get()
+          .then((value) {
+        if (value.exists) {
+          isExit = true;
+        } else {
+          isExit = false;
+        }
+      });
+    } catch (error) {
+      print("Failed to check user existence: $error");
+      isExit = false;
+    }
+    return isExit;
+  }
+
+  static Future<List<ServiceModel>> getService() async {
+    List<ServiceModel> serviceList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.service)
+          .where('enable', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          ServiceModel documentModel = ServiceModel.fromJson(element.data());
+          serviceList.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getService error: $error");
+    }
+    return serviceList;
+  }
+
+  static Future<List<BannerModel>> getBanner() async {
+    List<BannerModel> bannerList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.banner)
+          .where('enable', isEqualTo: true)
+          .where('isDeleted', isEqualTo: false)
+          .orderBy('position', descending: false)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          BannerModel documentModel = BannerModel.fromJson(element.data());
+          bannerList.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getBanner error: $error");
+    }
+    return bannerList;
+  }
+
+  static Future<List<IntercityServiceModel>> getIntercityService() async {
+    List<IntercityServiceModel> serviceList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.intercityService)
+          .where('enable', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          IntercityServiceModel documentModel =
+              IntercityServiceModel.fromJson(element.data());
+          serviceList.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getIntercityService error: $error");
+    }
+    return serviceList;
+  }
+
+  static Future<List<FreightVehicle>> getFreightVehicle() async {
+    List<FreightVehicle> freightVehicle = [];
+    try {
+      await fireStore
+          .collection(CollectionName.freightVehicle)
+          .where('enable', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          FreightVehicle documentModel =
+              FreightVehicle.fromJson(element.data());
+          freightVehicle.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getFreightVehicle error: $error");
+    }
+    return freightVehicle;
+  }
+
+  StreamController<List<DriverUserModel>>? getNearestOrderRequestController;
+
+  Stream<List<DriverUserModel>> sendOrderData(OrderModel orderModel) async* {
+    getNearestOrderRequestController ??=
+        StreamController<List<DriverUserModel>>.broadcast();
+
+    List<DriverUserModel> ordersList = [];
+    Query<Map<String, dynamic>> query = fireStore
+        .collection(CollectionName.driverUsers)
+        .where('serviceId', isEqualTo: orderModel.serviceId)
+        .where('zoneId', arrayContains: orderModel.zoneId)
+        .where('isOnline', isEqualTo: true);
+    GeoFirePoint center = Geoflutterfire().point(
+        latitude: orderModel.sourceLocationLAtLng!.latitude ?? 0.0,
+        longitude: orderModel.sourceLocationLAtLng!.longitude ?? 0.0);
+    Stream<List<DocumentSnapshot>> stream = Geoflutterfire()
+        .collection(collectionRef: query)
+        .within(
+            center: center,
+            radius: double.parse(Constant.radius),
+            field: 'position',
+            strictMode: true);
+
+    stream.listen((List<DocumentSnapshot> documentList) {
+      ordersList.clear();
+      if (getNearestOrderRequestController != null) {
+        for (var document in documentList) {
+          final data = document.data() as Map<String, dynamic>;
+          DriverUserModel orderModel = DriverUserModel.fromJson(data);
+          ordersList.add(orderModel);
+        }
+
+        if (!getNearestOrderRequestController!.isClosed) {
+          getNearestOrderRequestController!.sink.add(ordersList);
+        }
+        closeStream();
+      }
+    });
+    yield* getNearestOrderRequestController!.stream;
+  }
+
+  closeStream() {
+    if (getNearestOrderRequestController != null) {
+      getNearestOrderRequestController == null;
+      getNearestOrderRequestController!.close();
+    }
+  }
+
+  /// Enhanced method to find and notify nearby drivers
+  static Stream<List<DriverUserModel>> findNearbyDrivers(
+      OrderModel orderModel) {
+    try {
+      print("🔍 [DEBUG] Starting driver search with zone validation...");
+      print("🎯 Search criteria:");
+      print("   Service ID: ${orderModel.serviceId}");
+      print("   Zone ID: ${orderModel.zoneId}");
       print(
-          "✅ [DRIVER SAFE UPDATE] Order updated successfully with payment data preserved");
+          "   Source Location: ${orderModel.sourceLocationLAtLng?.latitude}, ${orderModel.sourceLocationLAtLng?.longitude}");
 
-      // Quick verification
-      await Future.delayed(Duration(milliseconds: 300));
-      final quickVerify = await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .get();
+      // Create base query - REMOVE the zone filter from the query
+      Query<Map<String, dynamic>> query = fireStore
+          .collection(CollectionName.driverUsers)
+          .where('isOnline', isEqualTo: true)
+          .where('documentVerification', isEqualTo: true)
+          .where('serviceId', isEqualTo: orderModel.serviceId);
 
-      if (quickVerify.exists) {
-        final data = quickVerify.data();
-        print("🔍 [DRIVER SAFE UPDATE] Quick verification:");
-        print("   paymentIntentId: ${data?['paymentIntentId']}");
-        print("   preAuthAmount: ${data?['preAuthAmount']}");
+      // DEBUG: Print the actual query being executed
+      print("📋 Executing query with filters:");
+      print("   - isOnline: true");
+      print("   - documentVerification: true");
+      print("   - serviceId: ${orderModel.serviceId}");
+
+      return query.snapshots().map((querySnapshot) {
+        print("📦 Query returned ${querySnapshot.size} drivers");
+
+        List<DriverUserModel> availableDrivers = [];
+
+        for (var doc in querySnapshot.docs) {
+          try {
+            final driver = DriverUserModel.fromJson(doc.data());
+            print("👤 Found driver: ${driver.fullName} (${doc.id})");
+            print("   Zones: ${driver.zoneIds}");
+
+            // MANUAL ZONE VALIDATION - Check if driver has the required zone
+            if (orderModel.zoneId != null &&
+                orderModel.zoneId!.isNotEmpty &&
+                driver.zoneIds != null &&
+                driver.zoneIds!.contains(orderModel.zoneId)) {
+              print("   ✅ Driver has required zone: ${orderModel.zoneId}");
+
+              // Manual distance calculation
+              if (driver.location?.latitude != null &&
+                  driver.location?.longitude != null &&
+                  orderModel.sourceLocationLAtLng?.latitude != null &&
+                  orderModel.sourceLocationLAtLng?.longitude != null) {
+                final double distance = _calculateDistance(
+                  orderModel.sourceLocationLAtLng!.latitude!,
+                  orderModel.sourceLocationLAtLng!.longitude!,
+                  driver.location!.latitude!,
+                  driver.location!.longitude!,
+                );
+
+                double searchRadius = double.tryParse(Constant.radius) ?? 10.0;
+
+                if (distance <= searchRadius) {
+                  availableDrivers.add(driver);
+                  print(
+                      "   ✅ Added driver: ${driver.fullName} - Distance: ${distance.toStringAsFixed(2)} km");
+                } else {
+                  print(
+                      "   ❌ Driver too far: ${distance.toStringAsFixed(2)} km > $searchRadius km");
+                }
+              } else {
+                print("   ⚠️  Skipping driver - missing location data");
+              }
+            } else {
+              print("   ❌ Driver missing required zone: ${orderModel.zoneId}");
+            }
+          } catch (e) {
+            print("❌ Error parsing driver document: $e");
+          }
+        }
+
+        print("🎉 Final available drivers: ${availableDrivers.length}");
+        return availableDrivers;
+      });
+    } catch (e) {
+      print("❌ Error in findNearbyDrivers: $e");
+      return Stream.value([]);
+    }
+  }
+
+// Add this helper method to calculate distance
+  static double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+
+    double dLat = _degreesToRadians(lat2 - lat1);
+    double dLon = _degreesToRadians(lon2 - lon1);
+
+    double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) *
+            cos(_degreesToRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  static double _degreesToRadians(double degrees) {
+    return degrees * pi / 180;
+  }
+
+  /// Send ride request to multiple drivers
+  static Future<bool> sendRideRequestToDrivers(
+      OrderModel orderModel, List<DriverUserModel> drivers) async {
+    try {
+      print("📤 Sending ride request to ${drivers.length} drivers");
+
+      if (drivers.isEmpty) {
+        print("❌ No drivers available to send request");
+        return false;
       }
 
-      return true;
-    } catch (error) {
+      // Save the order first
+      bool orderSaved = await setOrder(orderModel) ?? false;
+      if (!orderSaved) {
+        print("❌ Failed to save order to Firebase");
+        return false;
+      }
+
+      print("✅ Order saved successfully: ${orderModel.id}");
+
+      // Send notifications to all available drivers
+      List<Future> notificationFutures = [];
+
+      for (DriverUserModel driver in drivers) {
+        if (driver.fcmToken != null && driver.fcmToken!.isNotEmpty) {
+          Map<String, dynamic> payload = {
+            "type": "city_order",
+            "orderId": orderModel.id,
+            "sourceLatitude":
+                orderModel.sourceLocationLAtLng?.latitude?.toString(),
+            "sourceLongitude":
+                orderModel.sourceLocationLAtLng?.longitude?.toString(),
+            "destinationLatitude":
+                orderModel.destinationLocationLAtLng?.latitude?.toString(),
+            "destinationLongitude":
+                orderModel.destinationLocationLAtLng?.longitude?.toString(),
+            "sourceLocation": orderModel.sourceLocationName,
+            "destinationLocation": orderModel.destinationLocationName,
+            "offerRate": orderModel.offerRate,
+            "distance": orderModel.distance,
+            "paymentType": orderModel.paymentType,
+          };
+
+          notificationFutures.add(SendNotification.sendOneNotification(
+            token: driver.fcmToken!,
+            title: 'New Ride Available'.tr,
+            body: 'A customer has placed a ride near your location.'.tr,
+            payload: payload,
+          ).then((success) {
+            if (success) {
+              print("✅ Notification sent to driver: ${driver.fullName}");
+            } else {
+              print(
+                  "❌ Failed to send notification to driver: ${driver.fullName}");
+            }
+            return success;
+          }).catchError((error) {
+            print("❌ Error sending notification to ${driver.fullName}: $error");
+            return false;
+          }));
+        } else {
+          print("⚠️ Driver ${driver.fullName} has no FCM token");
+        }
+      }
+
+      // Wait for all notifications to complete
+      List<dynamic> results = await Future.wait(notificationFutures);
+      int successCount = results.where((result) => result == true).length;
+
       print(
-          "❌ [DRIVER SAFE UPDATE] Failed to update order ${orderModel.id}: $error");
+          "📊 Notification results: $successCount/${drivers.length} successful");
+
+      return successCount > 0;
+    } catch (e) {
+      print("❌ Error in sendRideRequestToDrivers: $e");
       return false;
     }
   }
 
-  /// 🔥 CRITICAL: Universal safe update method for drivers - PRESERVES PAYMENT DATA
-  static Future<bool> safeDriverOrderUpdateFields(
-      String orderId, Map<String, dynamic> updates) async {
+  /// Enhanced method to place a ride with better error handling and driver finding
+  static Future<bool> placeRideRequest(OrderModel orderModel) async {
     try {
-      print(
-          "🛡️  [DRIVER SAFE UPDATE FIELDS] Starting safe field update for order: $orderId");
-      print("   Requested updates: $updates");
+      print("🚀 [DEBUG] Starting ride request process...");
 
-      // 🔥 STEP 1: Get current order state from Firestore
-      final currentDoc =
-          await fireStore.collection(CollectionName.orders).doc(orderId).get();
+      // VERIFY
+      final savedDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderModel.id)
+          .get();
 
-      if (!currentDoc.exists) {
-        print("❌ [DRIVER SAFE UPDATE FIELDS] Order $orderId not found");
+      final savedData = savedDoc.data();
+      print("🔍 [VERIFICATION] Actual Firestore data:");
+      print("   paymentIntentId: ${savedData?['paymentIntentId']}");
+      print("   preAuthAmount: ${savedData?['preAuthAmount']}");
+      print("   paymentIntentStatus: ${savedData?['paymentIntentStatus']}");
+
+      await debugQueryResults(orderModel);
+
+      // Validate order data
+      if (orderModel.sourceLocationLAtLng?.latitude == null ||
+          orderModel.sourceLocationLAtLng?.longitude == null) {
+        ShowToastDialog.showToast("Invalid pickup location");
+        print("❌ [DEBUG] Invalid pickup location coordinates");
         return false;
       }
 
-      final currentData = currentDoc.data()!;
+      if (orderModel.destinationLocationLAtLng?.latitude == null ||
+          orderModel.destinationLocationLAtLng?.longitude == null) {
+        ShowToastDialog.showToast("Invalid destination location");
+        print("❌ [DEBUG] Invalid destination location coordinates");
+        return false;
+      }
 
-      // 🔥 STEP 2: Extract and preserve payment data
-      final preservedPaymentData = {
-        'paymentIntentId': currentData['paymentIntentId'],
-        'preAuthAmount': currentData['preAuthAmount'],
-        'paymentIntentStatus': currentData['paymentIntentStatus'],
-        'preAuthCreatedAt': currentData['preAuthCreatedAt'],
-        'paymentCapturedAt': currentData['paymentCapturedAt'],
-        'paymentCanceledAt': currentData['paymentCanceledAt'],
-        'paymentType': currentData['paymentType'],
-      };
+      if (orderModel.serviceId == null || orderModel.serviceId!.isEmpty) {
+        ShowToastDialog.showToast("Please select a service type");
+        print("❌ [DEBUG] No service ID specified");
+        return false;
+      }
 
-      print("🔒 [DRIVER SAFE UPDATE FIELDS] Preserved payment data:");
-      print("   paymentIntentId: ${preservedPaymentData['paymentIntentId']}");
-      print("   preAuthAmount: ${preservedPaymentData['preAuthAmount']}");
+      print("✅ [DEBUG] Order validation passed");
+      ShowToastDialog.showLoader("Finding nearby drivers...");
 
-      // 🔥 STEP 3: Merge updates with preserved payment data
-      final safeUpdateData = {
-        ...updates,
-        ...preservedPaymentData, // This OVERRIDES any payment fields in updates
-        'updateDate': FieldValue.serverTimestamp(),
-      };
+      // Find nearby drivers
+      bool driversFound = false;
+      List<DriverUserModel> availableDrivers = [];
 
-      // Remove any null values that might overwrite existing data
-      safeUpdateData.removeWhere((key, value) => value == null);
+      // Listen to the stream for a limited time
+      StreamSubscription? driverSubscription;
+      Completer<bool> completer = Completer<bool>();
 
-      print("💾 [DRIVER SAFE UPDATE FIELDS] Final safe update data:");
-      safeUpdateData.forEach((key, value) {
-        print("   $key: $value");
+      Timer timeoutTimer = Timer(const Duration(seconds: 15), () {
+        if (!completer.isCompleted) {
+          print("⏰ [DEBUG] Driver search timeout after 15 seconds");
+          completer.complete(false);
+        }
       });
 
-      // 🔥 STEP 4: Perform the update
+      print("🔍 [DEBUG] Starting driver search stream...");
+      driverSubscription = findNearbyDrivers(orderModel).listen(
+        (List<DriverUserModel> drivers) {
+          print("📦 [DEBUG] Received ${drivers.length} drivers from stream");
+          if (!completer.isCompleted && drivers.isNotEmpty) {
+            availableDrivers = drivers;
+            driversFound = true;
+            print("✅ [DEBUG] Drivers found successfully");
+            completer.complete(true);
+          } else if (!completer.isCompleted) {
+            print("⚠️ [DEBUG] Empty driver list received");
+          }
+        },
+        onError: (error) {
+          print("❌ [DEBUG] Error in driver stream: $error");
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+        },
+        onDone: () {
+          print("🏁 [DEBUG] Driver stream completed");
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+        },
+      );
+
+      // Wait for drivers to be found or timeout
+      driversFound = await completer.future;
+
+      // Clean up
+      timeoutTimer.cancel();
+      await driverSubscription?.cancel();
+
+      ShowToastDialog.closeLoader();
+
+      if (!driversFound || availableDrivers.isEmpty) {
+        print("❌ [DEBUG] No drivers available after search");
+
+        // Debug: Check what's in the database
+        print("🔍 [DEBUG] Checking database for potential issues...");
+
+        // Check if there are any online drivers at all
+        final onlineDrivers = await fireStore
+            .collection(CollectionName.driverUsers)
+            .where('isOnline', isEqualTo: true)
+            .limit(5)
+            .get();
+
+        print(
+            "👥 [DEBUG] Total online drivers in database: ${onlineDrivers.size}");
+
+        if (onlineDrivers.size > 0) {
+          onlineDrivers.docs.forEach((doc) {
+            final driver = DriverUserModel.fromJson(doc.data());
+            print("👤 [DEBUG] Online driver: ${driver.fullName}");
+            print(
+                "📍 [DEBUG] Location: ${driver.location?.latitude}, ${driver.location?.longitude}");
+            print("🗺️ [DEBUG] Zone IDs: ${driver.zoneIds}");
+            print("🚗 [DEBUG] Service ID: ${driver.serviceId}");
+
+            // Calculate distance from order location
+            if (driver.location?.latitude != null &&
+                driver.location?.longitude != null) {
+              final distance = _calculateDistance(
+                orderModel.sourceLocationLAtLng!.latitude!,
+                orderModel.sourceLocationLAtLng!.longitude!,
+                driver.location!.latitude!,
+                driver.location!.longitude!,
+              );
+              print(
+                  "📏 [DEBUG] Distance from order: ${distance.toStringAsFixed(2)} km");
+            }
+          });
+        }
+
+        ShowToastDialog.showToast(
+            "No drivers available in your area. Please try again later.");
+        return false;
+      }
+
+      // Send ride request to found drivers
+      print(
+          "📤 [DEBUG] Sending ride request to ${availableDrivers.length} drivers");
+      bool requestSent =
+          await sendRideRequestToDrivers(orderModel, availableDrivers);
+
+      if (requestSent) {
+        ShowToastDialog.showToast("Ride request sent! Looking for a driver...");
+        return true;
+      } else {
+        ShowToastDialog.showToast(
+            "Failed to send ride request. Please try again.");
+        return false;
+      }
+    } catch (e) {
+      ShowToastDialog.closeLoader();
+      print("❌ [DEBUG] Error in placeRideRequest: $e");
+      print("📋 [DEBUG] Stack trace: ${e.toString()}");
+      ShowToastDialog.showToast(
+          "Failed to place ride request: ${e.toString()}");
+      return false;
+    }
+  }
+
+  /// Monitor ride status and driver updates
+  static Stream<OrderModel?> monitorRideStatus(String orderId) {
+    return fireStore
+        .collection(CollectionName.orders)
+        .doc(orderId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        return OrderModel.fromJson(snapshot.data()!);
+      }
+      return null;
+    });
+  }
+
+  /// Get driver location updates for live tracking
+  static Stream<DriverUserModel?> getDriverLocationUpdates(String driverId) {
+    return fireStore
+        .collection(CollectionName.driverUsers)
+        .doc(driverId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        return DriverUserModel.fromJson(snapshot.data()!);
+      }
+      return null;
+    });
+  }
+
+  static Future<bool?> setInterCityOrder(InterCityOrderModel orderModel) async {
+    bool isAdded = false;
+    try {
+      await fireStore
+          .collection(CollectionName.ordersIntercity)
+          .doc(orderModel.id)
+          .set(orderModel.toJson())
+          .then((value) {
+        isAdded = true;
+      });
+    } catch (error) {
+      print("Failed to save intercity order: $error");
+      isAdded = false;
+    }
+    return isAdded;
+  }
+
+  static Future<DriverIdAcceptReject?> getAcceptedOrders(
+      String orderId, String driverId) async {
+    DriverIdAcceptReject? driverIdAcceptReject;
+    try {
       await fireStore
           .collection(CollectionName.orders)
           .doc(orderId)
-          .update(safeUpdateData);
-
-      print(
-          "✅ [DRIVER SAFE UPDATE FIELDS] Order updated safely with payment data preserved");
-
-      // 🔥 STEP 5: Verify the update
-      await Future.delayed(Duration(milliseconds: 500));
-      final verifyDoc =
-          await fireStore.collection(CollectionName.orders).doc(orderId).get();
-
-      if (verifyDoc.exists) {
-        final verifiedData = verifyDoc.data()!;
-        final paymentStillValid = verifiedData['paymentIntentId'] != null &&
-            verifiedData['paymentIntentId'] ==
-                preservedPaymentData['paymentIntentId'];
-
-        if (paymentStillValid) {
-          print(
-              "✅ [DRIVER SAFE UPDATE FIELDS] Payment data verified - still intact");
-          return true;
-        } else {
-          print(
-              "🚨 [DRIVER SAFE UPDATE FIELDS] WARNING: Payment data may have been affected");
-          return false;
+          .collection("acceptedDriver")
+          .doc(driverId)
+          .get()
+          .then((value) async {
+        if (value.exists && value.data() != null) {
+          driverIdAcceptReject = DriverIdAcceptReject.fromJson(value.data()!);
         }
-      }
-
-      return true;
+      });
     } catch (error) {
-      print("❌ [DRIVER SAFE UPDATE FIELDS] Error: $error");
-      return false;
+      print("getAcceptedOrders: Failed to load accepted order: $error");
+      driverIdAcceptReject = null;
     }
+    return driverIdAcceptReject;
   }
 
-  /// 🔥 CRITICAL: Safe OTP verification that preserves payment data
-  static Future<bool> safeUpdateAfterOTPVerification(
-      String orderId, String enteredOTP) async {
+  static Future<DriverIdAcceptReject?> getInterCItyAcceptedOrders(
+      String orderId, String driverId) async {
+    DriverIdAcceptReject? driverIdAcceptReject;
     try {
-      print(
-          "🛡️  [DRIVER SAFE OTP] Starting safe OTP update for order: $orderId");
-
-      // Get current order first
-      final currentOrder = await getOrder(orderId);
-      if (currentOrder == null) {
-        print("❌ [DRIVER SAFE OTP] Order $orderId not found");
-        return false;
-      }
-
-      // Validate OTP
-      if (currentOrder.otp != enteredOTP) {
-        print("❌ [DRIVER SAFE OTP] Invalid OTP");
-        return false;
-      }
-
-      print("🔍 [DRIVER SAFE OTP] Before OTP verification - Payment state:");
-      currentOrder.debugPaymentData();
-
-      // Use safe field update method
-      return await safeDriverOrderUpdateFields(orderId, {
-        'status': Constant.rideInProgress,
-        'updateDate': FieldValue.serverTimestamp(),
+      await fireStore
+          .collection(CollectionName.ordersIntercity)
+          .doc(orderId)
+          .collection("acceptedDriver")
+          .doc(driverId)
+          .get()
+          .then((value) async {
+        if (value.exists && value.data() != null) {
+          driverIdAcceptReject = DriverIdAcceptReject.fromJson(value.data()!);
+        }
       });
-    } catch (e) {
-      print("❌ [DRIVER SAFE OTP] Error: $e");
-      return false;
+    } catch (error) {
+      print(
+          "getInterCItyAcceptedOrders: Failed to load accepted order: $error");
+      driverIdAcceptReject = null;
     }
+    return driverIdAcceptReject;
   }
 
-  /// 🔥 CRITICAL: Safe ride completion that preserves payment data
-  static Future<bool> safeCompleteRide(String orderId) async {
+  static Future<OrderModel?> getOrderById(String orderId) async {
+    OrderModel? orderModel;
     try {
-      print(
-          "🛡️  [DRIVER SAFE COMPLETE] Starting safe ride completion for order: $orderId");
-
-      // Get current order first
-      final currentOrder = await getOrder(orderId);
-      if (currentOrder == null) {
-        print("❌ [DRIVER SAFE COMPLETE] Order $orderId not found");
-        return false;
-      }
-
-      print("🔍 [DRIVER SAFE COMPLETE] Before completion - Payment state:");
-      currentOrder.debugPaymentData();
-
-      // Use safe field update method
-      return await safeDriverOrderUpdateFields(orderId, {
-        'status': Constant.rideComplete,
-        'updateDate': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print("❌ [DRIVER SAFE COMPLETE] Error: $e");
-      return false;
-    }
-  }
-
-  /// 🔥 CRITICAL: Enhanced setOrder with payment data protection
-  static Future<bool> setOrderWithPaymentProtection(
-      OrderModel orderModel) async {
-    try {
-      print(
-          "🛡️  [DRIVER SET ORDER PROTECTED] Saving order ${orderModel.id} with payment protection");
-
-      // Debug payment data before save
-      orderModel.debugPaymentData();
-
-      // Convert to JSON and remove null payment fields
-      final orderJson = orderModel.toJson();
-
-      // Remove null payment fields to prevent overwriting existing payment data
-      orderJson.removeWhere((key, value) =>
-          value == null &&
-          [
-            'paymentIntentId',
-            'preAuthAmount',
-            'paymentIntentStatus',
-            'preAuthCreatedAt',
-            'paymentCapturedAt',
-            'paymentCanceledAt'
-          ].contains(key));
-
-      // Save with merge to preserve untouched fields
       await fireStore
           .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .set(orderJson, SetOptions(merge: true));
-
-      print(
-          "✅ [DRIVER SET ORDER PROTECTED] Order saved successfully with payment protection");
-
-      // Quick verification
-      await Future.delayed(Duration(milliseconds: 300));
-      final quickVerify = await fireStore
-          .collection(CollectionName.orders)
-          .doc(orderModel.id)
-          .get();
-
-      if (quickVerify.exists) {
-        final data = quickVerify.data();
-        print("🔍 [DRIVER SET ORDER PROTECTED] Quick verification:");
-        print("   paymentIntentId: ${data?['paymentIntentId']}");
-        print("   preAuthAmount: ${data?['preAuthAmount']}");
-      }
-
-      return true;
-    } catch (error) {
-      print(
-          "❌ [DRIVER SET ORDER PROTECTED] Failed to save order ${orderModel.id}: $error");
-      return false;
-    }
-  }
-
-  /// Emergency recovery for lost payment data
-  static Future<bool> emergencyPaymentRecovery(String orderId) async {
-    try {
-      print(
-          "🆘 [EMERGENCY RECOVERY] Attempting payment data recovery for order: $orderId");
-
-      // Get the current corrupted order
-      final currentOrder = await getOrder(orderId);
-      if (currentOrder == null) {
-        print("❌ [EMERGENCY RECOVERY] Order not found");
-        return false;
-      }
-
-      // Check if recovery is needed
-      if (currentOrder.hasValidPaymentData()) {
-        print("✅ [EMERGENCY RECOVERY] Order already has valid payment data");
-        return true;
-      }
-
-      // Try to find the original payment data from order history or logs
-      print("🔍 [EMERGENCY RECOVERY] Searching for original payment data...");
-
-      // For now, we'll log the issue and return false
-      print(
-          "🚨 [EMERGENCY RECOVERY] CRITICAL: Payment data permanently lost for order: $orderId");
-      print("   This requires manual intervention with Stripe dashboard");
-      print("   Order ID: $orderId");
-      print("   Contact support with this information");
-
-      return false;
-    } catch (e) {
-      print("❌ [EMERGENCY RECOVERY] Error: $e");
-      return false;
-    }
-  }
-
-  /// Validate payment data before critical operations
-  static Future<bool> validatePaymentDataBeforeUpdate(String orderId) async {
-    try {
-      final order = await getOrder(orderId);
-      if (order == null) {
-        print("❌ [PAYMENT VALIDATION] Order $orderId not found");
-        return false;
-      }
-
-      if (order.paymentType?.toLowerCase().contains("stripe") == true) {
-        if (!order.hasValidPaymentData()) {
-          print(
-              "🚨 [PAYMENT VALIDATION] Payment data missing for Stripe order $orderId");
-          print("   Payment Type: ${order.paymentType}");
-          print("   Payment Intent ID: ${order.paymentIntentId}");
-          print("   Pre-auth Amount: ${order.preAuthAmount}");
-          return false;
-        } else {
-          print(
-              "✅ [PAYMENT VALIDATION] Payment data validated for order $orderId");
-          return true;
+          .doc(orderId)
+          .get()
+          .then((value) async {
+        if (value.exists && value.data() != null) {
+          orderModel = OrderModel.fromJson(value.data()!);
         }
-      }
-
-      // Non-Stripe payments don't need validation
-      return true;
-    } catch (e) {
-      print("❌ [PAYMENT VALIDATION] Error: $e");
-      return false;
+      });
+    } catch (error) {
+      print("getOrderById: Failed to load order $orderId: $error");
+      orderModel = null;
     }
+    return orderModel;
   }
 
-  /// Enhanced getOrder with payment data validation
-  static Future<OrderModel?> getOrderWithPaymentValidation(
-      String orderId) async {
+  Future<PaymentModel?> getPayment() async {
     try {
-      final order = await getOrder(orderId);
-      if (order == null) {
-        print("❌ [GET ORDER VALIDATED] Order $orderId not found");
-        return null;
-      }
-
-      // Validate payment data for Stripe orders
-      if (order.paymentType?.toLowerCase().contains("stripe") == true &&
-          !order.hasValidPaymentData()) {
-        print(
-            "🚨 [GET ORDER VALIDATED] WARNING: Payment data missing for Stripe order $orderId");
-        print("   This may cause payment processing issues");
-      }
-
-      return order;
+      PaymentModel? paymentModel;
+      await fireStore
+          .collection(CollectionName.settings)
+          .doc("payment")
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          paymentModel = PaymentModel.fromJson(value.data()!);
+        }
+      });
+      return paymentModel;
     } catch (e) {
-      print("❌ [GET ORDER VALIDATED] Error: $e");
+      print("Error getting payment data: $e");
       return null;
     }
   }
-  
+
+  Future<CurrencyModel?> getCurrency() async {
+    CurrencyModel? currencyModel;
+    try {
+      await fireStore
+          .collection(CollectionName.currency)
+          .where("enable", isEqualTo: true)
+          .get()
+          .then((value) {
+        if (value.docs.isNotEmpty) {
+          currencyModel = CurrencyModel.fromJson(value.docs.first.data());
+        }
+      });
+    } catch (error) {
+      print("getCurrency error: $error");
+    }
+    return currencyModel;
+  }
+
+  Future<List<TaxModel>?> getTaxList() async {
+    List<TaxModel> taxList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.tax)
+          .where('country', isEqualTo: Constant.country)
+          .where('enable', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          TaxModel taxModel = TaxModel.fromJson(element.data());
+          taxList.add(taxModel);
+        }
+      });
+    } catch (error) {
+      print("getTaxList error: $error");
+    }
+    return taxList;
+  }
+
+  Future<List<CouponModel>?> getCoupon() async {
+    List<CouponModel> couponModel = [];
+    try {
+      await fireStore
+          .collection(CollectionName.coupon)
+          .where('enable', isEqualTo: true)
+          .where("isPublic", isEqualTo: true)
+          .where('isDeleted', isEqualTo: false)
+          .where('validity', isGreaterThanOrEqualTo: Timestamp.now())
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          CouponModel taxModel = CouponModel.fromJson(element.data());
+          couponModel.add(taxModel);
+        }
+      });
+    } catch (error) {
+      print("getCoupon error: $error");
+    }
+    return couponModel;
+  }
+
+  static Future<bool?> setReview(ReviewModel reviewModel) async {
+    bool isAdded = false;
+    try {
+      await fireStore
+          .collection(CollectionName.reviewDriver)
+          .doc(reviewModel.id)
+          .set(reviewModel.toJson())
+          .then((value) {
+        isAdded = true;
+      });
+    } catch (error) {
+      print("Failed to set review: $error");
+      isAdded = false;
+    }
+    return isAdded;
+  }
+
+  static Future<ReviewModel?> getReview(String orderId) async {
+    ReviewModel? reviewModel;
+    try {
+      await fireStore
+          .collection(CollectionName.reviewDriver)
+          .doc(orderId)
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          reviewModel = ReviewModel.fromJson(value.data()!);
+        }
+      });
+    } catch (error) {
+      print("getReview error: $error");
+    }
+    return reviewModel;
+  }
+
+  static Future<List<WalletTransactionModel>?> getWalletTransaction() async {
+    List<WalletTransactionModel> walletTransactionModel = [];
+    try {
+      await fireStore
+          .collection(CollectionName.walletTransaction)
+          .where('userId', isEqualTo: FireStoreUtils.getCurrentUid())
+          .orderBy('createdDate', descending: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          WalletTransactionModel taxModel =
+              WalletTransactionModel.fromJson(element.data());
+          walletTransactionModel.add(taxModel);
+        }
+      });
+    } catch (error) {
+      print("getWalletTransaction error: $error");
+    }
+    return walletTransactionModel;
+  }
+
+  static Future<bool?> setWalletTransaction(
+      WalletTransactionModel walletTransactionModel) async {
+    bool isAdded = false;
+    try {
+      await fireStore
+          .collection(CollectionName.walletTransaction)
+          .doc(walletTransactionModel.id)
+          .set(walletTransactionModel.toJson())
+          .then((value) {
+        isAdded = true;
+      });
+    } catch (error) {
+      print("Failed to set wallet transaction: $error");
+      isAdded = false;
+    }
+    return isAdded;
+  }
+
+  static Future<bool?> updateUserWallet({required String amount}) async {
+    bool isAdded = false;
+    try {
+      await getUserProfile(FireStoreUtils.getCurrentUid()).then((value) async {
+        if (value != null) {
+          UserModel userModel = value;
+          userModel.walletAmount =
+              (double.parse(userModel.walletAmount.toString()) +
+                      double.parse(amount))
+                  .toString();
+          await FireStoreUtils.updateUser(userModel).then((value) {
+            isAdded = value;
+          });
+        }
+      });
+    } catch (error) {
+      print("updateUserWallet error: $error");
+    }
+    return isAdded;
+  }
+
+  static Future<bool?> updateDriverWallet(
+      {required String driverId, required String amount}) async {
+    bool isAdded = false;
+    try {
+      await getDriver(driverId).then((value) async {
+        if (value != null) {
+          DriverUserModel userModel = value;
+          userModel.walletAmount =
+              (double.parse(userModel.walletAmount.toString()) +
+                      double.parse(amount))
+                  .toString();
+          await FireStoreUtils.updateDriver(userModel).then((value) {
+            isAdded = value;
+          });
+        }
+      });
+    } catch (error) {
+      print("updateDriverWallet error: $error");
+    }
+    return isAdded;
+  }
+
+  static Future<List<LanguageModel>?> getLanguage() async {
+    List<LanguageModel> languageList = [];
+    try {
+      await fireStore.collection(CollectionName.languages).get().then((value) {
+        for (var element in value.docs) {
+          LanguageModel taxModel = LanguageModel.fromJson(element.data());
+          languageList.add(taxModel);
+        }
+      });
+    } catch (error) {
+      print("getLanguage error: $error");
+    }
+    return languageList;
+  }
+
+  static Future<ReferralModel?> getReferral() async {
+    ReferralModel? referralModel;
+    try {
+      await fireStore
+          .collection(CollectionName.referral)
+          .doc(FireStoreUtils.getCurrentUid())
+          .get()
+          .then((value) {
+        if (value.exists && value.data() != null) {
+          referralModel = ReferralModel.fromJson(value.data()!);
+        }
+      });
+    } catch (error) {
+      print("getReferral error: $error");
+      referralModel = null;
+    }
+    return referralModel;
+  }
+
+  static Future<bool?> checkReferralCodeValidOrNot(String referralCode) async {
+    bool? isExit;
+    try {
+      await fireStore
+          .collection(CollectionName.referral)
+          .where("referralCode", isEqualTo: referralCode)
+          .get()
+          .then((value) {
+        if (value.size > 0) {
+          isExit = true;
+        } else {
+          isExit = false;
+        }
+      });
+    } catch (e, s) {
+      print('checkReferralCodeValidOrNot error: $e $s');
+      return false;
+    }
+    return isExit;
+  }
+
+  static Future<ReferralModel?> getReferralUserByCode(
+      String referralCode) async {
+    ReferralModel? referralModel;
+    try {
+      await fireStore
+          .collection(CollectionName.referral)
+          .where("referralCode", isEqualTo: referralCode)
+          .get()
+          .then((value) {
+        if (value.docs.isNotEmpty) {
+          referralModel = ReferralModel.fromJson(value.docs.first.data());
+        }
+      });
+    } catch (e, s) {
+      print('getReferralUserByCode error: $e $s');
+      return null;
+    }
+    return referralModel;
+  }
+
+  static Future<String?> referralAdd(ReferralModel ratingModel) async {
+    try {
+      await fireStore
+          .collection(CollectionName.referral)
+          .doc(ratingModel.id)
+          .set(ratingModel.toJson());
+    } catch (e, s) {
+      print('referralAdd error: $e $s');
+      return null;
+    }
+    return null;
+  }
+
+  static Future<List<OnBoardingModel>> getOnBoardingList() async {
+    List<OnBoardingModel> onBoardingModel = [];
+    try {
+      await fireStore
+          .collection(CollectionName.onBoarding)
+          .where("type", isEqualTo: "customerApp")
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          OnBoardingModel documentModel =
+              OnBoardingModel.fromJson(element.data());
+          onBoardingModel.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getOnBoardingList error: $error");
+    }
+    return onBoardingModel;
+  }
+
+  static Future addInBox(InboxModel inboxModel) async {
+    try {
+      return await fireStore
+          .collection("chat")
+          .doc(inboxModel.orderId)
+          .set(inboxModel.toJson())
+          .then((document) {
+        return inboxModel;
+      });
+    } catch (error) {
+      print("addInBox error: $error");
+      return null;
+    }
+  }
+
+  static Future addChat(ConversationModel conversationModel) async {
+    try {
+      return await fireStore
+          .collection("chat")
+          .doc(conversationModel.orderId)
+          .collection("thread")
+          .doc(conversationModel.id)
+          .set(conversationModel.toJson())
+          .then((document) {
+        return conversationModel;
+      });
+    } catch (error) {
+      print("addChat error: $error");
+      return null;
+    }
+  }
+
+  static Future<List<FaqModel>> getFaq() async {
+    List<FaqModel> faqModel = [];
+    try {
+      await fireStore
+          .collection(CollectionName.faq)
+          .where('enable', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          FaqModel documentModel = FaqModel.fromJson(element.data());
+          faqModel.add(documentModel);
+        }
+      });
+    } catch (error) {
+      print("getFaq error: $error");
+    }
+    return faqModel;
+  }
+
+  static Future<bool?> deleteUser() async {
+    bool? isDelete;
+    try {
+      await fireStore
+          .collection(CollectionName.users)
+          .doc(FireStoreUtils.getCurrentUid())
+          .delete();
+      await FirebaseAuth.instance.currentUser!.delete().then((value) {
+        isDelete = true;
+      });
+    } catch (e, s) {
+      print('deleteUser error: $e $s');
+      return false;
+    }
+    return isDelete;
+  }
+
+  static Future<bool?> setSOS(SosModel sosModel) async {
+    bool isAdded = false;
+    try {
+      await fireStore
+          .collection(CollectionName.sos)
+          .doc(sosModel.id)
+          .set(sosModel.toJson())
+          .then((value) {
+        isAdded = true;
+      });
+    } catch (error) {
+      print("Failed to set SOS: $error");
+      isAdded = false;
+    }
+    return isAdded;
+  }
+
+  static Future<SosModel?> getSOS(String orderId) async {
+    SosModel? sosModel;
+    try {
+      await fireStore
+          .collection(CollectionName.sos)
+          .where("orderId", isEqualTo: orderId)
+          .get()
+          .then((value) {
+        if (value.docs.isNotEmpty) {
+          sosModel = SosModel.fromJson(value.docs.first.data());
+        }
+      });
+    } catch (e, s) {
+      print('getSOS error: $e $s');
+      return null;
+    }
+    return sosModel;
+  }
+
+  Future<List<AriPortModel>?> getAirports() async {
+    List<AriPortModel> airPortList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.airPorts)
+          .where('cityLocation', isEqualTo: Constant.city)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          AriPortModel ariPortModel = AriPortModel.fromJson(element.data());
+          airPortList.add(ariPortModel);
+        }
+      });
+    } catch (error) {
+      print("getAirports error: $error");
+    }
+    return airPortList;
+  }
+
+  static Future<bool> paymentStatusCheck() async {
+    ShowToastDialog.showLoader("Please wait");
+    bool isFirst = false;
+    try {
+      await fireStore
+          .collection(CollectionName.orders)
+          .where('userId', isEqualTo: FireStoreUtils.getCurrentUid())
+          .where("status", isEqualTo: Constant.rideComplete)
+          .where("paymentStatus", isEqualTo: false)
+          .get()
+          .then((value) {
+        ShowToastDialog.closeLoader();
+        if (value.size >= 1) {
+          isFirst = true;
+        } else {
+          isFirst = false;
+        }
+      });
+    } catch (error) {
+      ShowToastDialog.closeLoader();
+      print("paymentStatusCheck error: $error");
+    }
+    return isFirst;
+  }
+
+  static Future<bool> paymentStatusCheckIntercity() async {
+    ShowToastDialog.showLoader("Please wait");
+    bool isFirst = false;
+    try {
+      await fireStore
+          .collection(CollectionName.ordersIntercity)
+          .where('userId', isEqualTo: FireStoreUtils.getCurrentUid())
+          .where("status", isEqualTo: Constant.rideComplete)
+          .where("paymentStatus", isEqualTo: false)
+          .get()
+          .then((value) {
+        ShowToastDialog.closeLoader();
+        print(value.size);
+        if (value.size >= 1) {
+          isFirst = true;
+        } else {
+          isFirst = false;
+        }
+      });
+    } catch (error) {
+      ShowToastDialog.closeLoader();
+      print("paymentStatusCheckIntercity error: $error");
+    }
+    return isFirst;
+  }
+
+  Future<List<ZoneModel>?> getZone() async {
+    List<ZoneModel> airPortList = [];
+    try {
+      await fireStore
+          .collection(CollectionName.zone)
+          .where('publish', isEqualTo: true)
+          .get()
+          .then((value) {
+        for (var element in value.docs) {
+          ZoneModel ariPortModel = ZoneModel.fromJson(element.data());
+          airPortList.add(ariPortModel);
+        }
+      });
+    } catch (error) {
+      print("getZone error: $error");
+    }
+    return airPortList;
+  }
+
+  static Future<bool> phoneNumberExists(String fullPhoneNumber) async {
+    try {
+      final querySnapshot = await fireStore
+          .collection(CollectionName.users)
+          .where('phoneNumber', isEqualTo: fullPhoneNumber)
+          .limit(1)
+          .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print("Error checking phone number existence: $e");
+      return false;
+    }
+  }
+
+  /// CORRECT method to handle driver acceptance
+  static Future<bool> handleDriverAcceptance(
+      String orderId, String driverId) async {
+    try {
+      print("✅ Driver $driverId accepted order $orderId");
+
+      // 1. First, save to acceptedDriver subcollection (you're already doing this)
+      await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .collection("acceptedDriver")
+          .doc(driverId)
+          .set({
+        'driverId': driverId,
+        'acceptedRejectTime': FieldValue.serverTimestamp(),
+        'offerAmount':
+            0, // TODO: Replace 0 with actual offer amount if available
+      });
+
+      // 2. ✅ CRITICAL FIX: Update the main order document
+      await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .update({
+        'driverId': driverId, // ← THIS IS WHAT WAS MISSING
+        'acceptedDriverId': FieldValue.arrayUnion([driverId]), // ← ALSO THIS
+        'updateDate': FieldValue.serverTimestamp(),
+        'status': 'Driver Accepted', // Or whatever status you use
+      });
+
+      print("✅ Order $orderId successfully updated with driver $driverId");
+      return true;
+    } catch (e) {
+      print("❌ Error in driver acceptance: $e");
+      return false;
+    }
+  }
+
+  /// SAFE method to recover driver assignment without corrupting data
+  static Future<bool> safeRecoverDriverAssignment(String orderId) async {
+    try {
+      print("🔍 SAFELY recovering driver for order: $orderId");
+
+      // 1. Check accepted drivers subcollection
+      final acceptedDrivers = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .collection("acceptedDriver")
+          .get();
+
+      if (acceptedDrivers.docs.isEmpty) {
+        print("❌ No accepted drivers found for order: $orderId");
+        return false;
+      }
+
+      // 2. Get the first driver who accepted
+      final driverId = acceptedDrivers.docs.first.id;
+      final acceptanceData = acceptedDrivers.docs.first.data();
+
+      print("✅ Found accepted driver: $driverId");
+
+      // 3. Verify the driver exists and has valid data
+      final driver = await getDriver(driverId);
+      if (driver == null) {
+        print("❌ Driver $driverId no longer exists");
+        return false;
+      }
+
+      // 4. SAFELY update ONLY the order document (not driver document!)
+      await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .update({
+        'driverId': driverId,
+        'acceptedDriverId': FieldValue.arrayUnion([driverId]),
+        'updateDate': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Order $orderId safely updated with driver: ${driver.fullName}");
+      return true;
+    } catch (e) {
+      print("❌ Safe recovery failed: $e");
+      return false;
+    }
+  }
+
+  /// Enhanced debug method to see WHY the query returns 0 results
+  static Future<void> debugQueryResults(OrderModel orderModel) async {
+    try {
+      print("🔍 [QUERY DEBUG] Analyzing why query returns 0 results...");
+
+      // Test each filter individually
+      print("\n1️⃣ Testing isOnline filter only:");
+      var onlineOnly = await fireStore
+          .collection(CollectionName.driverUsers)
+          .where('isOnline', isEqualTo: true)
+          .get();
+      print("   Found ${onlineOnly.size} online drivers");
+
+      print("\n2️⃣ Testing isOnline + documentVerification:");
+      var onlineVerified = await fireStore
+          .collection(CollectionName.driverUsers)
+          .where('isOnline', isEqualTo: true)
+          .where('documentVerification', isEqualTo: true)
+          .get();
+      print("   Found ${onlineVerified.size} online & verified drivers");
+
+      print("\n3️⃣ Testing isOnline + documentVerification + serviceId:");
+      var withService = await fireStore
+          .collection(CollectionName.driverUsers)
+          .where('isOnline', isEqualTo: true)
+          .where('documentVerification', isEqualTo: true)
+          .where('serviceId', isEqualTo: orderModel.serviceId)
+          .get();
+      print(
+          "   Found ${withService.size} drivers with service ${orderModel.serviceId}");
+
+      // Check each driver from the full query
+      for (var doc in withService.docs) {
+        final driver = DriverUserModel.fromJson(doc.data());
+        print("   👤 ${driver.fullName} - zones: ${driver.zoneIds}");
+
+        // Check if this driver has the required zone
+        if (driver.zoneIds != null &&
+            driver.zoneIds!.contains(orderModel.zoneId)) {
+          print("   ✅ HAS REQUIRED ZONE: ${orderModel.zoneId}");
+        } else {
+          print("   ❌ MISSING ZONE: ${orderModel.zoneId}");
+        }
+      }
+
+      print("\n4️⃣ Testing full query with zone filter:");
+      try {
+        var fullQuery = await fireStore
+            .collection(CollectionName.driverUsers)
+            .where('isOnline', isEqualTo: true)
+            .where('documentVerification', isEqualTo: true)
+            .where('serviceId', isEqualTo: orderModel.serviceId)
+            .where('zoneIds', arrayContains: orderModel.zoneId)
+            .get();
+        print("   Full query found ${fullQuery.size} drivers");
+      } catch (e) {
+        print("   ❌ Full query failed: $e");
+      }
+    } catch (e) {
+      print("❌ Query debug failed: $e");
+    }
+  }
+
+  static Future<DocumentSnapshot> getAdminCommission() async {
+    return await FirebaseFirestore.instance
+        .collection(
+            CollectionName.settings) // FIXED: Use the correct collection name
+        .doc("adminCommission")
+        .get();
+  }
+
+  /// Comprehensive commission debugging method
+  static Future<void> debugCommissionIssue() async {
+    try {
+      print("=== COMMISSION DEBUG ANALYSIS ===");
+
+      // 1. First check if we already have commission data loaded
+      print("\n1️⃣ Currently loaded commission in Constant:");
+      if (Constant.adminCommission != null) {
+        print("   ✅ Commission loaded in memory:");
+        print("      Enabled: ${Constant.adminCommission!.isEnabled}");
+        print("      Type: ${Constant.adminCommission!.type}");
+        print("      Amount: ${Constant.adminCommission!.amount}");
+      } else {
+        print("   ❌ No commission loaded in memory");
+      }
+
+      // 2. Check what's actually in Firebase
+      print("\n2️⃣ Checking Firebase commission document...");
+      final commissionDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.settings)
+          .doc("adminCommission")
+          .get();
+
+      if (commissionDoc.exists) {
+        print("   ✅ Commission document exists in Firebase");
+        print("   Raw data: ${commissionDoc.data()}");
+
+        // Parse the data to see what fields are available
+        final data = commissionDoc.data()!;
+        print("   Available fields:");
+        data.forEach((key, value) {
+          print("      $key: $value (${value.runtimeType})");
+        });
+
+        // Check for common field name variations
+        final isEnabled =
+            data['isEnabled'] ?? data['enable'] ?? data['enabled'] ?? false;
+        final type = data['type']?.toString() ?? '';
+        final amount =
+            data['amount']?.toString() ?? data['commission']?.toString() ?? '';
+
+        print("\n   Parsed values:");
+        print("      isEnabled: $isEnabled");
+        print("      type: $type");
+        print("      amount: $amount");
+
+        // Test the calculation
+        if (isEnabled && type.isNotEmpty && amount.isNotEmpty) {
+          final testAmount = "100.0";
+          final commission = AdminCommission(
+            isEnabled: isEnabled,
+            type: type,
+            amount: amount,
+          );
+
+          final result = Constant.calculateOrderAdminCommission(
+            amount: testAmount,
+            adminCommission: commission,
+          );
+
+          print("\n3️⃣ Test calculation with amount: $testAmount");
+          print("   Commission result: $result");
+
+          if (type.toLowerCase() == "percent" ||
+              type.toLowerCase() == "percentage") {
+            final expected =
+                (double.parse(testAmount) * double.parse(amount)) / 100;
+            print("   Expected (${amount}% of $testAmount): $expected");
+          } else if (type.toLowerCase() == "fix") {
+            print("   Expected (fixed $amount): $amount");
+          }
+        } else {
+          print("   ❌ Commission configuration incomplete in Firebase");
+          print("      isEnabled: $isEnabled");
+          print("      type: '$type'");
+          print("      amount: '$amount'");
+        }
+      } else {
+        print("   ❌ Commission document does NOT exist in Firebase");
+        print("   Path: ${CollectionName.settings}/adminCommission");
+      }
+
+      // 3. Check if the commission is being loaded during settings initialization
+      print("\n4️⃣ Checking settings initialization...");
+      await getSettings(); // Reload settings to see the process
+
+      print("   After reloading settings:");
+      if (Constant.adminCommission != null) {
+        print("   ✅ Commission loaded successfully:");
+        print("      Enabled: ${Constant.adminCommission!.isEnabled}");
+        print("      Type: ${Constant.adminCommission!.type}");
+        print("      Amount: ${Constant.adminCommission!.amount}");
+      } else {
+        print("   ❌ Commission still not loaded after getSettings()");
+      }
+
+      print("\n=== END COMMISSION DEBUG ===");
+    } catch (e) {
+      print("❌ Error in commission debug: $e");
+      print("Stack trace: ${e.toString()}");
+    }
+  }
+
+  /// Verify that commission data was saved with the order
+  static Future<void> verifyOrderCommission(String orderId) async {
+    try {
+      final orderDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .get();
+
+      if (orderDoc.exists) {
+        final orderData = orderDoc.data();
+        print("🔍 Verifying commission data for order $orderId:");
+
+        if (orderData != null && orderData.containsKey('adminCommission')) {
+          final commissionData = orderData['adminCommission'];
+          print("   ✅ Commission data found in Firestore:");
+          print("      Type: ${commissionData['type']}");
+          print("      Amount: ${commissionData['amount']}");
+          print("      Enabled: ${commissionData['isEnabled']}");
+
+          if (commissionData['flatRatePromotion'] != null) {
+            print(
+                "      Flat Rate Enabled: ${commissionData['flatRatePromotion']['isEnabled']}");
+            print(
+                "      Flat Rate Amount: ${commissionData['flatRatePromotion']['amount']}");
+          }
+        } else {
+          print("   ❌ Commission data missing from Firestore order");
+        }
+      }
+    } catch (e) {
+      print("❌ Error verifying order commission: $e");
+    }
+  }
+
+  /// Verify order data integrity after save
+  static Future<void> verifyOrderDataIntegrity(String orderId) async {
+    try {
+      print("🔍 [DATA INTEGRITY] Verifying order $orderId...");
+
+      await Future.delayed(Duration(seconds: 1));
+
+      final orderDoc = await FirebaseFirestore.instance
+          .collection(CollectionName.orders)
+          .doc(orderId)
+          .get();
+
+      if (orderDoc.exists) {
+        final data = orderDoc.data()!;
+        print("📋 [DATA INTEGRITY] Current Firestore state:");
+        print("   paymentIntentId: ${data['paymentIntentId']}");
+        print("   preAuthAmount: ${data['preAuthAmount']}");
+        print("   paymentIntentStatus: ${data['paymentIntentStatus']}");
+        print("   paymentType: ${data['paymentType']}");
+        print("   status: ${data['status']}");
+        print("   driverId: ${data['driverId']}");
+      }
+    } catch (e) {
+      print("❌ [DATA INTEGRITY] Verification failed: $e");
+    }
+  }
+
+/// Clean atomic setOrder with validation and payment data protection
+static Future<bool> setOrder(OrderModel orderModel) async {
+  try {
+    // 🔥 CRITICAL: Validate before save
+    if (!orderModel.validateForSave()) {
+      print("❌ [SET ORDER] Validation failed for order ${orderModel.id}");
+      return false;
+    }
+
+    // 🔥 CRITICAL: Debug payment data before save
+    print("💾 [SET ORDER] Saving order ${orderModel.id}");
+    print("   driverId: ${orderModel.driverId}");
+    print("   paymentIntentId: ${orderModel.paymentIntentId}");
+    print("   paymentType: ${orderModel.paymentType}");
+    print("   status: ${orderModel.status}");
+    print("   preAuthAmount: ${orderModel.preAuthAmount}");
+    print("   paymentIntentStatus: ${orderModel.paymentIntentStatus}");
+    print("   preAuthCreatedAt: ${orderModel.preAuthCreatedAt}");
+
+    // Ensure commission data is always included
+    if (orderModel.adminCommission == null) {
+      print("💡 [SET ORDER] Adding missing admin commission to order before saving");
+      if (Constant.adminCommission != null) {
+        orderModel.adminCommission = Constant.adminCommission;
+      } else {
+        orderModel.adminCommission = AdminCommission(
+          isEnabled: false,
+          type: "percentage",
+          amount: "0",
+          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+        );
+      }
+    }
+
+    // 🔥 CRITICAL FIX: Convert to JSON and remove null payment fields
+    // This prevents Firestore from overwriting payment data with nulls
+    final orderJson = orderModel.toJson();
+
+    // Remove null payment fields to prevent overwriting existing payment data
+    orderJson.removeWhere((key, value) =>
+      value == null && [
+        'paymentIntentId',
+        'preAuthAmount',
+        'paymentIntentStatus',
+        'preAuthCreatedAt',
+        'paymentCapturedAt',
+        'paymentCanceledAt'
+      ].contains(key)
+    );
+
+    // Save with merge to preserve untouched fields
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .set(orderJson, SetOptions(merge: true));
+
+    print("✅ [SET ORDER] Order saved successfully");
+
+    // Quick verification
+    await Future.delayed(Duration(milliseconds: 300));
+    final quickVerify = await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .get();
+
+    if (quickVerify.exists) {
+      final data = quickVerify.data();
+      print("🔍 [SET ORDER] Quick verification:");
+      print("   paymentIntentId: ${data?['paymentIntentId']}");
+      print("   preAuthAmount: ${data?['preAuthAmount']}");
+    }
+
+    return true;
+  } catch (error) {
+    print("❌ [SET ORDER] Save failed for order ${orderModel.id}: $error");
+    print("   Stack trace: ${StackTrace.current}");
+    return false;
+  }
+}
+
+/// CRITICAL: Safe order update that PRESERVES payment data from Firestore
+/// This method ALWAYS fetches existing payment data before updating
+static Future<bool> updateOrderPreservingPayment(OrderModel updatedOrder) async {
+  try {
+    print("🔐 [SAFE UPDATE] Updating order ${updatedOrder.id} with payment preservation");
+
+    // 🔥 STEP 1: Fetch the CURRENT order from Firestore to get latest payment data
+    final currentFirestoreOrder = await fireStore
+        .collection(CollectionName.orders)
+        .doc(updatedOrder.id)
+        .get();
+
+    if (!currentFirestoreOrder.exists) {
+      print("❌ [SAFE UPDATE] Order ${updatedOrder.id} not found in Firestore");
+      return false;
+    }
+
+    final currentData = currentFirestoreOrder.data()!;
+
+    // 🔥 STEP 2: Extract payment data from Firestore (source of truth)
+    final firestorePaymentIntentId = currentData['paymentIntentId']?.toString();
+    final firestorePreAuthAmount = currentData['preAuthAmount']?.toString();
+    final firestorePaymentIntentStatus = currentData['paymentIntentStatus']?.toString();
+    final firestorePreAuthCreatedAt = currentData['preAuthCreatedAt'];
+    final firestorePaymentCapturedAt = currentData['paymentCapturedAt'];
+    final firestorePaymentCanceledAt = currentData['paymentCanceledAt'];
+
+    print("🔍 [SAFE UPDATE] Current Firestore payment data:");
+    print("   paymentIntentId: $firestorePaymentIntentId");
+    print("   preAuthAmount: $firestorePreAuthAmount");
+    print("   paymentIntentStatus: $firestorePaymentIntentStatus");
+
+    // 🔥 STEP 3: Override updatedOrder's payment fields with Firestore data
+    if (firestorePaymentIntentId != null && firestorePaymentIntentId.isNotEmpty) {
+      print("🔒 [SAFE UPDATE] Restoring payment data from Firestore");
+      updatedOrder.paymentIntentId = firestorePaymentIntentId;
+      updatedOrder.preAuthAmount = firestorePreAuthAmount;
+      updatedOrder.paymentIntentStatus = firestorePaymentIntentStatus;
+      updatedOrder.preAuthCreatedAt = firestorePreAuthCreatedAt as Timestamp?;
+      updatedOrder.paymentCapturedAt = firestorePaymentCapturedAt as Timestamp?;
+      updatedOrder.paymentCanceledAt = firestorePaymentCanceledAt as Timestamp?;
+    }
+
+    // 🔥 STEP 4: Now save with guaranteed payment data
+    return await setOrder(updatedOrder);
+
+  } catch (error) {
+    print("❌ [SAFE UPDATE] Error: $error");
+    return false;
+  }
+}
+
+/// Enhanced setOrder with comprehensive verification
+static Future<bool> setOrderWithVerification(OrderModel orderModel) async {
+  try {
+    print("💾 [SET ORDER WITH VERIFICATION] Saving order ${orderModel.id}");
+
+    // 🔥 CRITICAL: Debug all payment fields
+    orderModel.debugPaymentData();
+
+    // Ensure commission data is always included
+    if (orderModel.adminCommission == null) {
+      print("💡 [SET ORDER VERIFICATION] Adding missing admin commission");
+      if (Constant.adminCommission != null) {
+        orderModel.adminCommission = Constant.adminCommission;
+      } else {
+        orderModel.adminCommission = AdminCommission(
+          isEnabled: false,
+          type: "percentage",
+          amount: "0",
+          flatRatePromotion: FlatRatePromotion(isEnabled: false, amount: 0.0),
+        );
+      }
+    }
+
+    // 🔥 CRITICAL FIX: Convert to JSON and remove null payment fields
+    final orderJson = orderModel.toJson();
+
+    // Remove null payment fields to prevent overwriting
+    orderJson.removeWhere((key, value) =>
+      value == null && [
+        'paymentIntentId',
+        'preAuthAmount',
+        'paymentIntentStatus',
+        'preAuthCreatedAt',
+        'paymentCapturedAt',
+        'paymentCanceledAt'
+      ].contains(key)
+    );
+
+    // Save the order with merge
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderModel.id)
+        .set(orderJson, SetOptions(merge: true));
+
+    print("✅ [SET ORDER WITH VERIFICATION] Successfully saved order ${orderModel.id}");
+
+    // 🔥 CRITICAL: Enhanced verification with retry logic
+    OrderModel? verifiedOrder;
+    for (int i = 0; i < 3; i++) {
+      await Future.delayed(Duration(milliseconds: 500));
+      verifiedOrder = await getOrder(orderModel.id!);
+      
+      if (verifiedOrder != null) {
+        print("🔍 [SET ORDER VERIFICATION] Attempt ${i + 1}:");
+        verifiedOrder.debugPaymentData();
+        
+        // Check if payment data is intact
+        if (verifiedOrder.hasValidPaymentData()) {
+          break;
+        }
+      }
+      
+      if (i < 2) {
+        print("🔄 [SET ORDER VERIFICATION] Retrying verification...");
+      }
+    }
+
+    if (verifiedOrder != null && verifiedOrder.hasValidPaymentData()) {
+      print("✅ [SET ORDER VERIFICATION] Order saved and verified successfully");
+      return true;
+    } else {
+      print("❌ [SET ORDER VERIFICATION] Order verification failed");
+      return false;
+    }
+  } catch (error) {
+    print("❌ [SET ORDER WITH VERIFICATION] Failed to save order ${orderModel.id}: $error");
+    return false;
+  }
+}
+
+/// Safe order update that preserves payment data
+static Future<bool> updateOrder(String orderId, Map<String, dynamic> updateData) async {
+  try {
+    print("🔄 [UPDATE ORDER] Updating order $orderId");
+    print("   Update data: $updateData");
+    
+    // Get current order to preserve payment data
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder == null) {
+      print("❌ [UPDATE ORDER] Order $orderId not found");
+      return false;
+    }
+    
+    // Debug current payment state
+    print("🔍 [UPDATE ORDER] Current payment state:");
+    currentOrder.debugPaymentData();
+    
+    // Perform the update
+    await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderId)
+        .update(updateData);
+    
+    print("✅ [UPDATE ORDER] Order updated successfully");
+    
+    // Verify payment data was preserved
+    await Future.delayed(Duration(milliseconds: 300));
+    final verifiedOrder = await getOrder(orderId);
+    if (verifiedOrder != null && verifiedOrder.hasValidPaymentData()) {
+      print("✅ [UPDATE ORDER] Payment data preserved after update");
+      return true;
+    } else {
+      print("⚠️  [UPDATE ORDER] Payment data may have been affected");
+      return false;
+    }
+  } catch (error) {
+    print("❌ [UPDATE ORDER] Failed to update order $orderId: $error");
+    return false;
+  }
+}
+
+/// Enhanced getOrder with payment data recovery
+static Future<OrderModel?> getOrder(String orderId) async {
+  try {
+    final document = await fireStore
+        .collection(CollectionName.orders)
+        .doc(orderId)
+        .get();
+
+    if (document.exists) {
+      // 🔥 Use the FIXED OrderModel.fromJson that preserves payment data
+      final order = OrderModel.fromJson(document.data()!);
+      
+      // Final validation
+      if (order.paymentType?.toLowerCase().contains("stripe") == true && 
+          !order.hasValidPaymentData()) {
+        print("🚨 [GET ORDER] WARNING: Payment data may be corrupted after parsing");
+      }
+      
+      return order;
+    }
+    
+    print("❌ [GET ORDER] Order $orderId not found in Firestore");
+    return null;
+  } catch (error) {
+    print("❌ [GET ORDER] Error fetching order $orderId: $error");
+    return null;
+  }
+}
+
+/// Recovery function for orders with lost payment data
+static Future<bool> recoverOrderPaymentData(String orderId, OrderModel sourceOrder) async {
+  try {
+    print("🔄 [PAYMENT RECOVERY] Attempting to recover payment data for order $orderId");
+    
+    // Get the current order state
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder == null) {
+      print("❌ [PAYMENT RECOVERY] Order $orderId not found");
+      return false;
+    }
+    
+    // Check if recovery is needed
+    if (currentOrder.hasValidPaymentData()) {
+      print("✅ [PAYMENT RECOVERY] Order already has valid payment data, no recovery needed");
+      return true;
+    }
+    
+    // Restore payment data from source order
+    currentOrder.restorePaymentData(sourceOrder);
+    
+    // Save the recovered order
+    final success = await setOrder(currentOrder);
+    
+    if (success) {
+      print("✅ [PAYMENT RECOVERY] Payment data recovered successfully");
+      
+      // Final verification
+      final verifiedOrder = await getOrder(orderId);
+      if (verifiedOrder != null && verifiedOrder.hasValidPaymentData()) {
+        print("✅ [PAYMENT RECOVERY] Recovery verified successfully");
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    print("❌ [PAYMENT RECOVERY] Failed to recover payment data: $error");
+    return false;
+  }
+}
+
+/// Safe driver assignment with payment data protection
+static Future<bool> assignDriverToOrder(String orderId, String driverId) async {
+  try {
+    print("👤 [ASSIGN DRIVER] Assigning driver $driverId to order $orderId");
+    
+    // Use update to only change driver fields, preserving payment data
+    final updateData = {
+      'driverId': driverId,
+      'status': Constant.rideActive,
+      'updateDate': Timestamp.now(),
+    };
+    
+    // Add to accepted drivers list safely
+    final currentOrder = await getOrder(orderId);
+    if (currentOrder != null) {
+      List<dynamic> existingAccepted = currentOrder.acceptedDriverId ?? [];
+      if (!existingAccepted.contains(driverId)) {
+        existingAccepted.add(driverId);
+      }
+      updateData['acceptedDriverId'] = existingAccepted;
+    }
+    
+    return await updateOrder(orderId, updateData);
+  } catch (error) {
+    print("❌ [ASSIGN DRIVER] Failed to assign driver: $error");
+    return false;
+  }
+}
+
+/// Enhanced order streaming with payment data monitoring
+static Stream<OrderModel?> monitorOrderWithPayment(String orderId) {
+  return fireStore
+      .collection(CollectionName.orders)
+      .doc(orderId)
+      .snapshots()
+      .map((document) {
+        if (document.exists) {
+          final order = OrderModel.fromJson(document.data()!);
+          
+          // Monitor payment data changes
+          print("📊 [ORDER STREAM] Order ${order.id} update:");
+          order.debugPaymentData();
+          
+          return order;
+        }
+        return null;
+      })
+      .handleError((error) {
+        print("❌ [ORDER STREAM] Error monitoring order $orderId: $error");
+      });
+}
+
 }

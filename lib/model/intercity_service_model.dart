@@ -1,3 +1,5 @@
+import 'package:customer/model/admin_commission.dart';
+
 class IntercityServiceModel {
   String? image;
   bool? enable;
@@ -5,14 +7,9 @@ class IntercityServiceModel {
   String? name;
   bool? offerRate;
   String? id;
+  AdminCommission? adminCommission;
 
-  IntercityServiceModel(
-      {this.image,
-        this.enable,
-        this.kmCharge,
-        this.name,
-        this.offerRate,
-        this.id});
+  IntercityServiceModel({this.image, this.enable, this.kmCharge, this.name, this.offerRate, this.id,this.adminCommission});
 
   IntercityServiceModel.fromJson(Map<String, dynamic> json) {
     image = json['image'];
@@ -21,6 +18,7 @@ class IntercityServiceModel {
     name = json['name'];
     offerRate = json['offerRate'];
     id = json['id'];
+    adminCommission = json['adminCommission'] != null ? AdminCommission.fromJson(json['adminCommission']) : AdminCommission(isEnabled: true,amount: "",type: "");
   }
 
   Map<String, dynamic> toJson() {
@@ -31,6 +29,9 @@ class IntercityServiceModel {
     data['name'] = name;
     data['offerRate'] = offerRate;
     data['id'] = id;
+    if (adminCommission != null) {
+      data['adminCommission'] = adminCommission!.toJson();
+    }
     return data;
   }
 }

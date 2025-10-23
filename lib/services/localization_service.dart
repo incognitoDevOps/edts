@@ -1,11 +1,11 @@
-import 'package:driver/lang/app_de.dart';
-import 'package:driver/lang/app_en.dart';
-import 'package:driver/lang/app_fr.dart';
-import 'package:driver/lang/app_hi.dart';
-import 'package:driver/lang/app_ja.dart';
-import 'package:driver/lang/app_pt.dart';
-import 'package:driver/lang/app_ru.dart';
-import 'package:driver/lang/app_zh.dart';
+import 'package:customer/lang/app_de.dart';
+import 'package:customer/lang/app_en.dart';
+import 'package:customer/lang/app_fr.dart';
+import 'package:customer/lang/app_hi.dart';
+import 'package:customer/lang/app_ja.dart';
+import 'package:customer/lang/app_pt.dart';
+import 'package:customer/lang/app_ru.dart';
+import 'package:customer/lang/app_zh.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

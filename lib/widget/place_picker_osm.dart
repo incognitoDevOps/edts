@@ -1,7 +1,8 @@
-import 'package:driver/themes/app_colors.dart';
-import 'package:driver/utils/DarkThemeProvider.dart';
-import 'package:driver/utils/utils.dart';
-import 'package:driver/widget/osm_map_search_place.dart';
+import 'dart:async';
+import 'package:customer/themes/app_colors.dart';
+import 'package:customer/utils/DarkThemeProvider.dart';
+import 'package:customer/utils/utils.dart';
+import 'package:customer/widget/osm_map_search_place.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:get/get.dart';
@@ -9,7 +10,8 @@ import 'package:osm_nominatim/osm_nominatim.dart';
 import 'package:provider/provider.dart';
 
 class LocationPicker extends StatefulWidget {
-  const LocationPicker({super.key});
+  final bool isSource;
+  const LocationPicker({super.key, this.isSource = true});
 
   @override
   State<LocationPicker> createState() => _LocationPickerState();
@@ -20,7 +22,9 @@ class _LocationPickerState extends State<LocationPicker> {
   late MapController mapController;
   Place? place;
   TextEditingController textController = TextEditingController();
-  final List<GeoPoint> _markers = [];
+  List<GeoPoint> _markers = [];
+  bool _isLoading = false;
+  Timer? _regionChangeDebounce;
 
   @override
   void initState() {
@@ -28,21 +32,61 @@ class _LocationPickerState extends State<LocationPicker> {
     mapController = MapController(
       initMapWithUserPosition: const UserTrackingOption(enableTracking: false, unFollowUser: true),
     );
+    // Listen for map movement and update marker/address
+    mapController.listenerMapSingleTapping.addListener(() async {
+      if (mapController.listenerMapSingleTapping.value != null) {
+        setState(() {
+          _isLoading = true;
+        });
+        GeoPoint position = mapController.listenerMapSingleTapping.value!;
+        await addMarker(position);
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+    mapController.listenerMapLongTapping.addListener(() async {
+      if (mapController.listenerMapLongTapping.value != null) {
+        setState(() {
+          _isLoading = true;
+        });
+        GeoPoint position = mapController.listenerMapLongTapping.value!;
+        await addMarker(position);
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+    mapController.listenerRegionIsChanging.addListener(() async {
+      // Called when the map is being moved
+      // We only want to update when the movement stops, so debounce
+      if (_regionChangeDebounce != null) {
+        _regionChangeDebounce!.cancel();
+      }
+      _regionChangeDebounce = Timer(const Duration(milliseconds: 500), () async {
+        final center = await mapController.centerMap;
+        setState(() {
+          _isLoading = true;
+        });
+        await addMarker(center);
+        setState(() {
+          _isLoading = false;
+        });
+      });
+    });
   }
 
   _listerTapPosition() async {
     mapController.listenerMapSingleTapping.addListener(() async {
       if (mapController.listenerMapSingleTapping.value != null) {
+      setState(() {
+          _isLoading = true;
+      });
         GeoPoint position = mapController.listenerMapSingleTapping.value!;
-        addMarker(position);
-        place = await Nominatim.reverseSearch(
-          lat: position.latitude,
-          lon: position.longitude,
-          zoom: 14,
-          addressDetails: true,
-          extraTags: true,
-          nameDetails: true,
-        );
+        await addMarker(position);
+        setState(() {
+          _isLoading = false;
+        });
       }
     });
   }
@@ -55,9 +99,10 @@ class _LocationPickerState extends State<LocationPicker> {
       setState(() {
         _markers.clear();
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await mapController
-            .addMarker(position,
+
+      // Add marker to the map
+      await mapController
+          .addMarker(position,
                 markerIcon: const MarkerIcon(
                   icon: Icon(Icons.location_on, size: 26),
                 ))
@@ -65,6 +110,8 @@ class _LocationPickerState extends State<LocationPicker> {
           _markers.add(position);
         });
 
+      // Fetch location data with a timeout
+    try {
         place = await Nominatim.reverseSearch(
           lat: position.latitude,
           lon: position.longitude,
@@ -72,37 +119,61 @@ class _LocationPickerState extends State<LocationPicker> {
           addressDetails: true,
           extraTags: true,
           nameDetails: true,
-        );
-        setState(() {});
-        mapController.moveTo(position, animate: true);
+        ).timeout(const Duration(seconds: 5), onTimeout: () {
+          throw Exception('Location search timed out');
       });
+        setState(() {});
+    } catch (e) {
+        print("Error fetching location: $e");
+        // Set a default placeholder if reverse geocoding fails
+        place = Place(
+          placeId: 0, // fallback id as int
+          osmId: 0, // fallback OSM id
+          osmType: "unknown", // fallback type
+          displayName: "Selected location",
+          lat: position.latitude, // as double
+          lon: position.longitude, // as double
+          boundingBox: [
+            position.latitude.toString(),
+            position.latitude.toString(),
+            position.longitude.toString(),
+            position.longitude.toString(),
+          ],
+          placeRank: 0, // fallback rank
+          category: "unknown", // fallback category
+          type: "unknown", // fallback type
+          importance: 0.0, // fallback importance
+    );
+        setState(() {});
+  }
+
+      mapController.moveTo(position, animate: true);
     }
   }
 
   Future<void> _setUserLocation() async {
     try {
+      setState(() {
+        _isLoading = true;
+      });
       final locationData = await Utils.getCurrentLocation();
-      setState(() async {
-        selectedLocation = GeoPoint(
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-        );
-        await addMarker(selectedLocation!);
-        mapController.moveTo(selectedLocation!, animate: true);
-        place = await Nominatim.reverseSearch(
-          lat: selectedLocation!.latitude,
-          lon: selectedLocation!.longitude,
-          zoom: 14,
-          addressDetails: true,
-          extraTags: true,
-          nameDetails: true,
-        );
+      selectedLocation = GeoPoint(
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+    );
+      await addMarker(selectedLocation!);
+      mapController.moveTo(selectedLocation!, animate: true);
+      setState(() {
+        _isLoading = false;
       });
     } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
       print("Error getting location: $e");
       // Handle error (e.g., show a snackbar to the user)
-    }
   }
+}
 
   @override
   void dispose() {
@@ -136,6 +207,13 @@ class _LocationPickerState extends State<LocationPicker> {
               }
             },
           ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
           if (place?.displayName != null)
             Align(
               alignment: Alignment.bottomCenter,
@@ -162,15 +240,31 @@ class _LocationPickerState extends State<LocationPicker> {
                         style: const TextStyle(fontSize: 16,color: Colors.black),
                       ),
                     ),
-                    IconButton(
-                        onPressed: () {
-                          Get.back(result: place);
-                        },
-                        icon: const Icon(
-                          Icons.check_circle,
-                          size: 40,
-                          color: Colors.black,
-                        ))
+                    ElevatedButton(
+                      onPressed: (_isLoading || (place?.displayName == null || place!.displayName!.isEmpty))
+                          ? null
+                          : () {
+                              Get.back(result: place);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: (_isLoading || (place?.displayName == null || place!.displayName!.isEmpty))
+                            ? Colors.grey[400]
+                            : (themeChange.getThem() ? AppColors.darkModePrimary : AppColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      child: Text(
+                        widget.isSource ? 'Confirm Pickup' : 'Confirm Destination',
+                        style: TextStyle(
+                          color: (_isLoading || (place?.displayName == null || place!.displayName!.isEmpty))
+                              ? Colors.white.withOpacity(0.7)
+                              : Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -185,10 +279,15 @@ class _LocationPickerState extends State<LocationPicker> {
                     onTap: () async {
                       Get.to(const OsmSearchPlacesApi())?.then((value) async {
                         if (value != null) {
+                          setState(() {
+                            _isLoading = true;
+                          });
                           SearchInfo place = value;
                           textController = TextEditingController(text: place.address.toString());
                           await addMarker(place.point);
-                          print("Search :: ${place.point.toString()}");
+                          setState(() {
+                            _isLoading = false;
+                          });
                         }
                       });
                     },

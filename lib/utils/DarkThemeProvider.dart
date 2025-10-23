@@ -1,4 +1,4 @@
-import 'package:driver/utils/DarkThemePreference.dart';
+import 'package:customer/utils/DarkThemePreference.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 

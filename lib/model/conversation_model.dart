@@ -50,7 +50,7 @@ class ConversationModel {
       'message': message,
       'messageType': messageType,
       'videoThumbnail': videoThumbnail,
-      'url': url?.toJson(),
+      'url': url == null ? null : url!.toJson(),
       'createdAt': createdAt,
     };
   }

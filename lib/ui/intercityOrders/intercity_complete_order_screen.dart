@@ -27,7 +27,12 @@ class IntercityCompleteOrderScreen extends StatelessWidget {
     return GetX<IntercityCompleteOrderController>(
         init: IntercityCompleteOrderController(),
         builder: (controller) {
-          return Scaffold(
+          return WillPopScope(
+            onWillPop: () async {
+              Get.back();
+              return false;
+            },
+            child: Scaffold(
               backgroundColor: AppColors.primary,
               appBar: AppBar(
                 backgroundColor: AppColors.primary,
@@ -424,6 +429,7 @@ class IntercityCompleteOrderScreen extends StatelessWidget {
                           ),
                   ),
                 ],
+              ),
               ));
         });
   }

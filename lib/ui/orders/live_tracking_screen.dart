@@ -17,7 +17,12 @@ class LiveTrackingScreen extends StatelessWidget {
     return GetBuilder<LiveTrackingController>(
       init: LiveTrackingController(),
       builder: (controller) {
-        return Scaffold(
+        return WillPopScope(
+          onWillPop: () async {
+            Get.back();
+            return false;
+          },
+          child: Scaffold(
           appBar: AppBar(
             elevation: 2,
             backgroundColor: AppColors.primary,
@@ -75,6 +80,7 @@ class LiveTrackingScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+          ),
         );
       },
     );

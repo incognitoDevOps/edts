@@ -34,7 +34,12 @@ class InterCityPaymentOrderScreen extends StatelessWidget {
     return GetX<IntercityPaymentOrderController>(
         init: IntercityPaymentOrderController(),
         builder: (controller) {
-          return Scaffold(
+          return WillPopScope(
+            onWillPop: () async {
+              Get.back();
+              return false;
+            },
+            child: Scaffold(
               backgroundColor: AppColors.primary,
               appBar: AppBar(
                 backgroundColor: AppColors.primary,
@@ -1109,6 +1114,7 @@ class InterCityPaymentOrderScreen extends StatelessWidget {
                 ),
               );
             }),
+          ),
           );
         });
   }

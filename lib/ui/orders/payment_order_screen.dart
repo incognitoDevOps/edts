@@ -24,7 +24,17 @@ class PaymentOrderScreen extends StatelessWidget {
     return GetX<PaymentOrderController>(
       init: PaymentOrderController(),
       builder: (controller) {
-        return Scaffold(
+        return WillPopScope(
+          onWillPop: () async {
+            if (!controller.isPaymentProcessing.value && !controller.isLoading.value) {
+              Get.back();
+              return false;
+            } else {
+              ShowToastDialog.showToast("Please wait, payment is being processed");
+              return false;
+            }
+          },
+          child: Scaffold(
           backgroundColor: AppColors.primary,
           appBar: AppBar(
             backgroundColor: AppColors.primary,
@@ -95,6 +105,7 @@ class PaymentOrderScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
           ),
         );
       },

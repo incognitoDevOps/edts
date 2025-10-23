@@ -266,7 +266,31 @@ class LastActiveRideScreen extends StatelessWidget {
 
   // Extract the main screen building to a separate method
   Widget _buildRideScreen(BuildContext context, OrderModel order) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Exit Ride', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            content: Text(
+              'Are you sure you want to exit? Your ride is still active.',
+              style: GoogleFonts.poppins(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text('Cancel', style: GoogleFonts.poppins()),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text('Exit', style: GoogleFonts.poppins(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+        return shouldExit ?? false;
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -1068,6 +1092,7 @@ class LastActiveRideScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
       ),
     );
   }

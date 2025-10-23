@@ -27,7 +27,12 @@ class CompleteOrderScreen extends StatelessWidget {
     return GetX<CompleteOrderController>(
         init: CompleteOrderController(),
         builder: (controller) {
-          return Scaffold(
+          return WillPopScope(
+            onWillPop: () async {
+              Get.back();
+              return false;
+            },
+            child: Scaffold(
             appBar: AppBar(
               backgroundColor: AppColors.primary,
               title: Text("Ride Details".tr),
@@ -387,6 +392,7 @@ class CompleteOrderScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
             ),
           );
         });

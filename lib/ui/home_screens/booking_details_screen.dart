@@ -32,7 +32,12 @@ class BookingDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeChange = Provider.of<DarkThemeProvider>(context);
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        Get.back();
+        return false;
+      },
+      child: Scaffold(
       backgroundColor:
           themeChange.getThem() ? AppColors.darkBackground : Colors.grey[50],
       appBar: AppBar(
@@ -115,6 +120,7 @@ class BookingDetailsScreen extends StatelessWidget {
             Obx(() => _buildLoadingOverlay(homeController.isBooking.value)),
           ],
         ),
+      ),
       ),
     );
   }

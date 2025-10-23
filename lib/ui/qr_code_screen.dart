@@ -14,7 +14,12 @@ class QrCodeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop();
+        return false;
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(64),
@@ -168,6 +173,7 @@ class QrCodeScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
